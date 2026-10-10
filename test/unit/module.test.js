@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {PassThrough, Duplex} from 'node:stream';
 
-import {RadioModule, encodeTelegram, decodeTelegram} from '../../lib/module.js';
+import {RadioModule} from '../../lib/module.js';
+import {encodeTelegram, decodeTelegram} from '../../lib/telegram.js';
 import {encodeFrame, FrameParser} from '../../lib/frame.js';
 import {
     TYPE,

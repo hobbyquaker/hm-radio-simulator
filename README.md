@@ -46,6 +46,13 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   ([#17](https://github.com/OpenCCU/OpenCCU-Base/pull/17)), eine falsche Seriennummer, kein Gateway beim Start,
   Gateway weg und wieder da (rfd meldet `CONNECTED = false`, verbindet neu und initialisiert das Modul erneut), der
   Takt der Wiederverbindung, hmlangw ohne `-b` (das Modul wird ohne Client im Bootloader geparkt).
+- **Ein simulierter Schaltaktor (HM-LC-Sw1-Pl) hinter dem Modul,** aus der `rftypes`-Beschreibung, die auch rfd liest:
+  Anlernen im Anlernmodus (Ansage des Geräts, rfd schreibt Liste 0 mit der Zentralenadresse, tauscht den AES-Schlüssel
+  aus, liest die Listen und Peers zurück, meldet `newDevices`), Schalten mit `ACK_STATUS` und dem Event dazu,
+  eine Statusmeldung des Geräts, `UNREACH`/`STICKY_UNREACH` samt Servicemeldung bei einem stummen Gerät und das
+  Zurückkommen, `CONFIG_PENDING` für eine Konfiguration, die erst nach der Rückkehr ankommt, der Duty Cycle, die
+  Events über BIN-RPC und XML-RPC. Jeder Test schreibt die Telegramme der Luftstrecke als Spur in den Bericht, sodass
+  sich die OpenCCU-Base-Versionen vergleichen lassen.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -67,6 +74,11 @@ Verlust des Moduls deshalb weiter mit 100 % CPU und meldet `CONNECTED = true`. G
 - Das simulierte Funkmodul (`lib/`, Node.js) spricht das serielle Protokoll des Moduls: Framing mit CRC, die
   System- und BidCoS-Befehle, Adresse, Schlüssel, Peers, Uhrzeit, Duty Cycle. Es hängt über ein Pseudo-Terminal
   (`socat`) als Gerätedatei am Daemon. rfd öffnet es wie einen echten `ComPortFile`.
+- Hinter dem Modul liegt eine virtuelle Luftstrecke mit simulierten Geräten. Ein Gerät wird von derselben
+  `rftypes`-XML-Datei getrieben, aus der rfd seine Telegramme baut (ein kleiner Leser dafür, keine Abhängigkeit); dazu
+  kommt das generische BidCoS-Protokoll (Anlern-Ansage, die Konfigurationslisten, Peer-Listen, Statusabfragen,
+  Quittungen) und ein dünnes Verhalten je Gerätetyp, bisher der Schaltaktor. Die erste Antwort eines Geräts meldet das
+  Modul als Quittung (`TELEGRAM_SENT_RECVD_ACK`), weitere als Events; ein stummes Gerät endet in `SEND_FAILED`.
 - Das LAN-Gateway ist hmlangw selbst (MIT, beim Bau des Images aus dem OpenCCU-Repository geholt, Commit
   festgepinnt): Es lauscht auf den HM-LGW-Ports 2000 und 2001 und reicht die Frames an das simulierte Modul auf dem
   Pseudo-Terminal durch. Zwei Eigenheiten von hmlangw 1.1.1 zeigen sich dabei: Es startet seine Threads mit
@@ -139,14 +151,16 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
   Modul, ohne Verschlüsselung
 - ✅ **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu
   den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
-- 🏗️ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
+- 🕵️ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
   UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
 - 📥 **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte
 - 📥 **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
-- ✅ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
+- 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
 - 📥 **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
+- 🤷 **Mehr Daemon-Tests:** RPC- und Gerätetyp-Durchläufe, Persistenz, Verknüpfungen und Wakeup, Firmware, hs485d,
+  weitere Fuzz-Ziele
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 

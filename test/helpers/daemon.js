@@ -48,6 +48,8 @@ function daemonEnv(workdir) {
             process.env.ASAN_OPTIONS || `detect_leaks=0:abort_on_error=1:log_path=${path.join(workdir, 'asan')}`,
         UBSAN_OPTIONS: process.env.UBSAN_OPTIONS || `print_stacktrace=1:log_path=${path.join(workdir, 'ubsan')}`,
         TZ: 'Europe/Berlin',
+        // the coverage variant preloads the profile-flushing shim into the daemons only (not socat, hmlangw, node)
+        ...(process.env.HMRS_DAEMON_PRELOAD ? {LD_PRELOAD: process.env.HMRS_DAEMON_PRELOAD} : {}),
     };
 }
 
@@ -261,6 +263,9 @@ export async function spawnRfd({
         `Firmware Dir = ${path.join(dir, 'firmware')}`,
         `User Firmware Dir = ${path.join(dir, 'firmware')}`,
         `StatusfileDir = ${path.join(dir, 'status')}/`,
+        // rfd persists its registered receivers here and re-registers them at start-up; without the key it uses
+        // /var/rfd.handlers, so every later rfd in the same container would start with earlier tests' dead receivers
+        `XmlRpcHandlersFile = ${path.join(dir, 'rfd.handlers')}`,
         'Fire NACK Error Events = true',
         'Improved Coprocessor Initialization = true',
         extra,
@@ -334,6 +339,7 @@ export async function startHs485d({host, port, logLevel = 0, lgw = false}) {
             `Device Description Dir = ${HS485TYPES}`,
             `Device Files Dir = ${path.join(dir, 'devices')}`,
             `Firmware Dir = ${path.join(dir, 'firmware')}`,
+            `XmlRpcHandlersFile = ${path.join(dir, 'hs485d.handlers')}`,
             '',
         ].join('\n'),
     );
