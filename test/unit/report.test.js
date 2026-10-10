@@ -23,7 +23,7 @@ test('describeTest: pull requests in the name become regression links, findings 
         'init with an empty id deregisters the receiver and rfd stays up (the double-join finding under ASan)',
     );
     assert.equal(known.kind, 'known-bug');
-    assert.ok(known.refs[0].url.includes('README'));
+    assert.ok(known.refs[0].url.endsWith('upstream-reports/001-double-join.md'), known.refs[0].url);
     const viaTodo = describeTest('no busy loop after the hangup', {
         todo: 'the read-eof finding is not fixed in this BASE_REF',
     });
@@ -36,7 +36,7 @@ test('collectResults finds the jobs and fuzz runs below the fixture; buildReport
     const results = collectResults([FIXTURE]);
     assert.deepEqual(
         results.jobs.map((j) => j.id),
-        ['3.89.11-release', 'main-release'],
+        ['3.89.11-release', 'main-coverage', 'main-release'],
     );
     assert.equal(results.fuzz.length, 1);
     assert.deepEqual(results.jobs[0].counts, {pass: 3, fail: 0, todo: 2, skip: 0});
@@ -103,7 +103,7 @@ test('the HTML report has a column per job, the links, the diagnostics and no sc
     // the test tables have one result column per job (two in the fixture), the others four
     for (const t of tables) {
         assert.match(t, /^<table><colgroup><col>/, 'the first column takes the rest');
-        const expected = t.includes('<th class="k">kind</th>') ? report.jobs.length : 4;
+        const expected = t.includes('<th class="">test</th>') ? report.jobs.length : 4;
         assert.equal((t.match(/<col class="r">/g) || []).length, expected, `result columns: ${t.slice(0, 200)}`);
         assert.equal((t.match(/<th class="r">/g) || []).length, expected, 'result headers');
     }
@@ -157,6 +157,44 @@ test('writeSite keeps the previous runs and caps the history', () => {
         assert.match(fs.readFileSync(path.join(out, 'summary.md'), 'utf8'), /hm-radio-simulator test report/);
     } finally {
         fs.rmSync(previous, {recursive: true, force: true});
+        fs.rmSync(out, {recursive: true, force: true});
+    }
+});
+
+test('coverage: the lcov summary per component, the section, the links and the history line', async () => {
+    const {parseLcov, summarise, componentOf} = await import('../../scripts/coverage-summary.mjs');
+    const lcov = fs.readFileSync(new URL('../fixtures/coverage/small.info', import.meta.url), 'utf8');
+    const summary = summarise(parseLcov(lcov));
+    assert.deepEqual(
+        summary.components.map((c) => [c.component, c.kind, c.lines, c.files.length]),
+        [
+            ['rfd', 'daemon', 36.7, 2],
+            ['hs485d', 'daemon', 10, 1],
+            ['libXmlRpc', 'library', 70, 1],
+        ],
+    );
+    assert.equal(componentOf('/x/src/libelvutils/Actor.cpp'), 'libelvutils');
+    assert.equal(componentOf('/usr/include/c++/14/vector'), 'other');
+
+    const results = collectResults([FIXTURE]);
+    const coverageJob = results.jobs.find((j) => j.variant === 'coverage');
+    assert.ok(coverageJob && coverageJob.coverage, 'the coverage job carries its summary');
+    const report = buildReport(results, {repoSha: 'abcdef0123456789', generatedAt: '2026-10-10T18:05:00.000Z'});
+    const md = renderSummaryMarkdown(report);
+    assert.match(md, /\| main \| rfd \| 36\.7 % \(550\/1500\) \| 41\.7 % \| 24\.0 % \|/);
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'hmrs-report-cov-'));
+    try {
+        const history = writeSite(report, {out, keep: 5});
+        assert.deepEqual(history[0].coverage, {main: {rfd: 36.7, hs485d: 10}});
+        const html = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
+        assert.match(html, /<h2>Coverage<\/h2>/);
+        assert.ok(html.includes('lcov tracefile'), 'the data file is linked');
+        assert.ok(
+            fs.existsSync(path.join(out, 'runs', report.id, 'coverage-main-030dba7-abcdef0.info')),
+            'the tracefile is published',
+        );
+        assert.ok(html.includes('coverage main: rfd 36.7 %, hs485d 10.0 %'), 'the history line');
+    } finally {
         fs.rmSync(out, {recursive: true, force: true});
     }
 });

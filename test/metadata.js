@@ -6,14 +6,14 @@
  *
  * Kinds:
  *   regression - pins a fixed upstream bug (a PR or commit); runs as todo on refs that predate the fix
- *   known-bug  - a finding of this suite with no upstream fix yet (links to the README's findings until an issue
- *                exists); runs as todo everywhere
+ *   known-bug  - a finding of this suite with no upstream fix yet (links to its issue draft in upstream-reports/
+ *                until an issue exists); runs as todo everywhere
  *   behaviour  - a measured daemon behaviour or protocol case
  *   fuzz       - the seeded frame or RPC fuzzing tests (the libFuzzer harnesses are reported separately)
  */
 
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
-const README_FINDINGS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob/main/README.en.md#what-it-tests';
+const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob/main/upstream-reports';
 
 /**
  * The OpenCCU-Base pull requests the regression tests pin, with their merge commits (from the GitHub API).
@@ -60,22 +60,35 @@ export const UPSTREAM_FIXES = Object.freeze({
 });
 
 /**
- * Findings of this suite without an upstream issue yet. When an issue exists, put its URL here.
- * @type {Record<string, {title: string, issue: string|null}>}
+ * Findings of this suite, each with its issue draft in upstream-reports/ (not reported yet; the maintainer decides).
+ * When an issue exists, put its URL into `issue` and the draft's status line.
+ * @type {Record<string, {title: string, draft: string, issue: string|null}>}
  */
 export const FINDINGS = Object.freeze({
     'double-join': {
         title: 'rfd aborts under ASan on init(url, ""): the receiver dispatcher thread is joined twice (libelvutils Actor::Stop())',
+        draft: '001-double-join.md',
         issue: null,
     },
     'read-eof': {
         title: 'rfd on main spins at 100 % and keeps CONNECTED after a pty hangup: read() == 0 is not treated as an error (#115/#116)',
+        draft: '002-read-eof.md',
+        issue: null,
+    },
+    'exit-rpc': {
+        title: 'the RPC method exit is always compiled into rfd: any client can stop it',
+        draft: '003-exit-rpc-method.md',
+        issue: null,
+    },
+    'no-sigterm': {
+        title: 'rfd and hs485d do not handle SIGTERM: a pending save is lost on stop',
+        draft: '004-no-sigterm-handling.md',
         issue: null,
     },
 });
 
 /**
- * @typedef {{label: string, url: string, kind: 'pr'|'commit'|'issue'|'readme'}} Ref
+ * @typedef {{label: string, url: string, kind: 'pr'|'commit'|'issue'|'draft'}} Ref
  */
 
 /**
@@ -100,7 +113,10 @@ export function refsForFinding(name) {
     if (finding && finding.issue) {
         return [{label: `${name} (issue)`, url: finding.issue, kind: 'issue'}];
     }
-    return [{label: `${name} (README)`, url: README_FINDINGS, kind: 'readme'}];
+    if (finding) {
+        return [{label: `${name} (draft)`, url: `${UPSTREAM_REPORTS}/${finding.draft}`, kind: 'draft'}];
+    }
+    return [{label: `${name} (drafts)`, url: UPSTREAM_REPORTS, kind: 'draft'}];
 }
 
 /**

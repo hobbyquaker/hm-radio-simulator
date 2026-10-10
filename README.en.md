@@ -40,7 +40,9 @@ time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); t
 The second finding without an issue yet is `read-eof`: a pty slave whose master went away
 answers `read()` with 0 (end of file), which #115/#116 do not treat as an error (they handle -1: `ENODEV` from a stale
 `/dev/mmd_bidcos`, `EIO` from an unplugged adapter), so rfd on `main` still spins at 100 % CPU and keeps
-`CONNECTED = true` after the hangup. Against `main`, `double-join` and `read-eof`.
+`CONNECTED = true` after the hangup. Against `main`, `double-join` and `read-eof`. Every finding has an issue draft in
+[`upstream-reports/`](upstream-reports/) (German README, English drafts); nothing is reported upstream until the
+maintainer decides.
 
 ## Running it
 
@@ -196,8 +198,15 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | enqueued      |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                        | in progress   |
 | -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | enqueued      |
+| -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                             | done          |
 | -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | enqueued      |
-| -     | more daemon tests: RPC and device-type sweeps, persistence, links and wakeup, firmware, hs485d, fuzz targets                    | to be refined |
+| -     | more daemon tests (the collection, split into the items below)                                                                  | not as such   |
+| -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                           | ready         |
+| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                      | ready         |
+| -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                              | ready         |
+| -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                               | ready         |
+| -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                     | ready         |
+| -     | a ThreadSanitizer image variant                                                                                                 | ready         |
 
 ## Credits and licences
 

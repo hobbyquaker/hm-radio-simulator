@@ -65,7 +65,8 @@ zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt 
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
 `ENODEV` von einem veralteten `/dev/mmd_bidcos`, `EIO` von einem abgezogenen Adapter). rfd auf `main` dreht nach dem
 Verlust des Moduls deshalb weiter mit 100 % CPU und meldet `CONNECTED = true`. Gegen `main` bleiben `double-join` und
-`read-eof`.
+`read-eof`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
 
@@ -159,12 +160,20 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 - 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
 - 📥 **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
+- ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
+  Daemons (`double-join`, `read-eof`, die `exit`-RPC-Methode, kein SIGTERM-Handler); gemeldet wird noch nichts
 - 📥 **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
   Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
-- 🤷 **Mehr Daemon-Tests:** RPC- und Gerätetyp-Durchläufe, Persistenz, Verknüpfungen und Wakeup, Firmware, hs485d,
-  weitere Fuzz-Ziele
+- 🚫 **Mehr Daemon-Tests** (die Sammlung, aufgeteilt in die folgenden Punkte)
+- ☑️ **RPC-Methoden-Durchlauf,** Gerätetyp-Durchlauf über alle `rftypes`-Beschreibungen, der Vergleich 3.89.11 gegen main
+- ☑️ **Der Empfänger-Vertrag:** mehrere Empfänger, `init`-Synchronisation, Event-Reihenfolge, die Unerreichbar-Regel,
+  ein hängender Empfänger
+- ☑️ **Neustart, Gerätedateien und Konfiguration:** Persistenz, kaputte Dateien, Adressvergabe, die Start-Matrix
+- ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
+- ☑️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
+- ☑️ **Eine ThreadSanitizer-Variante** des Images
 
-✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
+✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später · 🚫 nicht umsetzen
 
 ## Credits und Lizenzen
 
