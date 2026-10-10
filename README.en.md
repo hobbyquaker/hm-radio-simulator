@@ -233,14 +233,15 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                                      | in progress   |
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                                        | to be refined |
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                                      | enqueued      |
+| -     | calibration of the HMW-LGW timing against a real wired LAN gateway (hs485d)                                                                     | enqueued      |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                                        | done          |
 | -     | the test report: code coverage of rfd and hs485d from the suite                                                                                 | done          |
 | -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                                             | done          |
 | -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report                          | done          |
 | -     | more daemon tests (the collection, split into the items below)                                                                                  | not as such   |
-| -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                           | ready         |
+| -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                           | enqueued      |
 | -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                      | ready         |
-| -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                              | ready         |
+| -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                              | enqueued      |
 | -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                               | ready         |
 | -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                     | ready         |
 | -     | a ThreadSanitizer image variant                                                                                                                 | ready         |
