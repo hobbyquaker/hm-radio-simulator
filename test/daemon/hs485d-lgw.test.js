@@ -390,12 +390,24 @@ test(
                     assert.ok(maintenanceEvents(from).includes('STICKY_UNREACH=true'));
                 },
             );
-            // the device returns: the next write goes through
+            // the device returns: after two failures hs485d drops sends to it until its fail counter resets
+            // (FAIL_COUNTER_RESET_TIME); a write every 2 s shows when the device is served again
             sw.answering = true;
-            await hs485d.call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 3.5}}], {
-                timeout: 30000,
-            });
-            assert.equal(sw.eeprom[1], 35);
+            const back = Date.now();
+            await waitUntil(
+                async () => {
+                    await hs485d
+                        .call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 3.5}}], {
+                            timeout: 30000,
+                        })
+                        .catch(() => null);
+                    await sleep(1800);
+                    return sw.eeprom[1] === 35;
+                },
+                40000,
+                'the write after the device came back',
+            );
+            t.diagnostic(`the returned device was written ${Date.now() - back} ms after it came back`);
         }).finally(cleanup);
     },
 );
@@ -535,15 +547,17 @@ test(
                 .catch(() => null);
             await waitForValue(second, `${SERIAL}:0`, 'UNREACH', true, 20000);
             assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), true);
-            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', true, {from});
-            await waitForEvent(receiver, `${SERIAL}:0`, 'STICKY_UNREACH', true, {from});
+            // measured: hs485d sends the maintenance events with the raw internal value, an integer 1/0 (getValue
+            // answers the booleans of the description; rfd sends booleans in both)
+            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', 1, {from});
+            await waitForEvent(receiver, `${SERIAL}:0`, 'STICKY_UNREACH', 1, {from});
             assert.equal(second.grep(/Tried to get unknown internal value UNREACH/).length, 0);
             sw.answering = true;
             const from2 = receiver.received.length;
             await second.call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 4.5}}], {
                 timeout: 30000,
             });
-            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', false, {from: from2});
+            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', 0, {from: from2});
             assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), true, 'sticky stays');
             await second.call('setValue', [`${SERIAL}:0`, 'STICKY_UNREACH', false]);
             assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), false);
