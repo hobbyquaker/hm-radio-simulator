@@ -270,6 +270,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                                                                 | done          |
 | -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                                                            | in progress   |
 | -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                                                                    | in progress   |
+| -     | `listMethods` tells the truth: every listed method is callable, and no callable method is missing                                                                                     | enqueued      |
 | -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                                                                     | ready         |
 | -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                                                           | ready         |
 | -     | a ThreadSanitizer image variant                                                                                                                                                       | ready         |
