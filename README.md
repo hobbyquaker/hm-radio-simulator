@@ -159,6 +159,8 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 - 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
 - 📥 **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
+- 📥 **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
+  Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
 - 🤷 **Mehr Daemon-Tests:** RPC- und Gerätetyp-Durchläufe, Persistenz, Verknüpfungen und Wakeup, Firmware, hs485d,
   weitere Fuzz-Ziele
 

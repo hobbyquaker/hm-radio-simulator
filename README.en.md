@@ -196,6 +196,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | enqueued      |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                        | in progress   |
 | -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | enqueued      |
+| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | enqueued      |
 | -     | more daemon tests: RPC and device-type sweeps, persistence, links and wakeup, firmware, hs485d, fuzz targets                    | to be refined |
 
 ## Credits and licences
