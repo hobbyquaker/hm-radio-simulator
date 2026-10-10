@@ -59,7 +59,7 @@ test('the Markdown summary lists the jobs, the failure and the known-broken test
     const md = renderSummaryMarkdown(report);
     assert.match(
         md,
-        /\| 3\.89\.11 \(\[3ed652a\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/commit\/3ed652a4[0-9a-f]+\)\) \| release \| 3 \| 0 \| 2 \| 0 \|/,
+        /\| 3\.89\.11 \(\[3ed652a\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/commit\/3ed652a4[0-9a-f]+\)\) \| release \| \d+ s \| 3 \| 0 \| 2 \| 0 \|/,
     );
     assert.match(
         md,
@@ -95,7 +95,19 @@ test('the HTML report has a column per job, the links, the diagnostics and no sc
     );
     assert.ok(html.includes('rfd used 200 clock ticks in the 2 s after the hangup'));
     assert.ok(html.includes('runs/x/'), 'the history links to the kept run');
-    assert.equal((html.match(/<th>3\.89\.11<br>/g) || []).length, 2, 'a column per job in both file tables');
+    assert.equal((html.match(/<th class="r">3\.89\.11<br>/g) || []).length, 2, 'a column per job in both file tables');
+    // every table shares the column scheme: a colgroup, fixed layout, the result columns right-aligned
+    assert.match(html, /table-layout: fixed/);
+    const tables = html.match(/<table>[\s\S]*?<\/table>/g);
+    assert.ok(tables.length >= 4, `tables: ${tables.length}`);
+    // the test tables have one result column per job (two in the fixture), the others four
+    for (const t of tables) {
+        assert.match(t, /^<table><colgroup><col>/, 'the first column takes the rest');
+        const expected = t.includes('<th class="k">kind</th>') ? report.jobs.length : 4;
+        assert.equal((t.match(/<col class="r">/g) || []).length, expected, `result columns: ${t.slice(0, 200)}`);
+        assert.equal((t.match(/<th class="r">/g) || []).length, expected, 'result headers');
+    }
+    assert.match(html, /col\.d \{ width: 1px; \}/, 'secondary columns shrink away at phone width');
 });
 
 test('writeSite keeps the previous runs and caps the history', () => {

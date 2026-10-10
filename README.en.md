@@ -180,6 +180,8 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                      | enqueued      |
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined |
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | enqueued      |
+| -     | the test report: the four result columns right-aligned and the same width in every table                                        | in progress   |
+| -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | ready         |
 
 ## Credits and licences
 

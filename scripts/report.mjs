@@ -146,11 +146,11 @@ export function renderSummaryMarkdown(report) {
     );
     lines.push('');
     if (report.jobs.length) {
-        lines.push('| OpenCCU-Base | daemons | pass | fail | todo (known) | skip | duration |');
+        lines.push('| OpenCCU-Base | daemons | duration | pass | fail | todo (known) | skip |');
         lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: |');
         for (const job of report.jobs) {
             lines.push(
-                `| ${job.ref} ([${short(job.baseCommit)}](${BASE}/commit/${job.baseCommit})) | ${job.variant} | ${job.counts.pass} | ${job.counts.fail} | ${job.counts.todo} | ${job.counts.skip} | ${seconds(job.durationMs)} |`,
+                `| ${job.ref} ([${short(job.baseCommit)}](${BASE}/commit/${job.baseCommit})) | ${job.variant} | ${seconds(job.durationMs)} | ${job.counts.pass} | ${job.counts.fail} | ${job.counts.todo} | ${job.counts.skip} |`,
             );
         }
         lines.push('');
@@ -190,7 +190,7 @@ export function renderSummaryMarkdown(report) {
         lines.push('### Fuzzing');
         lines.push('');
         lines.push('| OpenCCU-Base | harness | time | executions | findings |');
-        lines.push('| --- | --- | ---: | ---: | --- |');
+        lines.push('| --- | --- | ---: | ---: | ---: |');
         for (const run of report.fuzz) {
             for (const h of run.harnesses) {
                 lines.push(
@@ -240,10 +240,18 @@ h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; color: var(--muted); font-weight: 
 .cards { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .75rem 1rem; min-width: 11rem; }
 .card .big { font-size: 1.5rem; font-weight: 600; } .card .label { color: var(--muted); font-size: .85rem; }
-table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; }
-th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: .85rem; white-space: nowrap; }
-td.num { text-align: right; white-space: nowrap; } td.st { text-align: center; white-space: nowrap; }
+/* every table: the name column takes the rest, the fixed columns share one width scheme, the four result columns at
+   the right edge are --w-result wide and right-aligned in every table */
+:root { --w-result: 6.5rem; --w-commit: 5.5rem; --w-small: 6rem; --w-kind: 7.5rem; --w-links: 11rem; }
+.phone-only { display: none; }
+table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; table-layout: fixed; }
+col.r { width: var(--w-result); } col.c { width: var(--w-commit); } col.s { width: var(--w-small); }
+col.k { width: var(--w-kind); } col.l { width: var(--w-links); } col.d { width: var(--w-small); }
+th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top;
+  overflow-wrap: anywhere; }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+th.r, td.r { text-align: right; } td.r { white-space: nowrap; }
+td.name { overflow-wrap: anywhere; }
 .badge { display: inline-block; padding: 0 .5em; border-radius: 999px; font-size: .78em; font-weight: 600; line-height: 1.6;
   border: 1px solid currentColor; }
 .pass { color: var(--pass); } .fail { color: var(--fail); } .todo { color: var(--todo); } .skip { color: var(--skip); }
@@ -253,7 +261,38 @@ td.num { text-align: right; white-space: nowrap; } td.st { text-align: center; w
 .diag { color: var(--muted); font-size: .85em; } .err { color: var(--fail); font-size: .85em; }
 .overall-pass { color: var(--pass); } .overall-fail { color: var(--fail); }
 footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
+/* phone: the commit, kind, links and duration columns shrink to a pixel (a zero width would count as auto) (their content moves under the name; the
+   cells stay in the fixed layout so nothing shifts into the next <col>), the result columns keep one fixed width,
+   the name wraps in the rest */
+@media (max-width: 760px) { :root { --w-result: 3rem; --w-small: 3.6rem; }
+  body { padding: .75rem; font-size: 13px; }
+  th, td { padding: .35rem .3rem; }
+  col.c, col.k, col.l, col.d { width: 1px; }
+  th.c, th.k, th.l, th.d, td.c, td.k, td.l, td.d { padding: 0; border: 0; overflow: hidden; visibility: hidden;
+    font-size: 0; line-height: 0; }
+  td.r { white-space: normal; }
+  .phone-only { display: block; margin-top: .2rem; } }
 `;
+
+/**
+ * A table with a <colgroup>: the first column takes the remaining width, the others are fixed by their class
+ * (`c` commit, `s` small, `d` duration, `k` kind, `l` links, `r` result - the result columns share one width and are
+ * right-aligned; at phone width c, k, l and d leave the table).
+ * @param {Array<{label: string, cls?: string, raw?: boolean}>} head
+ * @param {string[][]} rows cells as HTML
+ */
+function table(head, rows) {
+    const cols = head.map((c) => {
+        const cls = (c.cls || '').split(' ').find((x) => ['r', 'c', 's', 'k', 'l', 'd'].includes(x));
+        return cls ? `<col class="${cls}">` : '<col>';
+    });
+    const ths = head.map((c) => `<th class="${esc(c.cls || '')}">${c.raw ? c.label : esc(c.label)}</th>`);
+    const trs = rows.map(
+        (cells) =>
+            `<tr>${cells.map((cell, i) => `<td class="${i === 0 ? 'name' : esc(head[i].cls || '')}">${cell}</td>`).join('')}</tr>`,
+    );
+    return `<table><colgroup>${cols.join('')}</colgroup><thead><tr>${ths.join('')}</tr></thead><tbody>\n${trs.join('\n')}\n</tbody></table>`;
+}
 
 export function renderHtml(report, history = []) {
     const jobs = report.jobs;
@@ -315,86 +354,153 @@ export function renderHtml(report, history = []) {
     );
     h.push(`</div>`);
 
+    // Jobs: name | commit | daemons | duration | pass | fail | todo | skip
+    h.push(`<h2>Jobs</h2>`);
     h.push(
-        `<h2>Jobs</h2><table><tr><th>OpenCCU-Base</th><th>commit</th><th>daemons</th><th>pass</th><th>fail</th><th>todo</th><th>skip</th><th>duration</th><th>known broken</th></tr>`,
+        table(
+            [
+                {label: 'OpenCCU-Base'},
+                {label: 'commit', cls: 'c'},
+                {label: 'daemons', cls: 's'},
+                {label: 'duration', cls: 'd r'},
+                {label: 'pass', cls: 'r'},
+                {label: 'fail', cls: 'r'},
+                {label: 'todo', cls: 'r'},
+                {label: 'skip', cls: 'r'},
+            ],
+            jobs.map((job) => [
+                `${esc(job.ref)}<span class="phone-only mono">${esc(short(job.baseCommit))}</span>${job.knownBroken.length ? `<div class="diag">known broken: ${esc(job.knownBroken.join(', '))}</div>` : ''}`,
+                `<a class="mono" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a>`,
+                esc(job.variant),
+                esc(seconds(job.durationMs)),
+                `<span class="pass">${job.counts.pass}</span>`,
+                `<span class="fail">${job.counts.fail}</span>`,
+                `<span class="todo">${job.counts.todo}</span>`,
+                `<span class="skip">${job.counts.skip}</span>`,
+            ]),
+        ),
     );
-    for (const job of jobs) {
-        h.push(
-            `<tr><td>${esc(job.ref)}</td><td><a class="mono" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a></td><td>${esc(job.variant)}</td><td class="num pass">${job.counts.pass}</td><td class="num fail">${job.counts.fail}</td><td class="num todo">${job.counts.todo}</td><td class="num skip">${job.counts.skip}</td><td class="num">${esc(seconds(job.durationMs))}</td><td class="muted">${esc(job.knownBroken.join(', ') || '-')}</td></tr>`,
-        );
-    }
-    h.push(`</table>`);
 
+    // Tests: name | kind | links | one result column per job
     h.push(
         `<h2>Tests</h2><p class="muted">One column per job. <span class="badge kind-regression">regression</span> pins an upstream fix and links to its pull request and commit; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (todo everywhere); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A <span class="todo">todo</span> is a regression test on a ref that predates the fix.</p>`,
     );
+    const testHead = [
+        {label: 'test'},
+        {label: 'kind', cls: 'k'},
+        {label: 'links', cls: 'l'},
+        ...jobs.map((job) => ({
+            label: `${esc(job.ref)}<br><span class="muted">${esc(job.variant)}</span>`,
+            cls: 'r',
+            raw: true,
+        })),
+    ];
     for (const [file, rows] of files) {
-        h.push(`<h3 class="mono">${esc(file || '?')}</h3><table><tr><th>test</th><th>kind</th>`);
-        for (const job of jobs) {
-            h.push(`<th>${esc(job.ref)}<br><span class="muted">${esc(job.variant)}</span></th>`);
-        }
-        h.push(`<th>links</th></tr>`);
-        for (const row of rows) {
-            const first = [...row.results.values()][0];
-            h.push(`<tr><td class="${row.nesting > 0 ? 'sub' : ''}">${esc(row.name)}`);
-            const diags = new Set();
-            const errors = new Set();
-            for (const r of row.results.values()) {
-                for (const d of r.diagnostics || []) {
-                    diags.add(d);
-                }
-                if (r.status === 'fail' && r.error) {
-                    errors.add(r.error);
-                }
-            }
-            for (const e of errors) {
-                h.push(`<div class="err">${esc(e)}</div>`);
-            }
-            for (const d of diags) {
-                h.push(`<div class="diag">${esc(d)}</div>`);
-            }
-            h.push(`</td><td><span class="badge kind-${esc(row.kind)}">${esc(row.kind.replace('-', ' '))}</span></td>`);
-            for (const job of jobs) {
-                const r = row.results.get(job.id);
-                if (!r) {
-                    h.push(`<td class="st muted">-</td>`);
-                } else {
-                    h.push(
-                        `<td class="st ${r.status}" title="${esc(r.todo && typeof r.todo === 'string' ? r.todo : r.skip && typeof r.skip === 'string' ? r.skip : '')}">${esc(STATUS_MARK[r.status] || r.status)} ${esc(r.status)}<br><span class="muted">${esc(duration(r.durationMs))}</span></td>`,
-                    );
-                }
-            }
-            h.push(
-                `<td>${(first.refs || []).map((ref) => `<a href="${esc(ref.url)}">${esc(ref.label)}</a>`).join('<br>')}</td></tr>`,
-            );
-        }
-        h.push(`</table>`);
+        h.push(`<h3 class="mono">${esc(file || '?')}</h3>`);
+        h.push(
+            table(
+                testHead,
+                rows.map((row) => {
+                    const first = [...row.results.values()][0];
+                    const diags = new Set();
+                    const errors = new Set();
+                    for (const r of row.results.values()) {
+                        for (const d of r.diagnostics || []) {
+                            diags.add(d);
+                        }
+                        if (r.status === 'fail' && r.error) {
+                            errors.add(r.error);
+                        }
+                    }
+                    const kindBadge = `<span class="badge kind-${esc(row.kind)}">${esc(row.kind.replace('-', ' '))}</span>`;
+                    const links = (first.refs || []).map((ref) => `<a href="${esc(ref.url)}">${esc(ref.label)}</a>`);
+                    let name = `${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}`;
+                    name += `<div class="phone-only">${kindBadge}${links.length ? ' ' + links.join(' · ') : ''}</div>`;
+                    for (const e of errors) {
+                        name += `<div class="err">${esc(e)}</div>`;
+                    }
+                    for (const d of diags) {
+                        name += `<div class="diag">${esc(d)}</div>`;
+                    }
+                    const cells = [name, kindBadge, links.join('<br>')];
+                    for (const job of jobs) {
+                        const r = row.results.get(job.id);
+                        if (!r) {
+                            cells.push(`<span class="muted">-</span>`);
+                        } else {
+                            const title =
+                                r.todo && typeof r.todo === 'string'
+                                    ? r.todo
+                                    : r.skip && typeof r.skip === 'string'
+                                      ? r.skip
+                                      : '';
+                            cells.push(
+                                `<span class="${r.status}" title="${esc(title)}">${esc(STATUS_MARK[r.status] || r.status)} ${esc(r.status)}</span><br><span class="muted">${esc(duration(r.durationMs))}</span>`,
+                            );
+                        }
+                    }
+                    return cells;
+                }),
+            ),
+        );
     }
 
+    // Fuzzing: name | commit | harness | time | executions | exec/s | findings
     if (report.fuzz.length) {
+        h.push(`<h2>Fuzzing (libFuzzer)</h2>`);
         h.push(
-            `<h2>Fuzzing (libFuzzer)</h2><table><tr><th>OpenCCU-Base</th><th>commit</th><th>harness</th><th>time</th><th>executions</th><th>exec/s</th><th>findings</th></tr>`,
+            table(
+                [
+                    {label: 'OpenCCU-Base'},
+                    {label: 'commit', cls: 'c'},
+                    {label: 'harness', cls: 'k'},
+                    {label: 'time', cls: 'r'},
+                    {label: 'executions', cls: 'r'},
+                    {label: 'exec/s', cls: 'r'},
+                    {label: 'findings', cls: 'r'},
+                ],
+                report.fuzz.flatMap((run) =>
+                    run.harnesses.map((hz) => [
+                        esc(run.ref),
+                        `<a class="mono" href="${BASE}/commit/${esc(run.baseCommit)}">${esc(short(run.baseCommit))}</a>`,
+                        `<span class="mono">${esc(hz.name)}</span>`,
+                        `${esc(String(hz.seconds))} s`,
+                        esc(String(hz.execs ?? '?')),
+                        esc(String(hz.execPerSec ?? '?')),
+                        hz.findings.length
+                            ? `<span class="${run.expected ? 'todo' : 'fail'}" title="${esc(hz.findings.map((f) => f.type).join(', '))}">${hz.findings.length}${run.expected ? ' <span class="muted">(expected)</span>' : ''}</span>`
+                            : `<span class="pass">0</span>`,
+                    ]),
+                ),
+            ),
         );
-        for (const run of report.fuzz) {
-            for (const hz of run.harnesses) {
-                h.push(
-                    `<tr><td>${esc(run.ref)}</td><td><a class="mono" href="${BASE}/commit/${esc(run.baseCommit)}">${esc(short(run.baseCommit))}</a></td><td class="mono">${esc(hz.name)}</td><td class="num">${esc(String(hz.seconds))} s</td><td class="num">${esc(String(hz.execs ?? '?'))}</td><td class="num">${esc(String(hz.execPerSec ?? '?'))}</td><td class="${hz.findings.length ? (run.expected ? 'todo' : 'fail') : 'pass'}">${hz.findings.length ? esc(hz.findings.map((f) => f.type).join(', ')) + (run.expected ? ' <span class="muted">(expected on this ref)</span>' : '') : 'none'}</td></tr>`,
-                );
-            }
-        }
-        h.push(`</table>`);
     }
 
+    // History: run | commit | overall | pass | fail | todo | fuzz findings
     if (history.length) {
+        h.push(`<h2>History</h2>`);
         h.push(
-            `<h2>History</h2><table><tr><th>run</th><th>commit</th><th>overall</th><th>pass</th><th>fail</th><th>todo</th><th>fuzz findings</th></tr>`,
+            table(
+                [
+                    {label: 'run'},
+                    {label: 'commit', cls: 'c'},
+                    {label: 'overall', cls: 's r'},
+                    {label: 'pass', cls: 'r'},
+                    {label: 'fail', cls: 'r'},
+                    {label: 'todo', cls: 'r'},
+                    {label: 'fuzz findings', cls: 'r'},
+                ],
+                history.map((entry) => [
+                    `<a href="runs/${esc(entry.id)}/">${esc(entry.generatedAt)}</a>${entry.runUrl ? ` <a class="muted" href="${esc(entry.runUrl)}">(CI)</a>` : ''}`,
+                    `<a class="mono" href="${REPO}/commit/${esc(entry.repoSha)}">${esc(short(entry.repoSha))}</a>`,
+                    `<span class="${esc(entry.status)}">${esc(entry.status === 'pass' ? 'green' : 'red')}</span>`,
+                    `<span class="pass">${entry.pass}</span>`,
+                    `<span class="fail">${entry.fail}</span>`,
+                    `<span class="todo">${entry.todo}</span>`,
+                    `<span class="${entry.fuzzFindings ? 'todo' : 'pass'}">${entry.fuzzFindings}</span>`,
+                ]),
+            ),
         );
-        for (const entry of history) {
-            h.push(
-                `<tr><td><a href="runs/${esc(entry.id)}/">${esc(entry.generatedAt)}</a>${entry.runUrl ? ` <a class="muted" href="${esc(entry.runUrl)}">(CI)</a>` : ''}</td><td><a class="mono" href="${REPO}/commit/${esc(entry.repoSha)}">${esc(short(entry.repoSha))}</a></td><td class="${entry.status}">${esc(entry.status === 'pass' ? 'green' : 'red')}</td><td class="num pass">${entry.pass}</td><td class="num fail">${entry.fail}</td><td class="num todo">${entry.todo}</td><td class="num">${entry.fuzzFindings}</td></tr>`,
-            );
-        }
-        h.push(`</table>`);
     }
     h.push(
         `<footer>hm-radio-simulator - a simulated Homematic radio module and a test suite for the CCU's radio daemons of <a href="${BASE}">OpenCCU-Base</a>. MIT. The daemons under test are built from the OpenCCU-Base commits linked above.</footer>`,
@@ -460,7 +566,7 @@ export function writeSite(report, {out, previous, keep = 20}) {
     for (const entry of history.slice(1)) {
         const src = previous ? path.join(previous, 'runs', entry.id) : null;
         const dst = path.join(out, 'runs', entry.id);
-        if (src && fs.existsSync(src)) {
+        if (src && fs.existsSync(src) && path.resolve(src) !== path.resolve(dst)) {
             fs.cpSync(src, dst, {recursive: true});
         }
     }
