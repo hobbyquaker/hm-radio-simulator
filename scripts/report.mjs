@@ -250,7 +250,7 @@ col.k { width: var(--w-kind); } col.l { width: var(--w-links); } col.d { width: 
 th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top;
   overflow-wrap: anywhere; }
 th { color: var(--muted); font-weight: 600; font-size: .85rem; }
-th.r, td.r { text-align: right; } td.r { white-space: nowrap; }
+th.r, td.r { text-align: right; font-variant-numeric: tabular-nums; padding-left: .9rem; } td.r { white-space: nowrap; }
 td.name { overflow-wrap: anywhere; }
 .badge { display: inline-block; padding: 0 .5em; border-radius: 999px; font-size: .78em; font-weight: 600; line-height: 1.6;
   border: 1px solid currentColor; }
