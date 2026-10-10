@@ -256,13 +256,15 @@ export async function spawnRfd({
     if (!interfaces && !noInterface) {
         module = new RadioModule(moduleOptions);
         if (lgwFront) {
-            const {configuredSerial, configuredKey, ...frontOptions} = lgwFront;
+            // `search: true` leaves the IP out of rfd.conf: rfd then looks for the gateway's serial over UDP (an
+            // Eq3LanDevice of lib/eq3udp.js answers) and connects to the fixed ports 2000/2001
+            const {configuredSerial, configuredKey, search = false, ...frontOptions} = lgwFront;
             front = await createLgwFront({module, ...frontOptions});
             interfaces = [
                 {
                     type: 'HMLGW2',
                     serial: configuredSerial ?? front.serial,
-                    ip: front.host,
+                    ip: search ? undefined : front.host,
                     key: configuredKey ?? front.key,
                 },
             ];
