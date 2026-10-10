@@ -272,7 +272,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report                                                                | done          |
 | -     | more daemon tests (the collection, split into the items below)                                                                                                                        | not as such   |
 | -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                                                                 | done          |
-| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                                                            | in testing    |
+| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                                                            | done          |
 | -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                                                                    | in testing    |
 | -     | `listMethods` tells the truth: every listed method is callable, and no callable method is missing                                                                                     | enqueued      |
 | -     | a misbehaving event receiver blocks nothing: server gone mid-callback, no answer, wrong answers                                                                                       | in progress   |
