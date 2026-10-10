@@ -282,7 +282,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **RPC-Methoden-Durchlauf,** Gerätetyp-Durchlauf über alle `rftypes`-Beschreibungen, der Vergleich 3.89.11 gegen main
 - ✅ **Der Empfänger-Vertrag:** mehrere Empfänger, `init`-Synchronisation, Event-Reihenfolge, die Unerreichbar-Regel,
   ein hängender Empfänger
-- 🕵️ **Neustart, Gerätedateien und Konfiguration:** Persistenz, kaputte Dateien, Adressvergabe, die Start-Matrix
+- ✅ **Neustart, Gerätedateien und Konfiguration:** Persistenz, kaputte Dateien, Adressvergabe, die Start-Matrix
 - 📥 **`listMethods` stimmt:** jede gelistete Methode ist aufrufbar, und keine aufrufbare fehlt in der Liste
 - 🏗️ **Ein Event-Empfänger, der sich danebenbenimmt, blockiert nichts:** Server weg mitten im Callback, keine oder
   falsche Antworten
