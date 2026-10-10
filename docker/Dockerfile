@@ -89,7 +89,7 @@ CMD ["fuzz/run.sh"]
 
 # the test environment
 FROM ${NODE_IMAGE} AS test
-ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof
+ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof,aes-republish
 RUN apt-get update \
  && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata llvm \
  && rm -rf /var/lib/apt/lists/*

@@ -15,6 +15,7 @@ import path from 'node:path';
 import {RadioModule} from '../../lib/module.js';
 import {createPtyModule} from '../../lib/pty.js';
 import {createHmlangwGateway} from '../../lib/hmlangw.js';
+import {createLgwFront} from '../../lib/lgw.js';
 import {BinRpcClient, XmlRpcClient, freePort} from './rpc.js';
 
 export const DAEMONS = process.env.HMRS_DAEMONS || '';
@@ -66,8 +67,10 @@ export class Daemon {
         this.module = null;
         /** @type {import('../../lib/pty.js').PtyModule|null} */
         this.pty = null;
-        /** @type {import('../../lib/hmlangw.js').HmlangwGateway|null} the LAN gateway, when the daemon got one */
+        /** @type {import('../../lib/hmlangw.js').HmlangwGateway|null} the LAN gateway (hmlangw), when the daemon got one */
         this.gateway = null;
+        /** @type {import('../../lib/lgw.js').LgwFront|null} the JavaScript LAN gateway, when the daemon got one */
+        this.lgw = null;
     }
 
     start() {
@@ -171,6 +174,10 @@ export class Daemon {
             await this.gateway.close();
             this.gateway = null;
         }
+        if (this.lgw) {
+            await this.lgw.close();
+            this.lgw = null;
+        }
         if (this.pty) {
             await this.pty.close();
             this.pty = null;
@@ -193,6 +200,12 @@ export class Daemon {
         if (this.gateway) {
             text += `\n--- hmlangw: ${this.gateway.lines.slice(-20).join(' | ')}`;
         }
+        if (this.lgw) {
+            text += `\n--- lgw front: ${this.lgw.trace
+                .slice(-20)
+                .map((t) => `${t.kind} ${t.dir} ${t.line ?? t.bytes + ' bytes'}`)
+                .join(' | ')}`;
+        }
         return text;
     }
 }
@@ -213,14 +226,17 @@ export function tmpdir(prefix) {
  * (`module` are its options) unless `noInterface` is set, which is what rfd refuses to start with. With `lgw`, the
  * module is put behind an hmlangw LAN gateway instead and rfd gets a `Type = HMLGW2` interface (`lgw` are the
  * gateway's options, e.g. `{serial, bootloaderOnDisconnect}`; `lgw.configuredSerial` is what rfd.conf says when it
- * should differ from the gateway's).
- * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string}} [options]
+ * should differ from the gateway's). With `lgwFront`, the JavaScript gateway (lib/lgw.js) is used instead, with its
+ * options (`key` = the LAN key for the AES transport, `serial`, ...; `configuredSerial` and `configuredKey` for what
+ * rfd.conf says).
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
     interfaces,
     module: moduleOptions = {},
     lgw = null,
+    lgwFront = null,
     noInterface = false,
     logLevel = 0,
     address = CENTRAL_ADDRESS,
@@ -231,9 +247,21 @@ export async function spawnRfd({
     let module = null;
     let pty = null;
     let gateway = null;
+    let front = null;
     if (!interfaces && !noInterface) {
         module = new RadioModule(moduleOptions);
-        if (lgw) {
+        if (lgwFront) {
+            const {configuredSerial, configuredKey, ...frontOptions} = lgwFront;
+            front = await createLgwFront({module, ...frontOptions});
+            interfaces = [
+                {
+                    type: 'HMLGW2',
+                    serial: configuredSerial ?? front.serial,
+                    ip: front.host,
+                    key: configuredKey ?? front.key,
+                },
+            ];
+        } else if (lgw) {
             const {configuredSerial, key, ...gatewayOptions} = lgw;
             gateway = await createHmlangwGateway({module, dir, ...gatewayOptions});
             interfaces = [{type: 'HMLGW2', serial: configuredSerial ?? gateway.serial, ip: gateway.host, key}];
@@ -295,6 +323,7 @@ export async function spawnRfd({
     daemon.module = module;
     daemon.pty = pty;
     daemon.gateway = gateway;
+    daemon.lgw = front;
     return daemon.start();
 }
 

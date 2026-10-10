@@ -7,21 +7,37 @@
 import path from 'node:path';
 
 import {loadDeviceDescription} from '../../lib/rftypes.js';
-import {BidcosDevice} from '../../lib/device.js';
+import {BidcosDevice, RemoteBehaviour} from '../../lib/device.js';
 import {Air} from '../../lib/air.js';
 import {RFTYPES} from './daemon.js';
 
 export const SWITCH_SERIAL = 'SIM0000123';
 export const SWITCH_ADDRESS = 0x123456;
 export const SWITCH_TYPE = 'HM-LC-Sw1-Pl';
+export const REMOTE_SERIAL = 'SIMRC00001';
+export const REMOTE_ADDRESS = 0x234567;
+export const REMOTE_TYPE = 'HM-RC-4';
 
-let description = null;
+const descriptions = new Map();
+
+/** A device description from the image's rftypes, loaded once. */
+export function description(file) {
+    if (!descriptions.has(file)) {
+        descriptions.set(file, loadDeviceDescription(path.join(RFTYPES, file)));
+    }
+    return descriptions.get(file);
+}
 
 export function switchDescription() {
-    if (!description) {
-        description = loadDeviceDescription(path.join(RFTYPES, 'rf_s.xml'));
+    return description('rf_s.xml');
+}
+
+/** The air behind the daemon's module, created once per daemon. */
+export function airOf(rfd) {
+    if (!rfd.air) {
+        rfd.air = new Air({module: rfd.module});
     }
-    return description;
+    return rfd.air;
 }
 
 /**
@@ -31,7 +47,7 @@ export function switchDescription() {
  * @returns {{air: Air, device: BidcosDevice}}
  */
 export function attachSwitch(rfd, options = {}) {
-    const air = new Air({module: rfd.module});
+    const air = airOf(rfd);
     const device = air.add(
         new BidcosDevice({
             address: SWITCH_ADDRESS,
@@ -41,7 +57,32 @@ export function attachSwitch(rfd, options = {}) {
             ...options,
         }),
     );
-    rfd.air = air;
+    return {air, device};
+}
+
+/**
+ * Puts an HM-RC-4 remote (rf_rc.xml: rx_modes CONFIG, four KEY channels with aes_default) on the daemon's air.
+ * @param {import('./daemon.js').Daemon} rfd
+ * @param {object} [options] BidcosDevice options
+ */
+export function attachRemote(rfd, options = {}) {
+    const air = airOf(rfd);
+    const device = air.add(
+        new BidcosDevice({
+            address: REMOTE_ADDRESS,
+            serial: REMOTE_SERIAL,
+            description: description('rf_rc.xml'),
+            typeId: REMOTE_TYPE,
+            behaviour: new RemoteBehaviour(),
+            channelCount: 4,
+            peeringChannel: 0,
+            // the HM-RC-4 supports AES and its keys carry aes_default="true": rfd authenticates their events from
+            // the start, so a remote that could not answer the module's challenge would never get a PRESS event
+            // through (auth_violate_policy="reject")
+            aes: true,
+            ...options,
+        }),
+    );
     return {air, device};
 }
 
@@ -57,7 +98,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {{timeout?: number}} [options]
  * @returns {Promise<{newDevices: object}>}
  */
-export async function pairSwitch(rfd, receiver, air, device, {timeout = 30000} = {}) {
+export async function pairSwitch(rfd, receiver, air, device, options) {
+    return pairDevice(rfd, receiver, air, device, options);
+}
+
+/**
+ * Pairs any simulated device: install mode on, the announcement, newDevices at the receiver, CONFIG_PENDING false.
+ */
+export async function pairDevice(rfd, receiver, air, device, {timeout = 30000} = {}) {
+    const serial = device.serial;
     await rfd.call('setInstallMode', [true]);
     air.announce(device);
     const until = Date.now() + timeout;
@@ -65,7 +114,7 @@ export async function pairSwitch(rfd, receiver, air, device, {timeout = 30000} =
     while (Date.now() < until) {
         newDevices = receiver
             .calls('newDevices')
-            .find((c) => Array.isArray(c.params[1]) && c.params[1].some((d) => d.ADDRESS === SWITCH_SERIAL));
+            .find((c) => Array.isArray(c.params[1]) && c.params[1].some((d) => d.ADDRESS === serial));
         if (newDevices) {
             break;
         }
@@ -73,11 +122,11 @@ export async function pairSwitch(rfd, receiver, air, device, {timeout = 30000} =
     }
     if (!newDevices) {
         throw new Error(
-            `newDevices for ${SWITCH_SERIAL} did not arrive within ${timeout} ms; receiver got ${receiver.received.map((r) => r.method).join(' ')}; air: ${air.traceLines().join(' | ')}`,
+            `newDevices for ${serial} did not arrive within ${timeout} ms; receiver got ${receiver.received.map((r) => r.method).join(' ')}; air: ${air.traceLines().join(' | ')}`,
         );
     }
     // the configuration after pairing (list reads, the enforced parameters) ends with CONFIG_PENDING = false
-    await waitForValue(rfd, `${SWITCH_SERIAL}:0`, 'CONFIG_PENDING', false, timeout);
+    await waitForValue(rfd, `${serial}:0`, 'CONFIG_PENDING', false, timeout);
     await rfd.call('setInstallMode', [false]);
     return {newDevices};
 }

@@ -24,12 +24,13 @@ nichts aus nicht-öffentlichen Quellen.
 
 ## Die Entwürfe
 
-| Datei                                                    | Komponente       | Kurz                                                                                                      | Suite         |
-| -------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------- | ------------- |
-| [001-double-join.md](001-double-join.md)                 | libelvutils, rfd | `Actor::Stop()` joint den Dispatcher-Thread ein zweites Mal; unter ASan bricht rfd bei `init(url, "")` ab | `double-join` |
-| [002-read-eof.md](002-read-eof.md)                       | rfd              | Dateiende auf dem seriellen Gerät: rfd dreht mit 100 % CPU und bleibt `CONNECTED`                         | `read-eof`    |
-| [003-exit-rpc-method.md](003-exit-rpc-method.md)         | rfd              | die RPC-Methode `exit` ist immer einkompiliert: jeder Client kann rfd beenden                             | -             |
-| [004-no-sigterm-handling.md](004-no-sigterm-handling.md) | rfd, hs485d      | kein SIGTERM-Handler: ein anstehendes Speichern geht beim Stoppen verloren                                | -             |
+| Datei                                                            | Komponente       | Kurz                                                                                                                              | Suite           |
+| ---------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| [001-double-join.md](001-double-join.md)                         | libelvutils, rfd | `Actor::Stop()` joint den Dispatcher-Thread ein zweites Mal; unter ASan bricht rfd bei `init(url, "")` ab                         | `double-join`   |
+| [002-read-eof.md](002-read-eof.md)                               | rfd              | Dateiende auf dem seriellen Gerät: rfd dreht mit 100 % CPU und bleibt `CONNECTED`                                                 | `read-eof`      |
+| [003-exit-rpc-method.md](003-exit-rpc-method.md)                 | rfd              | die RPC-Methode `exit` ist immer einkompiliert: jeder Client kann rfd beenden                                                     | -               |
+| [004-no-sigterm-handling.md](004-no-sigterm-handling.md)         | rfd, hs485d      | kein SIGTERM-Handler: ein anstehendes Speichern geht beim Stoppen verloren                                                        | -               |
+| [005-aes-policy-after-reinit.md](005-aes-policy-after-reinit.md) | rfd              | nach einer Neuinitialisierung des Coprozessors fehlt die AES-Richtlinie je Kanal: Events von AES-Fernbedienungen werden verworfen | `aes-republish` |
 
 Neue Funde späterer Stufen kommen auf dieselbe Weise dazu.
 

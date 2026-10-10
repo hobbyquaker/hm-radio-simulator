@@ -219,3 +219,38 @@ test('the air: the first answer is the acknowledgement status, the rest come as 
     assert.equal(describeTelegram(dev.sysinfoTelegram()), 'SYSINFO [bcast]');
     h.module.close();
 });
+
+test('an AES-secured device: challenge, the module answers with the key rfd set, a signed ACK, AUTHENTICATION_SUCCESS', async () => {
+    const h = moduleHarness();
+    const air = new Air({module: h.module, eventGapMs: 2});
+    const dev = air.add(device({aes: true, aesKeyIndex: 1}));
+    // rfd's SET_CURRENT_AES_KEY: 16 key bytes, then the index
+    const key = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
+    h.module.receive(encodeFrame(Buffer.from([TYPE.BIDCOS, 3, BIDCOS.SET_CURRENT_AES_KEY, ...key, 0x01])));
+    await h.waitFrames(1);
+    assert.ok(h.module.keyTable.get(1).equals(key));
+
+    h.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 5));
+    const [, status] = await h.waitFrames(2);
+    assert.equal(status[3], BIDCOS_STATUS.AUTHENTICATION_SUCCESS, `status ${status[3]}`);
+    assert.equal(status[4], 1, 'the key index');
+    const ack = decodeTelegram(status.subarray(6));
+    assert.equal(ack.type, FT.ACK_OR_NACK);
+    assert.equal(ack.payload.length, 5, 'ACK with the four signature bytes');
+    assert.equal(dev.behaviour.channel(1).STATE, 200, 'the command took effect after the handshake');
+    assert.deepEqual(
+        air.traceLines().map((l) => l.replace(/ \[.*\]$/, '')),
+        ['tx LEVEL_SET ch1 STATE=200 ON_TIME=0', 'rx ACK_W_AES_CHALLENGE', 'tx AES_SOLUTION', 'rx ACK (signed)'],
+    );
+
+    // a device on another key stays silent on the response: AUTHENTICATION_FAILURE
+    const other = Buffer.from(key);
+    other[0] ^= 0xff;
+    dev.aesKey = other;
+    h.send(central(FT.CENTRAL, [0x02, 0x01, 0x00, 0, 0], 6));
+    const [, , failed] = await h.waitFrames(3);
+    assert.equal(failed[3], BIDCOS_STATUS.AUTHENTICATION_FAILURE);
+    assert.equal(dev.aesFailures, 1);
+    assert.equal(dev.behaviour.channel(1).STATE, 200, 'the command did not take effect');
+    h.module.close();
+});

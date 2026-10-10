@@ -87,9 +87,14 @@ test(
                     `${name} in ${names.join(' | ')}`,
                 );
             }
-            // the module knows the device now: ADD_LINK_PEER and the AES policy
+            // the module knows the device now: ADD_LINK_PEER; its answer carried the authentication mask (all
+            // channels off), which equals what rfd wants for a switch without AES_ACTIVE, so rfd sends no
+            // AUTHENTICATION_ON/OFF at all (CCU2BidcosRemoteInterface::SetDeviceAesPolicy compares the two masks)
             assert.ok(rfd.module.peers.has(SWITCH_ADDRESS), 'ADD_LINK_PEER for the device');
-            assert.ok(rfd.module.authentication.has(SWITCH_ADDRESS), 'AUTHENTICATION_ON/OFF for the device');
+            assert.ok(
+                !rfd.module.authentication.has(SWITCH_ADDRESS),
+                'no AUTHENTICATION_ON/OFF for a device without AES',
+            );
 
             const devices = await rfd.call('listDevices');
             assert.ok(devices.some((d) => d.ADDRESS === SWITCH_SERIAL) && devices.some((d) => d.ADDRESS === CH1));

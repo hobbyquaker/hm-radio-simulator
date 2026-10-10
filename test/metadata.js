@@ -75,6 +75,11 @@ export const FINDINGS = Object.freeze({
         draft: '002-read-eof.md',
         issue: null,
     },
+    'aes-republish': {
+        title: 'rfd does not restore the per-channel AES policy (AUTHENTICATION_ON) when it republishes devices after a coprocessor re-init',
+        draft: '005-aes-policy-after-reinit.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

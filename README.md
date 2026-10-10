@@ -53,19 +53,39 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Zurückkommen, `CONFIG_PENDING` für eine Konfiguration, die erst nach der Rückkehr ankommt, der Duty Cycle, die
   Events über BIN-RPC und XML-RPC. Jeder Test schreibt die Telegramme der Luftstrecke als Spur in den Bericht, sodass
   sich die OpenCCU-Base-Versionen vergleichen lassen.
+- **rfd am LAN-Gateway mit AES (`lib/lgw.js`):** ein HM-LGW-Gegenstück in JavaScript mit `Encryption Key`, dem
+  `V`-Handshake und AES-128-CFB auf beiden Ports: die Initialisierung durch den verschlüsselten Kanal, ein falscher
+  LAN-Schlüssel (rfd meldet `WRONG_KEY` und beendet sich), Klartext, Port 2000 weg, Port 2001 weg, ein stummes
+  Keepalive, Gateway weg und wieder da mit falscher Seriennummer im ersten Hello
+  ([#13](https://github.com/OpenCCU/OpenCCU-Base/pull/13), [#16](https://github.com/OpenCCU/OpenCCU-Base/pull/16),
+  [#17](https://github.com/OpenCCU/OpenCCU-Base/pull/17)), Port 2000 weg, während ein Telegramm unterwegs ist, und
+  das Modul stromlos hinter dem Gateway: rfd meldet Geräte und Schlüssel neu an (`restoreConfigToCoprocessor`), die
+  AES-Richtlinie je Kanal aber nicht (`aes-republish`).
+- **AES-gesicherte Geräte und eine Fernbedienung (HM-RC-4 aus `rf_rc.xml`):** der Schlüsseltausch beim Anlernen,
+  `AES_ACTIVE` setzt die Kanal-Authentifizierung im Modul (`AUTHENTICATION_ON`), ein Schaltbefehl läuft durch
+  Challenge-Response (die Luftstrecke rechnet, was sonst die Modul-Firmware tut: `ACK_W_AES_CHALLENGE`,
+  `AES_SOLUTION`, signiertes ACK), ein Gerät mit anderem Schlüssel fällt durch (`UNREACH`); die Fernbedienung mit
+  `PRESS_SHORT`/`PRESS_LONG`, deren Tasten rfd ab Werk authentifizieren lässt (`aes_default`), die Konfiguration
+  eines schlafenden Geräts (`CONFIG_PENDING`, geliefert beim nächsten Druck auf die Anlerntaste), eine
+  Direktverknüpfung zwischen Fernbedienung und Aktor (`addLink`, Peer-Listen auf beiden Seiten, `getLinks`, das
+  LINK-Paramset als Liste 3 im Aktor, `removeLink`).
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer. Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
-sowie einen Fund dieser Suite ohne Issue bisher, `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie drei Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
 `ENODEV` von einem veralteten `/dev/mmd_bidcos`, `EIO` von einem abgezogenen Adapter). rfd auf `main` dreht nach dem
-Verlust des Moduls deshalb weiter mit 100 % CPU und meldet `CONNECTED = true`. Gegen `main` bleiben `double-join` und
-`read-eof`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+Verlust des Moduls deshalb weiter mit 100 % CPU und meldet `CONNECTED = true`. Der dritte, `aes-republish`: Wird
+der Coprozessor hinter einem wiederverbundenen LAN-Gateway neu initialisiert, meldet rfd alle Geräte
+(`ADD_LINK_PEER`) und die Schlüssel neu an, nicht aber die AES-Richtlinie je Kanal (`AUTHENTICATION_ON`); bis rfd
+neu startet oder die Konfiguration des Kanals erneut geschrieben wird, authentifiziert das Modul die Events der
+AES-Kanäle nicht mehr, und rfd verwirft sie (`auth_violate_policy="reject"`) - eine Fernbedienung mit AES verstummt.
+Gegen `main` bleiben `double-join`, `read-eof` und `aes-republish`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -78,8 +98,15 @@ erst, wenn der Maintainer es entscheidet.
 - Hinter dem Modul liegt eine virtuelle Luftstrecke mit simulierten Geräten. Ein Gerät wird von derselben
   `rftypes`-XML-Datei getrieben, aus der rfd seine Telegramme baut (ein kleiner Leser dafür, keine Abhängigkeit); dazu
   kommt das generische BidCoS-Protokoll (Anlern-Ansage, die Konfigurationslisten, Peer-Listen, Statusabfragen,
-  Quittungen) und ein dünnes Verhalten je Gerätetyp, bisher der Schaltaktor. Die erste Antwort eines Geräts meldet das
-  Modul als Quittung (`TELEGRAM_SENT_RECVD_ACK`), weitere als Events; ein stummes Gerät endet in `SEND_FAILED`.
+  Quittungen) und ein dünnes Verhalten je Gerätetyp, der Schaltaktor und die Fernbedienung. Die erste Antwort eines
+  Geräts meldet das Modul als Quittung (`TELEGRAM_SENT_RECVD_ACK`), weitere als Events; ein stummes Gerät endet in
+  `SEND_FAILED`. AES rechnet die Luftstrecke so, wie es sonst die Modul-Firmware tut: Sie beantwortet die Challenge
+  eines Geräts aus der Schlüsseltabelle des Moduls und fordert ein Gerät selbst heraus, wenn rfd dessen Kanal unter
+  Authentifizierung gestellt hat (`AUTHENTICATION_ON`); das Modul beantwortet `ADD_LINK_PEER` wie die Firmware mit
+  der Zahl der Peers und der Authentifizierungsmaske des Geräts, gegen die rfd seine Richtlinie abgleicht.
+- Das LAN-Gateway gibt es zweimal: hmlangw selbst (unten) für den Klartext und ein Gegenstück in JavaScript
+  (`lib/lgw.js`) für `Encryption Key`, den `V`-Handshake und AES-128-CFB auf beiden Ports - mit Schaltern für die
+  Reconnect-Szenarien (Port weg, Gateway weg und wieder da, stummes Keepalive, falsche Seriennummer).
 - Das LAN-Gateway ist hmlangw selbst (MIT, beim Bau des Images aus dem OpenCCU-Repository geholt, Commit
   festgepinnt): Es lauscht auf den HM-LGW-Ports 2000 und 2001 und reicht die Frames an das simulierte Modul auf dem
   Pseudo-Terminal durch. Zwei Eigenheiten von hmlangw 1.1.1 zeigen sich dabei: Es startet seine Threads mit
@@ -134,7 +161,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
@@ -173,11 +200,12 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
   den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
 - ✅ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
   UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
-- 📥 **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte
+- ✅ **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte,
+  Direktverknüpfungen, das Modul stromlos hinter dem Gateway
 - 📥 **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
-- 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
+- ✅ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
 - ✅ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 - ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
   Daemons (`double-join`, `read-eof`, die `exit`-RPC-Methode, kein SIGTERM-Handler); gemeldet wird noch nichts
@@ -191,6 +219,8 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ☑️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - ☑️ **Eine ThreadSanitizer-Variante** des Images
+- ☑️ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
+- ☑️ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später · 🚫 nicht umsetzen
 
