@@ -16,6 +16,8 @@ import {RadioModule} from '../../lib/module.js';
 import {createPtyModule} from '../../lib/pty.js';
 import {createHmlangwGateway} from '../../lib/hmlangw.js';
 import {createLgwFront} from '../../lib/lgw.js';
+import {createHmwLgwFront} from '../../lib/hmwlgw.js';
+import {WiredBus} from '../../lib/wired.js';
 import {BinRpcClient, XmlRpcClient, freePort} from './rpc.js';
 
 export const DAEMONS = process.env.HMRS_DAEMONS || '';
@@ -200,10 +202,13 @@ export class Daemon {
         if (this.gateway) {
             text += `\n--- hmlangw: ${this.gateway.lines.slice(-20).join(' | ')}`;
         }
+        if (this.bus) {
+            text += `\n--- bus: ${this.bus.traceLines().slice(-30).join(' | ') || 'nothing'}`;
+        }
         if (this.lgw) {
             text += `\n--- lgw front: ${this.lgw.trace
                 .slice(-20)
-                .map((t) => `${t.kind} ${t.dir} ${t.line ?? t.bytes + ' bytes'}`)
+                .map((t) => `${t.kind} ${t.dir} ${t.line ?? t.cmd ?? t.bytes + ' bytes'}`)
                 .join(' | ')}`;
         }
         return text;
@@ -354,27 +359,61 @@ export async function startRfd(options = {}) {
  * HMW-LGW. hs485d's XML-RPC port is fixed at 2000 unless it reads an [Interface] section, so one at a time.
  * @param {{host: string, port: number, logLevel?: number, lgw?: boolean}} options
  */
-export async function startHs485d({host, port, logLevel = 0, lgw = false}) {
-    const dir = tmpdir('hmrs-hs485d');
-    fs.mkdirSync(path.join(dir, 'devices'));
+export async function startHs485d({
+    host = '127.0.0.1',
+    port = 0,
+    logLevel = 0,
+    lgw = false,
+    lgwFront = null,
+    dir = null,
+    descriptionDir = HS485TYPES,
+    searchSerial = null,
+    bus = null,
+} = {}) {
+    dir = dir || tmpdir('hmrs-hs485d');
+    if (!fs.existsSync(path.join(dir, 'devices'))) {
+        fs.mkdirSync(path.join(dir, 'devices'));
+    }
     const config = path.join(dir, 'hs485d.conf');
     fs.writeFileSync(
         config,
         [
             'Log Destination = Console',
             `Log Level = ${logLevel}`,
-            `Device Description Dir = ${HS485TYPES}`,
+            `Device Description Dir = ${descriptionDir}`,
             `Device Files Dir = ${path.join(dir, 'devices')}`,
             `Firmware Dir = ${path.join(dir, 'firmware')}`,
             `XmlRpcHandlersFile = ${path.join(dir, 'hs485d.handlers')}`,
             '',
         ].join('\n'),
     );
-    const args = ['-f', config, '-c', '-l', String(logLevel), '-h', host, '-p', String(port)];
+    let front = null;
+    let keyArgs = [];
+    if (lgwFront) {
+        // the JavaScript HMW-LGW (lib/hmwlgw.js) on a simulated wired bus; hs485d connects to its port, or searches
+        // for its serial over UDP (`searchSerial`, the gateway then on the fixed port 1000)
+        const {configuredKey, ...frontOptions} = lgwFront;
+        bus = bus || new WiredBus();
+        front = await createHmwLgwFront({bus, port: searchSerial ? 1000 : 0, ...frontOptions});
+        host = front.host;
+        port = front.port;
+        lgw = true;
+        const key = configuredKey ?? front.key;
+        keyArgs = key ? ['-k', key] : [];
+    }
+    const args = ['-f', config, '-c', '-l', String(logLevel)];
+    if (searchSerial) {
+        args.push('-s', searchSerial);
+    } else {
+        args.push('-h', host, '-p', String(port));
+    }
     if (lgw) {
-        args.push('-g');
+        args.push('-g', ...keyArgs);
     }
     const daemon = new Daemon('hs485d', path.join(DAEMONS, 'bin', 'hs485d'), args, dir, 2000);
+    daemon.lgw = front;
+    daemon.bus = bus;
+    daemon.dir = dir;
     return daemon.start().waitReady();
 }
 

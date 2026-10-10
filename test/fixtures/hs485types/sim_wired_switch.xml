@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- A wired device description in the shape of OpenCCU-Base's hs485types files (two keys, two switches, an EEPROM),
+     written for the unit tests of this suite; the real files are read from the Base checkout in the image and are
+     not part of this repository. Frame types are characters (type="#x"), indices count from the frame start
+     (receiver 0-3, control 4, sender 5-8, the command character at 9). -->
+<device version="12" eep_size="1024">
+  <supported_types>
+    <type name="Simulated wired switch actuator 2-channel" id="SIM-HMW-Sw2" priority="2">
+      <parameter index="0" size="1" const_value="17"/>
+      <parameter index="1" size="1" const_value="0"/>
+      <parameter index="2" size="2" cond_op="GE" const_value="0x0303"/>
+    </type>
+  </supported_types>
+
+  <paramset type="MASTER" id="sim_wired_dev_master">
+    <parameter id="LOGGING_TIME">
+      <logical type="float" min="0.1" max="25.5" default="2.0" unit="s"/>
+      <physical type="integer" size="1.0" interface="eeprom">
+        <address index="0x0001"/>
+      </physical>
+      <conversion type="float_integer_scale" factor="10" offset="0.0"/>
+    </parameter>
+    <parameter id="CENTRAL_ADDRESS" hidden="true">
+      <logical type="integer"/>
+      <physical type="integer" size="4" interface="eeprom">
+        <address index="0x0002"/>
+      </physical>
+    </parameter>
+    <enforce id="CENTRAL_ADDRESS" value="1"/>
+  </paramset>
+
+  <frames>
+    <frame id="LEVEL_SET" direction="to_device" type="#x" channel_field="10">
+      <parameter type="integer" index="11.0" size="1.0" param="STATE"/>
+    </frame>
+    <frame id="LEVEL_GET" direction="to_device" type="#S" channel_field="10">
+    </frame>
+    <frame id="INFO_LEVEL" direction="from_device" event="true" type="#i" channel_field="10">
+      <parameter type="integer" index="11.0" size="1.0" param="STATE"/>
+      <parameter type="integer" index="12.4" size="0.3" param="STATE_FLAGS"/>
+    </frame>
+    <frame id="KEY_EVENT_SHORT" direction="from_device" event="true" type="#K" channel_field="10">
+      <parameter type="integer" index="12.0" size="0.1" const_value="0"/>
+      <parameter type="integer" index="12.2" size="0.6" param="COUNTER"/>
+    </frame>
+    <frame id="KEY_EVENT_LONG" direction="from_device" event="true" type="#K" channel_field="10">
+      <parameter type="integer" index="12.0" size="0.1" const_value="1"/>
+      <parameter type="integer" index="12.2" size="0.6" param="COUNTER"/>
+    </frame>
+    <frame id="SET_LOCK" direction="to_device" type="#l" channel_field="11">
+      <parameter type="integer" index="12.0" size="1.0" param="INHIBIT"/>
+    </frame>
+    <frame id="TOGGLE_INSTALL_TEST" direction="to_device" type="#x" channel_field="10">
+      <parameter type="integer" index="11.0" size="1.0" param="TOGGLE_FLAG"/>
+    </frame>
+  </frames>
+
+  <channels>
+    <channel index="0" type="MAINTENANCE" ui_flags="internal" class="maintenance" count="1">
+      <paramset type="MASTER" id="maint_ch_master"></paramset>
+      <paramset type="VALUES" id="maint_ch_values">
+        <parameter id="UNREACH" operations="read,event" ui_flags="service">
+          <logical type="boolean"/>
+          <physical type="integer" interface="internal" value_id="UNREACH"/>
+        </parameter>
+        <parameter id="STICKY_UNREACH" operations="read,write,event" ui_flags="service">
+          <logical type="boolean"/>
+          <physical type="integer" interface="internal" value_id="STICKY_UNREACH"/>
+        </parameter>
+        <parameter id="CONFIG_PENDING" operations="read,event" ui_flags="service">
+          <logical type="boolean"/>
+          <physical type="integer" interface="internal" value_id="CONFIG_PENDING"/>
+        </parameter>
+      </paramset>
+    </channel>
+    <channel index="1" physical_index_offset="-1" count="2" type="KEY">
+      <paramset type="MASTER" id="sim_input_ch_master" address_start="0x07" address_step="2">
+        <parameter id="LONG_PRESS_TIME">
+          <logical type="float" min="0.4" max="5.0" default="1.0" unit="s"/>
+          <physical type="integer" size="1.0" interface="eeprom">
+            <address index="+0"/>
+          </physical>
+          <conversion type="float_integer_scale" factor="10" offset="0.0"/>
+        </parameter>
+      </paramset>
+      <paramset type="VALUES" id="sim_input_ch_values">
+        <parameter id="PRESS_SHORT" operations="event,write" control="BUTTON.SHORT" loopback="true">
+          <logical type="action"/>
+          <physical type="integer" interface="command" value_id="COUNTER">
+            <event frame="KEY_EVENT_SHORT"/>
+          </physical>
+          <conversion type="action_key_counter" sim_counter="SIM_COUNTER" counter_size="6"/>
+        </parameter>
+        <parameter id="PRESS_LONG" operations="event,write" control="BUTTON.LONG" loopback="true">
+          <logical type="action"/>
+          <physical type="integer" interface="command" value_id="COUNTER">
+            <event frame="KEY_EVENT_LONG"/>
+          </physical>
+          <conversion type="action_key_counter" sim_counter="SIM_COUNTER" counter_size="6"/>
+        </parameter>
+      </paramset>
+    </channel>
+    <channel index="3" physical_index_offset="-1" count="2" type="SWITCH">
+      <paramset type="MASTER" id="sim_switch_ch_master" address_start="0x0B" address_step="2">
+        <parameter id="LOGGING">
+          <logical type="option">
+            <option id="OFF"/>
+            <option id="ON" default="true"/>
+          </logical>
+          <physical type="integer" size="0.1" interface="eeprom">
+            <address index="+0.0"/>
+          </physical>
+        </parameter>
+      </paramset>
+      <paramset type="VALUES" id="sim_switch_ch_values">
+        <parameter id="STATE" operations="read,write,event" control="SWITCH.STATE">
+          <logical type="boolean" default="false"/>
+          <physical type="integer" interface="command" value_id="STATE">
+            <set request="LEVEL_SET"/>
+            <get request="LEVEL_GET" response="INFO_LEVEL"/>
+            <event frame="INFO_LEVEL"/>
+          </physical>
+          <conversion type="boolean_integer" threshold="1" false="0" true="200"/>
+        </parameter>
+        <parameter id="INHIBIT" operations="read,write,event" control="NONE" loopback="true">
+          <logical type="boolean" default="false"/>
+          <physical type="integer" interface="command" value_id="INHIBIT">
+            <set request="SET_LOCK"/>
+          </physical>
+        </parameter>
+      </paramset>
+    </channel>
+  </channels>
+</device>
