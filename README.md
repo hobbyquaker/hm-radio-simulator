@@ -7,7 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > [!CAUTION]
-> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 2 stehen: Modul, LAN-Gateway und ein erster simulierter Schaltaktor.
+> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 3 stehen: Modul, LAN-Gateway (auch mit AES), ein simulierter
+> Schaltaktor und eine Fernbedienung; an Stufe 4 (hs485d) wird gearbeitet.
 
 hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
 **`rfd`** (BidCoS-RF) und **`hs485d`** (Homematic Wired), später möglicherweise auch **`multimacd`**. Die Daemons
@@ -72,7 +73,8 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
-Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer. Ein
+Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer; dazu
+kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
 sowie drei Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
@@ -107,7 +109,7 @@ erst, wenn der Maintainer es entscheidet.
 - Das LAN-Gateway gibt es zweimal: hmlangw selbst (unten) für den Klartext und ein Gegenstück in JavaScript
   (`lib/lgw.js`) für `Encryption Key`, den `V`-Handshake und AES-128-CFB auf beiden Ports - mit Schaltern für die
   Reconnect-Szenarien (Port weg, Gateway weg und wieder da, stummes Keepalive, falsche Seriennummer).
-- Das LAN-Gateway ist hmlangw selbst (MIT, beim Bau des Images aus dem OpenCCU-Repository geholt, Commit
+- hmlangw (MIT, beim Bau des Images aus dem OpenCCU-Repository geholt, Commit
   festgepinnt): Es lauscht auf den HM-LGW-Ports 2000 und 2001 und reicht die Frames an das simulierte Modul auf dem
   Pseudo-Terminal durch. Zwei Eigenheiten von hmlangw 1.1.1 zeigen sich dabei: Es startet seine Threads mit
   `SCHED_RR`, was im Container `--cap-add SYS_NICE` braucht (sonst endet es still mit Exit-Code 1), und seine
@@ -148,7 +150,7 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet `3.89.11` und `main` in beiden Varianten und
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet `3.89.11` und `main` in den Varianten normal, ASan und coverage und
 lässt jeden Fuzzer 60 s laufen.
 
 ## Testbericht
@@ -196,22 +198,21 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **Stufe 1b:** LAN-Gateway über
   [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
   Modul, ohne Verschlüsselung
-- ✅ **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu
-  den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
 - ✅ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
   UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
 - ✅ **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte,
   Direktverknüpfungen, das Modul stromlos hinter dem Gateway
-- 📥 **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
+- 🏗️ **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
-- 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
+- ✅ **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu
+  den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
 - ✅ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
 - ✅ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 - ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
-  Daemons (`double-join`, `read-eof`, die `exit`-RPC-Methode, kein SIGTERM-Handler); gemeldet wird noch nichts
+  Daemons; gemeldet wird noch nichts
 - ✅ **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
   Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
-- 🚫 **Mehr Daemon-Tests** (die Sammlung, aufgeteilt in die folgenden Punkte)
+- 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 - ☑️ **RPC-Methoden-Durchlauf,** Gerätetyp-Durchlauf über alle `rftypes`-Beschreibungen, der Vergleich 3.89.11 gegen main
 - ☑️ **Der Empfänger-Vertrag:** mehrere Empfänger, `init`-Synchronisation, Event-Reihenfolge, die Unerreichbar-Regel,
   ein hängender Empfänger
@@ -222,7 +223,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ☑️ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
 - ☑️ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
 
-✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später · 🚫 nicht umsetzen
+✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 
 ## Credits und Lizenzen
 

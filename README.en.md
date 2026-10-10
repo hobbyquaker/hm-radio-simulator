@@ -15,9 +15,8 @@ HM-MOD-RPI-PCB on a serial line, the HM-LGW over TCP, the HMW-LGW over TCP - so 
 exercised and broken in a container, in CI, without a radio module in the room. The daemons are built from
 OpenCCU-Base at a chosen ref inside the docker image; nothing of theirs is copied here.
 
-**Status:** stage 0 (the image, RPC black-box tests, libFuzzer harnesses), stage 1a (the simulated module on a
-pty: rfd's init to `CONNECTED`, module lost, frame fuzzing) and stage 1b (the LAN gateway through hmlangw, plaintext)
-exist. See _Stages_ for what follows.
+**Status:** stages 0 to 3 exist (the module, the LAN gateway with and without AES, a simulated switch and a remote);
+stage 4 (hs485d) is in progress. See _Stages_ for what follows.
 
 ## What it tests
 
@@ -87,7 +86,7 @@ Environment inside the image: `HMRS_VARIANT` (`release`, `asan`), `HMRS_KNOWN_BR
 the daemons' logs and sanitizer reports under `results/<variant>/work/`, fuzz artifacts under `results/fuzz/artifacts/`.
 
 CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, the daemon suite for `3.89.11` and `main` in
-both variants, and 60 s of each fuzz harness against `main` (findings fail the job) and `3.89.11` (findings are
+the release, ASan and coverage variants, and 60 s of each fuzz harness against `main` (findings fail the job) and `3.89.11` (findings are
 expected there and only reported). The docker layers are cached per ref.
 
 ## The test report
@@ -231,7 +230,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | the test report: a Markdown summary per CI run and an HTML report on GitHub Pages with history and upstream links                               | done          |
 | 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests                 | done          |
 | 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices, direct links, the module power-cycled behind the gateway | done          |
-| 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                                      | enqueued      |
+| 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                                      | in progress   |
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                                        | to be refined |
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                                      | enqueued      |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                                        | done          |
