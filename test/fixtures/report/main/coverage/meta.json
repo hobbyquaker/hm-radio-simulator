@@ -1,1 +1,8 @@
-{"ref": "main", "baseCommit": "030dba79b5e76cb10178a20e87a1b050df09faa9", "variant": "coverage", "knownBroken": ["double-join", "read-eof"], "node": "v22.23.3", "startedAt": "2026-10-10T18:00:00Z"}
+{
+  "ref": "main",
+  "baseCommit": "030dba79b5e76cb10178a20e87a1b050df09faa9",
+  "variant": "coverage",
+  "knownBroken": ["double-join", "read-eof"],
+  "node": "v22.23.3",
+  "startedAt": "2026-10-10T18:00:00Z"
+}

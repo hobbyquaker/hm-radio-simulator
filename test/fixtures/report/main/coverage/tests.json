@@ -1,3 +1,14 @@
-{"generatedAt": "2026-10-10T18:01:00Z", "counts": {"pass": 1, "fail": 0, "todo": 0, "skip": 0}, "tests": [
- {"name": "rfd initialises the simulated module and reports the interface CONNECTED", "file": "test/daemon/rfd-pty-module.test.js", "nesting": 0, "status": "pass", "durationMs": 1400, "diagnostics": []}
-]}
+{
+  "generatedAt": "2026-10-10T18:01:00Z",
+  "counts": {"pass": 1, "fail": 0, "todo": 0, "skip": 0},
+  "tests": [
+    {
+      "name": "rfd initialises the simulated module and reports the interface CONNECTED",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 1400,
+      "diagnostics": []
+    }
+  ]
+}
