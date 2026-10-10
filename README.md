@@ -1,0 +1,114 @@
+# hm-radio-simulator
+
+[![CI](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+> [!CAUTION]
+> hm-radio-simulator ist in Entwicklung. Die ersten Stufen stehen, vieles ist noch nicht gebaut.
+
+hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
+**`rfd`** (BidCoS-RF) und **`hs485d`** (Homematic Wired), später möglicherweise auch **`multimacd`**. Die Daemons
+werden aus [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) gebaut, in einem Docker-Container gestartet und
+über ihre XML-RPC- und BIN-RPC-Schnittstellen getestet, ohne dass ein Funkmodul im Raum sein muss. Die Tests laufen
+bei jedem Push auf GitHub Actions.
+
+[hm-simulator](https://github.com/hobbyquaker/hm-simulator) spielt die Schnittstellenprozesse der CCU gegenüber
+ihren Clients. hm-radio-simulator spielt in die andere Richtung: die **Hardware** gegenüber den echten Daemons. Das
+ist ein RPI-RF-MOD bzw. HM-MOD-RPI-PCB an einer seriellen Schnittstelle, ein LAN-Gateway (HM-LGW) über TCP oder ein
+Wired-LAN-Gateway (HMW-LGW) über TCP.
+
+## Warum
+
+rfd, hs485d und multimacd haben in OpenCCU-Base bisher keine Tests: Die CI dort baut die Daemons, prüft aber nicht,
+was sie tun. Gleichzeitig ändern sich gerade viele Teile davon. hm-radio-simulator soll solche Änderungen prüfbar
+machen: Startet rfd mit einem Funkmodul? Übersteht er, wenn das Modul weg ist und wiederkommt? Was macht ein
+kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich zur alten?
+
+## Was getestet wird
+
+- **rfd ohne Funkmodul:** Methodenliste über BIN-RPC und XML-RPC, `listDevices`, `listBidcosInterfaces`, `init`
+  mit einem Event-Empfänger.
+- **Robustheit der RPC-Schnittstellen:** verschachteltes `system.multicall`
+  ([#138](https://github.com/OpenCCU/OpenCCU-Base/pull/138)), fehlerhafte BIN-RPC-Requests
+  ([#140](https://github.com/OpenCCU/OpenCCU-Base/pull/140)), feindliches XML-RPC, ein Event-Empfänger, der
+  verschwindet ([#27](https://github.com/OpenCCU/OpenCCU-Base/pull/27)), jeweils für rfd und hs485d.
+- **rfd mit simuliertem Funkmodul:** die Initialisierung bis `CONNECTED`, das Modul im Bootloader, `BUSY` mit
+  Wiederholung, Modul weg ([#115](https://github.com/OpenCCU/OpenCCU-Base/pull/115),
+  [#116](https://github.com/OpenCCU/OpenCCU-Base/pull/116)) und wieder da, Events, Fuzzing der Funk-Frames.
+- **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
+  `system.multicall` und `xmlParser`.
+
+Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer. Ein
+Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
+Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140,
+gegen `main` nichts.
+
+## Wie es funktioniert
+
+- Das Docker-Image holt OpenCCU-Base in einer wählbaren Version (Tag oder Commit, Standard `3.89.11`) und baut daraus
+  rfd, hs485d, libXmlRpc und libxmlparser. Von OpenCCU-Base liegt nichts in diesem Repository.
+- Das simulierte Funkmodul (`lib/`, Node.js) spricht das serielle Protokoll des Moduls: Framing mit CRC, die
+  System- und BidCoS-Befehle, Adresse, Schlüssel, Peers, Uhrzeit, Duty Cycle. Es hängt über ein Pseudo-Terminal
+  (`socat`) als Gerätedatei am Daemon. rfd öffnet es wie einen echten `ComPortFile`.
+- Das eigentliche Funk-Timing (Frames in der Luft, ACK-Fenster, Burst, CSMA/CA, Duty Cycle) passiert in der Firmware
+  des Moduls. Der Daemon sieht davon nur Statusmeldungen, auf die er sekundenlang wartet. Die Simulation bildet das
+  logisch nach und muss nur die Antwortfenster auf der seriellen Seite einhalten (rfd: 1 s pro Befehl, 4 s bis zum
+  Sendestatus; hs485d: 700 ms). Node.js liegt mit unter einer Millisekunde Latenz weit darunter.
+
+```js
+import {RadioModule, createPtyModule} from 'hm-radio-simulator';
+
+const module = new RadioModule({serial: 'SIM0000001', mode: 'bootloader'});
+await createPtyModule({module, link: '/run/sim/uart0'});
+// rfd.conf: [Interface 0] Type = CCU2, ComPortFile = /run/sim/uart0, AccessFile = /dev/null, ResetFile = /dev/null
+await module.waitForCommand('SET_RF_ADDRESS');
+```
+
+## Ausführen
+
+Was die Daemons braucht, läuft in Docker. Die Unit-Tests des Simulators laufen überall mit Node.js ≥ 22.
+
+```sh
+npm ci
+npm test                       # Unit-Tests des Simulators
+scripts/run-tests.sh           # Image für OpenCCU-Base 3.89.11 bauen, Suite normal und mit ASan
+scripts/run-tests.sh --ref main --variants release --fuzz 60
+```
+
+Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet `3.89.11` und `main` in beiden Varianten und
+lässt jeden Fuzzer 60 s laufen.
+
+## Roadmap
+
+- 🏗️ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests ohne Funkmodul, Regressionstests
+- 🏗️ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
+- 🏗️ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
+  Frame-Fuzzing
+- ☑️ **Stufe 1b:** LAN-Gateway über
+  [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
+  Modul, ohne Verschlüsselung
+- ☑️ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
+  UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
+- ☑️ **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte
+- ☑️ **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
+- 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
+- 💤 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
+
+🏗️ in Arbeit · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
+
+## Credits und Lizenzen
+
+- Dieses Repository: MIT, Sebastian Raff.
+- [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) (OpenCCU-Projekt, eQ-3 AG): die getesteten Daemons und
+  ihre Gerätebeschreibungen, beim Bau des Images geholt. HMSL 2 für die Daemons und Beschreibungen, LGPL 2.1 für
+  libXmlRpc und libxmlparser. Nichts davon ist Teil dieses Repositorys.
+- [ReGaHss-Test](https://github.com/OpenCCU/ReGaHss-Test) (Jens Maus, Sebastian Raff; MIT): das Vorbild für Image
+  und Suite, dieselbe Idee für die ReGaHss.
+- [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) (Oliver Kastl,
+  Jens Maus, Jérôme Pech; MIT): die Grundlage für das LAN-Gateway in Stufe 1b.
+- `00_HMUARTLGW.pm` aus [FHEM](https://fhem.de) (GPL) und [Homegear](https://github.com/Homegear) (GPL): als
+  Dokumentation des Modulprotokolls gelesen, kein Code übernommen.
+- [binrpc](https://github.com/hobbyquaker/binrpc) und
+  [homematic-xmlrpc](https://github.com/hobbyquaker/homematic-xmlrpc) (MIT): die RPC-Clients der Tests.
+- [socat](http://www.dest-unreach.org/socat/) (GPL, im Image): das Pseudo-Terminal.
