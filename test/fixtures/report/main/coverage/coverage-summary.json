@@ -1,0 +1,82 @@
+{
+ "generatedAt": "2026-10-10T16:36:13.367Z",
+ "components": [
+  {
+   "component": "rfd",
+   "kind": "daemon",
+   "lines": 36.7,
+   "linesHit": 550,
+   "linesTotal": 1500,
+   "functions": 41.7,
+   "functionsHit": 25,
+   "functionsTotal": 60,
+   "branches": 24,
+   "branchesHit": 120,
+   "branchesTotal": 500,
+   "files": [
+    {
+     "file": "src/rfd/hm2/CCU2CommController.cpp",
+     "lines": 60,
+     "linesHit": 300,
+     "linesTotal": 500,
+     "functions": 75,
+     "branches": 40
+    },
+    {
+     "file": "src/rfd/RFManager.cpp",
+     "lines": 25,
+     "linesHit": 250,
+     "linesTotal": 1000,
+     "functions": 25,
+     "branches": 20
+    }
+   ]
+  },
+  {
+   "component": "hs485d",
+   "kind": "daemon",
+   "lines": 10,
+   "linesHit": 20,
+   "linesTotal": 200,
+   "functions": 20,
+   "functionsHit": 2,
+   "functionsTotal": 10,
+   "branches": 10,
+   "branchesHit": 5,
+   "branchesTotal": 50,
+   "files": [
+    {
+     "file": "src/hs485d/hs485d.cpp",
+     "lines": 10,
+     "linesHit": 20,
+     "linesTotal": 200,
+     "functions": 20,
+     "branches": 10
+    }
+   ]
+  },
+  {
+   "component": "libXmlRpc",
+   "kind": "library",
+   "lines": 70,
+   "linesHit": 420,
+   "linesTotal": 600,
+   "functions": 66.7,
+   "functionsHit": 20,
+   "functionsTotal": 30,
+   "branches": 60,
+   "branchesHit": 120,
+   "branchesTotal": 200,
+   "files": [
+    {
+     "file": "src/libXmlRpc/XmlRpcValue.cpp",
+     "lines": 70,
+     "linesHit": 420,
+     "linesTotal": 600,
+     "functions": 66.7,
+     "branches": 60
+    }
+   ]
+  }
+ ]
+}

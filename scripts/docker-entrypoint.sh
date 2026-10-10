@@ -28,11 +28,22 @@ if [ -d /results ] && [ "$#" -gt 0 ] && [ "$1" = "npm" ]; then
       node: process.version, startedAt: new Date().toISOString(),
     }, null, 1) + "\n");
   ' "$(cat /opt/openccu-base/ref)" "$(cat /opt/openccu-base/commit)" "${variant}" "${HMRS_KNOWN_BROKEN:-}" "/results/${variant}/meta.json"
+  if [ "${variant}" = coverage ]; then
+    # continuous mode (%c): every daemon process keeps its counters in mmapped profiles, one per instrumented object,
+    # so a SIGTERM loses nothing (see coverage.sh)
+    mkdir -p "/results/${variant}/profiles"
+    export LLVM_PROFILE_FILE="/results/${variant}/profiles/%c%p-%m.profraw"
+  fi
   node --test --test-concurrency=1 \
     --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="/results/${variant}/junit.xml" \
     --test-reporter=./scripts/json-reporter.mjs --test-reporter-destination="/results/${variant}/tests.json" \
     'test/daemon/*.test.js'
-  exit $?
+  status=$?
+  if [ "${variant}" = coverage ]; then
+    scripts/coverage.sh "/results/${variant}/profiles" "${HMRS_DAEMONS}" "/results/${variant}" || status=1
+    rm -rf "/results/${variant}/profiles"
+  fi
+  exit ${status}
 fi
 "$@"

@@ -5,6 +5,17 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+  # the upstream watch (upstream-watch.yml) runs the suite for a new OpenCCU-Base main commit through this workflow
+  workflow_call:
+    inputs:
+      upstream_sha:
+        description: the OpenCCU-Base commit to test in place of main
+        type: string
+        default: ''
+      trigger:
+        description: what triggered the run, shown on the report
+        type: string
+        default: ''
 
 jobs:
   unit:
@@ -43,6 +54,12 @@ jobs:
           - base_ref: main
             variant: asan
             known_broken: 'double-join,read-eof'
+          - base_ref: '3.89.11'
+            variant: coverage
+            known_broken: '115,116,138,140,double-join,read-eof'
+          - base_ref: main
+            variant: coverage
+            known_broken: 'double-join,read-eof'
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -55,7 +72,8 @@ jobs:
           load: true
           tags: hm-radio-simulator:test
           build-args: |
-            BASE_REF=${{ matrix.base_ref }}
+            BASE_REF=${{ (matrix.base_ref == 'main' && inputs.upstream_sha) || matrix.base_ref }}
+            BASE_LABEL=${{ matrix.base_ref }}
             KNOWN_BROKEN=${{ matrix.known_broken }}
           cache-from: type=gha,scope=base-${{ matrix.base_ref }}
           cache-to: type=gha,mode=max,scope=base-${{ matrix.base_ref }}
@@ -96,7 +114,8 @@ jobs:
           load: true
           tags: hm-radio-simulator:fuzz
           build-args: |
-            BASE_REF=${{ matrix.base_ref }}
+            BASE_REF=${{ (matrix.base_ref == 'main' && inputs.upstream_sha) || matrix.base_ref }}
+            BASE_LABEL=${{ matrix.base_ref }}
           cache-from: type=gha,scope=base-${{ matrix.base_ref }}
           cache-to: type=gha,mode=max,scope=base-${{ matrix.base_ref }}
       - name: run the harnesses (60 s each)
@@ -147,7 +166,8 @@ jobs:
         run: |
           node scripts/report.mjs collect --out site --previous previous --keep 20 \
             --repo-sha "$GITHUB_SHA" --ref "$GITHUB_REF_NAME" --run-id "$GITHUB_RUN_ID" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" artifacts
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --trigger "${{ inputs.trigger }}" artifacts
           cat site/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:

@@ -1,5 +1,5 @@
 node_modules
 results
-coverage
+/coverage
 *.log
 .docker.lock

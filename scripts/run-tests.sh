@@ -5,7 +5,7 @@
 #
 # Usage: scripts/run-tests.sh [options]
 #   --ref <ref>          OpenCCU-Base branch, tag or commit (default 3.89.11)
-#   --variants <list>    comma-separated: release, asan (default release,asan)
+#   --variants <list>    comma-separated: release, asan, coverage (default release,asan,coverage)
 #   --known-broken <l>   OpenCCU-Base issues known unfixed in the ref (default per ref, see below)
 #   --fuzz <seconds>     also run the fuzz harnesses for that long each (default 0 = skip)
 #   --no-build           reuse the images
@@ -14,7 +14,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 REF=3.89.11
-VARIANTS=release,asan
+VARIANTS=release,asan,coverage
 KNOWN=
 FUZZ=0
 BUILD=1

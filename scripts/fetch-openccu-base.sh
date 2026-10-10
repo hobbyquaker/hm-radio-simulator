@@ -5,13 +5,17 @@
 # the web UI and Tcl sources come along because the component CMake of newer revisions adds them). The sources are HMSL-2/LGPL/GPL licensed by eQ-3 and the OpenCCU project and stay in the
 # image only; nothing of them is copied into this repository.
 #
-# Usage: fetch-openccu-base.sh <repo-url> <ref> <destdir>
+# Usage: fetch-openccu-base.sh <repo-url> <ref> <destdir> [<label>]
+#
+#   label  what the image reports as the ref (default: the ref itself) - the upstream watch tests main's head by its
+#          commit and labels it "main", so the report keeps its columns
 #
 set -euo pipefail
 
 REPO=${1:?usage: $0 <repo-url> <ref> <destdir>}
 REF=${2:?missing ref}
 DEST=${3:?missing destdir}
+LABEL=${4:-${REF}}
 
 if [[ -e ${DEST} ]]; then
   echo "ERROR: ${DEST} already exists" >&2
@@ -29,7 +33,7 @@ git -C "${DEST}" -c advice.detachedHead=false checkout -q FETCH_HEAD
 
 commit=$(git -C "${DEST}" rev-parse HEAD)
 echo "${commit}" >"${DEST}/.openccu-base-commit"
-echo "${REF}" >"${DEST}/.openccu-base-ref"
+echo "${LABEL}" >"${DEST}/.openccu-base-ref"
 rm -rf "${DEST:?}/.git"
 
 for f in CMakeLists.txt src/rfd/CMakeLists.txt src/hs485d/CMakeLists.txt src/libXmlRpc/CMakeLists.txt \

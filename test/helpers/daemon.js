@@ -48,8 +48,6 @@ function daemonEnv(workdir) {
             process.env.ASAN_OPTIONS || `detect_leaks=0:abort_on_error=1:log_path=${path.join(workdir, 'asan')}`,
         UBSAN_OPTIONS: process.env.UBSAN_OPTIONS || `print_stacktrace=1:log_path=${path.join(workdir, 'ubsan')}`,
         TZ: 'Europe/Berlin',
-        // the coverage variant preloads the profile-flushing shim into the daemons only (not socat, hmlangw, node)
-        ...(process.env.HMRS_DAEMON_PRELOAD ? {LD_PRELOAD: process.env.HMRS_DAEMON_PRELOAD} : {}),
     };
 }
 

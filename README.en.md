@@ -98,6 +98,15 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
   until there is one, to the findings above;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
 
+**Code coverage** of rfd and hs485d comes from a third build variant, `coverage` (clang source-based coverage, `-O0`),
+running the same suite: the report shows, per OpenCCU-Base ref, lines, functions and branches for the daemons' own
+sources and for each library as its own row, the per-file percentages, and links the data for download (an lcov
+tracefile and llvm-cov's JSON - file paths and counts, no source text; with an OpenCCU-Base checkout at that commit,
+`genhtml --prefix /openccu-base coverage.info` renders the annotated view). The daemons have no SIGTERM handler and
+would lose their profile when the suite stops them, so the variant uses clang's continuous mode, where the counters
+live in an mmapped file. clang was chosen because rfd and hs485d build and pass the suite with it unchanged; the
+release and ASan variants stay on gcc.
+
 The data is next to the page as `report.json`. Nothing of it is committed: the report is built from the run's
 artifacts by `scripts/report.mjs` (a node:test JSON reporter writes `tests.json`, the entrypoint `meta.json` with the
 OpenCCU-Base commit, `fuzz/run.sh` a `fuzz-summary.json`; `test/metadata.js` holds the upstream links), locally with
@@ -197,7 +206,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined |
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | enqueued      |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                        | in progress   |
-| -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | enqueued      |
+| -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | testing       |
 | -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                             | done          |
 | -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | enqueued      |
 | -     | more daemon tests (the collection, split into the items below)                                                                  | not as such   |

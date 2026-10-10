@@ -11,7 +11,8 @@
  *
  * Usage:
  *   report.mjs collect --out <site dir> [--previous <dir with the published site>] [--repo-sha <sha>]
- *                      [--run-id <id>] [--run-url <url>] [--ref <git ref>] [--keep 20] <results dir>...
+ *                      [--run-id <id>] [--run-url <url>] [--ref <git ref>] [--trigger <text>] [--keep 20]
+ *                      <results dir>...
  *   report.mjs summary <results dir>...        print the Markdown overview of these results only
  *
  * The test names carry their upstream references (see test/metadata.js), so a regression test links to the pull
@@ -56,7 +57,16 @@ export function collectResults(roots) {
                 const meta = readJson(full);
                 const testsFile = path.join(dir, 'tests.json');
                 const tests = fs.existsSync(testsFile) ? readJson(testsFile) : {counts: {}, tests: []};
-                jobs.push(makeJob(meta, tests));
+                const job = makeJob(meta, tests);
+                const summaryFile = path.join(dir, 'coverage-summary.json');
+                if (fs.existsSync(summaryFile)) {
+                    // the coverage variant: the per-component summary, and the data files to publish next to the page
+                    job.coverage = readJson(summaryFile);
+                    job.coverageFiles = ['coverage.info', 'coverage.json']
+                        .map((f) => path.join(dir, f))
+                        .filter((f) => fs.existsSync(f));
+                }
+                jobs.push(job);
             } else if (entry.name === 'fuzz-summary.json') {
                 fuzz.push(readJson(full));
             }
@@ -112,6 +122,7 @@ export function buildReport(results, run = {}) {
         repoSha: sha,
         repoUrl: sha ? `${REPO}/commit/${sha}` : REPO,
         ref: run.ref || '',
+        trigger: run.trigger || '',
         runId: run.runId || '',
         runUrl: run.runUrl || '',
         status,
@@ -142,7 +153,7 @@ export function renderSummaryMarkdown(report) {
     lines.push(`## hm-radio-simulator test report`);
     lines.push('');
     lines.push(
-        `${report.status === 'pass' ? '✅' : '❌'} ${report.status === 'pass' ? 'green' : 'red'} - ${report.generatedAt}${report.repoSha ? ` - [${report.repoSha.slice(0, 7)}](${report.repoUrl})` : ''}`,
+        `${report.status === 'pass' ? '✅' : '❌'} ${report.status === 'pass' ? 'green' : 'red'} - ${report.generatedAt}${report.repoSha ? ` - [${report.repoSha.slice(0, 7)}](${report.repoUrl})` : ''}${report.trigger ? ` - triggered by ${escapeMd(report.trigger)}` : ''}`,
     );
     lines.push('');
     if (report.jobs.length) {
@@ -186,6 +197,21 @@ export function renderSummaryMarkdown(report) {
             lines.push('');
         }
     }
+    const covered = report.jobs.filter((j) => j.coverage);
+    if (covered.length) {
+        lines.push('### Coverage (clang source-based, the coverage variant)');
+        lines.push('');
+        lines.push('| OpenCCU-Base | component | lines | functions | branches |');
+        lines.push('| --- | --- | ---: | ---: | ---: |');
+        for (const job of covered) {
+            for (const c of job.coverage.components.filter((c) => c.kind === 'daemon' || c.linesTotal > 0)) {
+                lines.push(
+                    `| ${job.ref} | ${c.component}${c.kind === 'library' ? ' (library)' : ''} | ${pctText(c.lines)} (${c.linesHit}/${c.linesTotal}) | ${pctText(c.functions)} | ${pctText(c.branches)} |`,
+                );
+            }
+        }
+        lines.push('');
+    }
     if (report.fuzz.length) {
         lines.push('### Fuzzing');
         lines.push('');
@@ -212,6 +238,10 @@ function linksMd(refs) {
 
 function escapeMd(text) {
     return String(text).replace(/\|/g, '\\|').replace(/#/g, '\\#');
+}
+
+function pctText(value) {
+    return value === null || value === undefined ? '-' : `${value.toFixed(1)} %`;
 }
 
 function short(sha) {
@@ -266,7 +296,7 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
    the name wraps in the rest */
 @media (max-width: 760px) { :root { --w-result: 3rem; --w-small: 3.6rem; }
   body { padding: .75rem; font-size: 13px; }
-  th, td { padding: .35rem .3rem; }
+  th, td { padding: .35rem .3rem; } th.r, td.r { padding-left: .3rem; }
   col.c, col.k, col.l, col.d { width: 1px; }
   th.c, th.k, th.l, th.d, td.c, td.k, td.l, td.d { padding: 0; border: 0; overflow: hidden; visibility: hidden;
     font-size: 0; line-height: 0; }
@@ -336,7 +366,7 @@ export function renderHtml(report, history = []) {
     h.push(`<title>hm-radio-simulator test report ${esc(report.id)}</title><style>${CSS}</style></head><body>`);
     h.push(`<h1>hm-radio-simulator <span class="muted">test report</span></h1>`);
     h.push(
-        `<p class="muted">${esc(report.generatedAt)}${report.repoSha ? ` · <a href="${esc(report.repoUrl)}" class="mono">${esc(report.repoSha.slice(0, 7))}</a>` : ''}${report.ref ? ` · ${esc(report.ref)}` : ''}${report.runUrl ? ` · <a href="${esc(report.runUrl)}">CI run ${esc(report.runId)}</a>` : ''} · <a href="${REPO}">repository</a> · <a href="report.json">report.json</a></p>`,
+        `<p class="muted">${esc(report.generatedAt)}${report.repoSha ? ` · <a href="${esc(report.repoUrl)}" class="mono">${esc(report.repoSha.slice(0, 7))}</a>` : ''}${report.ref ? ` · ${esc(report.ref)}` : ''}${report.runUrl ? ` · <a href="${esc(report.runUrl)}">CI run ${esc(report.runId)}</a>` : ''}${report.trigger ? ` · triggered by ${triggerHtml(report.trigger)}` : ''} · <a href="${REPO}">repository</a> · <a href="report.json">report.json</a></p>`,
     );
     h.push(`<div class="cards">`);
     h.push(
@@ -445,6 +475,69 @@ export function renderHtml(report, history = []) {
         );
     }
 
+    // Coverage: component | kind | files | lines | functions | branches (per ref, the coverage variant's job)
+    const covered = jobs.filter((j) => j.coverage);
+    if (covered.length) {
+        h.push(
+            `<h2>Coverage</h2><p class="muted">What the suite reaches in the daemons' own sources and in the libraries they load, from the coverage variant (clang source-based coverage, -O0). The daemons and each library are their own rows, so a daemon's percentage is neither diluted nor inflated by the libraries. The data (an lcov tracefile and llvm-cov's JSON, file paths and counts, no source text) is linked per ref: with an OpenCCU-Base checkout at that commit, <code class="mono">genhtml --prefix /openccu-base coverage.info</code> renders the annotated view.</p>`,
+        );
+        for (const job of covered) {
+            const links = (job.coverageLinks || [])
+                .map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`)
+                .join(' · ');
+            h.push(
+                `<h3>${esc(job.ref)} <span class="muted">(<a class="mono" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a>${links ? ' · ' + links : ''})</span></h3>`,
+            );
+            h.push(
+                table(
+                    [
+                        {label: 'component'},
+                        {label: 'kind', cls: 'k'},
+                        {label: 'files', cls: 'r'},
+                        {label: 'lines', cls: 'r'},
+                        {label: 'functions', cls: 'r'},
+                        {label: 'branches', cls: 'r'},
+                    ],
+                    job.coverage.components
+                        .filter((c) => c.linesTotal > 0)
+                        .map((c) => [
+                            `<span class="mono">src/${esc(c.component)}</span>`,
+                            esc(c.kind),
+                            String(c.files.length),
+                            `${esc(pctText(c.lines))}<br><span class="muted">${c.linesHit}/${c.linesTotal}</span>`,
+                            `${esc(pctText(c.functions))}<br><span class="muted">${c.functionsHit}/${c.functionsTotal}</span>`,
+                            `${esc(pctText(c.branches))}<br><span class="muted">${c.branchesHit}/${c.branchesTotal}</span>`,
+                        ]),
+                ),
+            );
+            const daemons = job.coverage.components.filter((c) => c.kind === 'daemon');
+            for (const c of daemons) {
+                h.push(
+                    `<details><summary class="muted">per file: src/${esc(c.component)} (${c.files.length} files)</summary>`,
+                );
+                h.push(
+                    table(
+                        [
+                            {label: 'file'},
+                            {label: 'lines hit', cls: 'r'},
+                            {label: 'of', cls: 'r'},
+                            {label: 'lines', cls: 'r'},
+                            {label: 'branches', cls: 'r'},
+                        ],
+                        c.files.map((f) => [
+                            `<span class="mono">${esc(f.file)}</span>`,
+                            String(f.linesHit),
+                            String(f.linesTotal),
+                            esc(pctText(f.lines)),
+                            esc(pctText(f.branches)),
+                        ]),
+                    ),
+                );
+                h.push(`</details>`);
+            }
+        }
+    }
+
     // Fuzzing: name | commit | harness | time | executions | exec/s | findings
     if (report.fuzz.length) {
         h.push(`<h2>Fuzzing (libFuzzer)</h2>`);
@@ -491,7 +584,7 @@ export function renderHtml(report, history = []) {
                     {label: 'fuzz findings', cls: 'r'},
                 ],
                 history.map((entry) => [
-                    `<a href="runs/${esc(entry.id)}/">${esc(entry.generatedAt)}</a>${entry.runUrl ? ` <a class="muted" href="${esc(entry.runUrl)}">(CI)</a>` : ''}`,
+                    `<a href="runs/${esc(entry.id)}/">${esc(entry.generatedAt)}</a>${entry.runUrl ? ` <a class="muted" href="${esc(entry.runUrl)}">(CI)</a>` : ''}${entry.trigger ? `<div class="diag">triggered by ${triggerHtml(entry.trigger)}</div>` : ''}${coverageLine(entry)}`,
                     `<a class="mono" href="${REPO}/commit/${esc(entry.repoSha)}">${esc(short(entry.repoSha))}</a>`,
                     `<span class="${esc(entry.status)}">${esc(entry.status === 'pass' ? 'green' : 'red')}</span>`,
                     `<span class="pass">${entry.pass}</span>`,
@@ -507,6 +600,29 @@ export function renderHtml(report, history = []) {
     );
     h.push(`</body></html>`);
     return h.join('\n') + '\n';
+}
+
+/** "OpenCCU-Base <sha>" with the commit linked, any other trigger text as it is. */
+function triggerHtml(trigger) {
+    const m = /^OpenCCU-Base ([0-9a-f]{7,40})$/.exec(trigger);
+    if (m) {
+        return `OpenCCU-Base <a class="mono" href="${BASE}/commit/${esc(m[1])}">${esc(m[1].slice(0, 7))}</a>`;
+    }
+    return esc(trigger);
+}
+
+/** "coverage main: rfd 12.3 %, hs485d 20.1 %" for a history entry, or nothing. */
+function coverageLine(entry) {
+    if (!entry.coverage || !Object.keys(entry.coverage).length) {
+        return '';
+    }
+    const parts = Object.entries(entry.coverage).map(
+        ([ref, daemons]) =>
+            `${esc(ref)}: ${Object.entries(daemons)
+                .map(([d, v]) => `${esc(d)} ${esc(pctText(v))}`)
+                .join(', ')}`,
+    );
+    return `<div class="diag">coverage ${parts.join(' · ')}</div>`;
 }
 
 function duration(ms) {
@@ -537,11 +653,22 @@ export function historyEntry(report) {
         id: report.id,
         generatedAt: report.generatedAt,
         repoSha: report.repoSha,
+        trigger: report.trigger || '',
         runId: report.runId,
         runUrl: report.runUrl,
         status: report.status,
         ...totals,
         fuzzFindings: unexpectedFuzzFindings(report.fuzz),
+        coverage: Object.fromEntries(
+            report.jobs
+                .filter((j) => j.coverage)
+                .map((j) => [
+                    j.ref,
+                    Object.fromEntries(
+                        j.coverage.components.filter((c) => c.kind === 'daemon').map((c) => [c.component, c.lines]),
+                    ),
+                ]),
+        ),
     };
 }
 
@@ -570,9 +697,25 @@ export function writeSite(report, {out, previous, keep = 20}) {
             fs.cpSync(src, dst, {recursive: true});
         }
     }
-    const html = renderHtml(report, history);
     const runDir = path.join(out, 'runs', report.id);
     fs.mkdirSync(runDir, {recursive: true});
+    for (const job of report.jobs) {
+        if (!job.coverageFiles) {
+            continue;
+        }
+        job.coverageLinks = [];
+        for (const src of job.coverageFiles) {
+            const ext = path.extname(src);
+            const name = `coverage-${job.ref.replace(/[^A-Za-z0-9.-]/g, '_')}-${short(job.baseCommit)}-${short(report.repoSha) || 'local'}${ext}`;
+            fs.copyFileSync(src, path.join(runDir, name));
+            job.coverageLinks.push({
+                label: ext === '.info' ? 'lcov tracefile' : 'llvm-cov JSON',
+                href: `runs/${report.id}/${name}`,
+            });
+        }
+        delete job.coverageFiles;
+    }
+    const html = renderHtml(report, history);
     fs.writeFileSync(path.join(runDir, 'index.html'), html);
     fs.writeFileSync(path.join(runDir, 'report.json'), JSON.stringify(report, null, 1) + '\n');
     fs.writeFileSync(path.join(out, 'index.html'), html);
@@ -609,6 +752,7 @@ function main(argv) {
             runId: options.runId,
             runUrl: options.runUrl,
             ref: options.ref,
+            trigger: options.trigger,
         });
         process.stdout.write(renderSummaryMarkdown(report) + '\n');
         return 0;
@@ -628,6 +772,7 @@ function main(argv) {
             runId: options.runId,
             runUrl: options.runUrl,
             ref: options.ref,
+            trigger: options.trigger,
         });
         const history = writeSite(report, {
             out: options.out,

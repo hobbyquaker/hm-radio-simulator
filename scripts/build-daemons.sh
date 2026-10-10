@@ -5,10 +5,14 @@
 # only rfd and hs485d are selected (the libraries follow the link graph); on 3.89.11 the extra options are unused and
 # the two targets are built out of the whole tree.
 #
-# Usage: build-daemons.sh <openccu-base dir> release|asan <output dir>
+# Usage: build-daemons.sh <openccu-base dir> release|asan|coverage <output dir>
 #
-#   release  -O2, as the firmware builds them
-#   asan     AddressSanitizer and UndefinedBehaviorSanitizer, debug info, -O1
+#   release   -O2, as the firmware builds them (gcc)
+#   asan      AddressSanitizer and UndefinedBehaviorSanitizer, debug info, -O1 (gcc)
+#   coverage  clang's source-based coverage (-fprofile-instr-generate -fcoverage-mapping), -O0, in continuous mode
+#             (-mllvm -runtime-counter-relocation with a %c in LLVM_PROFILE_FILE): the counters live in an mmapped
+#             .profraw per process and object, so a daemon stopped with SIGTERM - neither rfd nor hs485d handles it -
+#             loses nothing; llvm-profdata merges them, llvm-cov exports, see scripts/coverage.sh
 #
 set -euo pipefail
 
@@ -25,8 +29,13 @@ case "${VARIANT}" in
     build_type=RelWithDebInfo
     flags="-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g"
     ;;
+  coverage)
+    build_type=Debug
+    flags="-fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation -O0 -g"
+    export CC=clang CXX=clang++
+    ;;
   *)
-    echo "unknown variant ${VARIANT} (release|asan)" >&2
+    echo "unknown variant ${VARIANT} (release|asan|coverage)" >&2
     exit 1
     ;;
 esac

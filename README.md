@@ -138,6 +138,14 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
+Dazu kommt die **Code-Abdeckung** von rfd und hs485d: Eine dritte Build-Variante `coverage` (clang, Source-based
+Coverage, `-O0`) läuft dieselbe Suite; der Bericht zeigt je OpenCCU-Base-Version Zeilen, Funktionen und Zweige für die
+Daemons selbst und jede Bibliothek als eigene Zeile sowie je Datei die Prozente, und verlinkt die Daten zum Herunterladen
+(lcov-Tracefile und llvm-cov-JSON, nur Dateipfade und Zähler, kein Quelltext: mit einem OpenCCU-Base-Checkout auf dem
+Commit rendert `genhtml --prefix /openccu-base coverage.info` die annotierte Ansicht). Die Daemons haben keinen
+SIGTERM-Handler und würden ihr Profil beim Stoppen verlieren; die Variante nutzt deshalb clangs Continuous Mode, in
+dem die Zähler in einer eingeblendeten Datei liegen.
+
 Die Daten dahinter liegen als `report.json` neben der Seite. Nichts davon ist im Repository eingecheckt; der Bericht
 entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run report` nach `scripts/run-tests.sh`.
 
@@ -159,7 +167,7 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 - 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
-- 📥 **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
+- 🕵️ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 - ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
   Daemons (`double-join`, `read-eof`, die `exit`-RPC-Methode, kein SIGTERM-Handler); gemeldet wird noch nichts
 - 📥 **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen

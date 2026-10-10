@@ -6,6 +6,7 @@
 #   docker build -f docker/Dockerfile --target test --build-arg BASE_REF=3.89.11 -t hm-radio-simulator .
 #   docker run --rm --init --cap-add SYS_NICE -v "$PWD/results:/results" hm-radio-simulator
 #   docker run --rm --init --cap-add SYS_NICE -e HMRS_VARIANT=asan hm-radio-simulator
+#   docker run --rm --init --cap-add SYS_NICE -e HMRS_VARIANT=coverage -v "$PWD/results:/results" hm-radio-simulator
 #
 # SYS_NICE: hmlangw (the LAN-gateway front of stage 1b) starts its threads with SCHED_RR, which docker's default
 # capability set refuses; without the capability it exits silently with code 1 and the LGW tests fail at start.
@@ -16,6 +17,7 @@
 # Build arguments:
 #   BASE_REPO     OpenCCU-Base git repository
 #   BASE_REF      branch, tag or commit of OpenCCU-Base to test (default 3.89.11)
+#   BASE_LABEL    what the image reports as the ref (default BASE_REF): a commit tested for main is labelled main
 #   HMLANGW_REPO  the OpenCCU repository hmlangw (MIT) is fetched from
 #   HMLANGW_REF   its commit
 #   KNOWN_BROKEN  OpenCCU-Base issue numbers (or named findings without an issue yet, e.g. double-join) known to be
@@ -33,11 +35,12 @@ ARG NODE_IMAGE=node:22-trixie-slim
 FROM debian:trixie-slim AS base-src
 ARG BASE_REPO=https://github.com/OpenCCU/OpenCCU-Base.git
 ARG BASE_REF=3.89.11
+ARG BASE_LABEL=
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git \
  && rm -rf /var/lib/apt/lists/*
 COPY scripts/fetch-openccu-base.sh /usr/local/bin/
-RUN fetch-openccu-base.sh "${BASE_REPO}" "${BASE_REF}" /openccu-base
+RUN fetch-openccu-base.sh "${BASE_REPO}" "${BASE_REF}" /openccu-base "${BASE_LABEL:-${BASE_REF}}"
 
 # hmlangw, the HM-LGW emulation (MIT), for the LAN-gateway stage
 FROM debian:trixie-slim AS hmlangw-src
@@ -49,15 +52,16 @@ RUN apt-get update \
 COPY scripts/fetch-hmlangw.sh /usr/local/bin/
 RUN fetch-hmlangw.sh "${HMLANGW_REPO}" "${HMLANGW_REF}" /hmlangw
 
-# the daemons, release and asan, and hmlangw
+# the daemons - release and asan (gcc), coverage (clang, source-based coverage) - and hmlangw
 FROM debian:trixie-slim AS build
 RUN apt-get update \
- && apt-get install -y --no-install-recommends cmake make g++ libssl-dev \
+ && apt-get install -y --no-install-recommends cmake make g++ libssl-dev clang libclang-rt-dev \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=base-src /openccu-base /openccu-base
 COPY scripts/build-daemons.sh /usr/local/bin/
 RUN build-daemons.sh /openccu-base release /opt/daemons/release
 RUN build-daemons.sh /openccu-base asan /opt/daemons/asan
+RUN build-daemons.sh /openccu-base coverage /opt/daemons/coverage
 COPY --from=hmlangw-src /hmlangw /hmlangw
 RUN make -C /hmlangw CXXFLAGS="-Wall -O2 -pipe" hmlangw \
  && install -D -m 0755 /hmlangw/hmlangw /opt/hmlangw/bin/hmlangw \
@@ -87,7 +91,7 @@ CMD ["fuzz/run.sh"]
 FROM ${NODE_IMAGE} AS test
 ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof
 RUN apt-get update \
- && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata \
+ && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata llvm \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /opt/daemons /opt/daemons
 COPY --from=build /opt/hmlangw /opt/hmlangw
