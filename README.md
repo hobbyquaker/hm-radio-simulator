@@ -118,6 +118,13 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
   Daemons sind danach wie vorher. Dazu riesige und ungültige `listDevices`-Antworten beim `init`, 100 Anmeldungen in
   Folge, zwei Empfänger mit einer ID, eine URL ohne Gegenstelle. Zwei Funde: `init-blocks` und
   `async-callback-threads` (siehe unten).
+- **`listMethods` stimmt** (rfd und hs485d, BIN-RPC und XML-RPC): jeder gelistete Name ist dem Dispatcher bekannt
+  (gefragt über `system.methodHelp`, die harmlosen auch aufgerufen), und kein anderer: alle Namen aus dem Quelltext
+  der Daemons (auch nicht registrierte), die des anderen Daemons, Namen anderer Homematic-Schnittstellen,
+  Schreibvarianten. Zerstörerische Methoden werden nie aufgerufen. Gemessen auf `3.89.11`: rfd listet 55 und alle 55
+  sind aufrufbar, hs485d 28 von 28, kein ungelisteter Name ist aufrufbar (hs485ds nicht registriertes
+  `activateLinkParamset` eingeschlossen); `system.methodHelp` kennt `system.multicall` nicht (es steckt in der
+  Verbindung), `system.methodSignature` gibt es nicht. Der Testbericht zeigt die Zahlen als Tabelle.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 

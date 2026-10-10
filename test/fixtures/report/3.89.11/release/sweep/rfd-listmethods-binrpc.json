@@ -1,0 +1,13 @@
+{
+  "listed": {},
+  "unlisted": {},
+  "summary": {
+    "listed": 55,
+    "callable": 55,
+    "probed": 57,
+    "unlistedCallable": [],
+    "anomalies": [],
+    "helpGaps": ["system.multicall"],
+    "helpTexts": 54
+  }
+}

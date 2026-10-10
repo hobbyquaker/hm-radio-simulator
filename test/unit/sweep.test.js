@@ -139,7 +139,16 @@ test('the report carries the differential of the fixture refs and the previous m
         report.jobs.every((j) => !('sweep' in JSON.parse(JSON.stringify(j)))),
         'the records stay out of report.json',
     );
+    assert.deepEqual(
+        report.listMethods.map((r) => [r.daemon, r.protocol, r.ref, r.listed, r.callable]),
+        [
+            ['rfd', 'binrpc', '3.89.11', 55, 55],
+            ['rfd', 'binrpc', 'main', 55, 55],
+        ],
+    );
     const md = renderSummaryMarkdown(report);
+    assert.match(md, /### listMethods tells the truth/);
+    assert.match(md, /\| rfd \| binrpc \| main \| 55 \| 55 \| none \| system\.multicall \|/);
     assert.match(md, /### Differential: 3\.89\.11 → main/);
     assert.match(md, /fault -2 Unknown instance → fault -5 Unknown parameter/);
     const html = renderHtml(report);

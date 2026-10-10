@@ -137,11 +137,40 @@ export function buildReport(results, run = {}) {
         status,
         jobs: results.jobs,
         fuzz: results.fuzz,
+        listMethods: listMethodsRows(results.jobs),
         differential: buildDifferential(results.jobs, run.previousMain || null).map((s) => ({
             ...s,
             diff: {...s.diff, items: s.diff.items.slice(0, DIFF_LIST_LIMIT)},
         })),
     };
+}
+
+/**
+ * The listMethods truth test's summaries (test/daemon/listmethods-truth.test.js) from the release jobs' sweep records.
+ * @returns {Array<{ref: string, daemon: string, protocol: string, listed: number, callable: number, unlistedCallable: string[], helpGaps: string[]}>}
+ */
+export function listMethodsRows(jobs) {
+    const rows = [];
+    for (const job of jobs.filter((j) => j.variant === 'release' && j.sweep)) {
+        for (const [name, record] of Object.entries(job.sweep)) {
+            const m = /^(.+)-listmethods-(binrpc|xmlrpc)$/.exec(name);
+            if (m && record && record.summary) {
+                rows.push({
+                    ref: job.ref,
+                    daemon: m[1],
+                    protocol: m[2],
+                    listed: record.summary.listed,
+                    callable: record.summary.callable,
+                    unlistedCallable: record.summary.unlistedCallable || [],
+                    helpGaps: record.summary.helpGaps || [],
+                });
+            }
+        }
+    }
+    return rows.sort(
+        (a, b) =>
+            a.daemon.localeCompare(b.daemon) || a.protocol.localeCompare(b.protocol) || a.ref.localeCompare(b.ref),
+    );
 }
 
 /** Fuzz findings that are not expected on that ref (an old tag has known ones). */
@@ -222,6 +251,20 @@ export function renderSummaryMarkdown(report) {
                     `| ${job.ref} | ${c.component}${c.kind === 'library' ? ' (library)' : ''} | ${pctText(c.lines)} (${c.linesHit}/${c.linesTotal}) | ${pctText(c.functions)} | ${pctText(c.branches)} |`,
                 );
             }
+        }
+        lines.push('');
+    }
+    if ((report.listMethods || []).length) {
+        lines.push('### listMethods tells the truth');
+        lines.push('');
+        lines.push(
+            '| daemon | callbacks over | OpenCCU-Base | listed | callable | unlisted but callable | methodHelp gaps |',
+        );
+        lines.push('| --- | --- | --- | ---: | ---: | --- | --- |');
+        for (const r of report.listMethods) {
+            lines.push(
+                `| ${r.daemon} | ${r.protocol} | ${r.ref} | ${r.listed} | ${r.callable} | ${r.unlistedCallable.join(', ') || 'none'} | ${r.helpGaps.join(', ') || 'none'} |`,
+            );
         }
         lines.push('');
     }
@@ -571,6 +614,35 @@ export function renderHtml(report, history = []) {
                 h.push(`</details>`);
             }
         }
+    }
+
+    // listMethods: daemon over protocol | ref | listed | callable | unlisted callable | help gaps
+    if ((report.listMethods || []).length) {
+        h.push(
+            `<h2>listMethods tells the truth</h2><p class="muted">Every name <code class="mono">system.listMethods</code> returns must be known to the dispatcher (asked through <code class="mono">system.methodHelp</code>, the harmless ones also called), and no other name may be: the daemons' own source names, the other daemon's, names of other Homematic interfaces, case and whitespace variants. <code class="mono">system.multicall</code> is built into the connection, so methodHelp does not know it.</p>`,
+        );
+        h.push(
+            table(
+                [
+                    {label: 'daemon, callbacks'},
+                    {label: 'OpenCCU-Base', cls: 'c'},
+                    {label: 'listed', cls: 'r'},
+                    {label: 'callable', cls: 'r'},
+                    {label: 'unlisted callable', cls: 'r'},
+                    {label: 'help gaps', cls: 'r'},
+                ],
+                report.listMethods.map((r) => [
+                    `${esc(r.daemon)} <span class="muted">${esc(r.protocol)}</span>`,
+                    esc(r.ref),
+                    `<span class="${r.callable === r.listed ? 'pass' : 'fail'}">${r.listed}</span>`,
+                    `<span class="${r.callable === r.listed ? 'pass' : 'fail'}">${r.callable}</span>`,
+                    r.unlistedCallable.length
+                        ? `<span class="fail" title="${esc(r.unlistedCallable.join(', '))}">${r.unlistedCallable.length}</span>`
+                        : '<span class="pass">0</span>',
+                    `<span class="muted" title="${esc(r.helpGaps.join(', '))}">${r.helpGaps.length}</span>`,
+                ]),
+            ),
+        );
     }
 
     // Differential: the sweeps' answers compared between refs (scripts/differential.mjs)

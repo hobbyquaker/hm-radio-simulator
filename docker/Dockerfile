@@ -117,6 +117,7 @@ RUN chmod +x scripts/*.sh fuzz/*.sh \
  && mkdir -p /opt/openccu-base/methods \
  && for d in rfd hs485d; do \
       node scripts/method-table.mjs /opt/openccu-base/methods-src/$d/*.cpp > /opt/openccu-base/methods/$d.json || exit 1; \
+      node scripts/method-table.mjs --all /opt/openccu-base/methods-src/$d/*.cpp > /opt/openccu-base/methods/$d-all.json || exit 1; \
     done
 VOLUME /results
 ENTRYPOINT ["scripts/docker-entrypoint.sh"]

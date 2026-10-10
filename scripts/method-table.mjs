@@ -6,7 +6,7 @@
  * `system.*` methods are not part of it. The method sweep compares `system.listMethods` against this table, so a
  * method added or removed upstream shows up as a failing test with the name in it.
  *
- * Usage: method-table.mjs <source file>... > table.json
+ * Usage: method-table.mjs [--all] <source file>... > table.json   (--all: every name defined, registered or not)
  */
 
 import fs from 'node:fs';
@@ -16,6 +16,22 @@ import {fileURLToPath} from 'node:url';
 /** Drops `//` line comments and block comments, keeping string literals intact enough for the patterns below. */
 export function stripComments(text) {
     return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"])\/\/.*$/gm, '$1');
+}
+
+/**
+ * Every method name the sources define, registered or not (classes left out of InitXmlRpcMethods, commented-out
+ * registrations): the candidates the listMethods test probes for unlisted but callable names.
+ * @param {string[]} sources
+ * @returns {string[]}
+ */
+export function allMethodNames(sources) {
+    const names = new Set();
+    for (const raw of sources) {
+        for (const m of raw.matchAll(/XmlRpcServerMethod\(\s*"([^"]+)"/g)) {
+            names.add(m[1]);
+        }
+    }
+    return [...names].sort();
 }
 
 /**
@@ -58,12 +74,14 @@ export function methodTable(sources) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const files = process.argv.slice(2);
+    const all = process.argv[2] === '--all';
+    const files = process.argv.slice(all ? 3 : 2);
     if (files.length === 0) {
         console.error('usage: method-table.mjs <source file>...');
         process.exit(2);
     }
-    const table = methodTable(files.map((f) => fs.readFileSync(f, 'latin1')));
+    const sources = files.map((f) => fs.readFileSync(f, 'latin1'));
+    const table = all ? allMethodNames(sources) : methodTable(sources);
     if (table.length === 0) {
         console.error(`method-table: no methods found in ${files.join(' ')}`);
         process.exit(1);
