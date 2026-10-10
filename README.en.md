@@ -246,7 +246,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | the test report: a Markdown summary per CI run and an HTML report on GitHub Pages with history and upstream links                                                                     | done          |
 | 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests                                                       | done          |
 | 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices, direct links, the module power-cycled behind the gateway                                       | done          |
-| 4     | hs485d against a simulated HMW-LGW with one wired actuator: discovery, sets, keys, EEPROM paramsets, a link, the keepalive timeout, a restart; the UDP device search for both daemons | in progress   |
+| 4     | hs485d against a simulated HMW-LGW with one wired actuator: discovery, sets, keys, EEPROM paramsets, a link, the keepalive timeout, a restart; the UDP device search for both daemons | done          |
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                                                                              | to be refined |
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                                                                            | enqueued      |
 | -     | calibration of the HMW-LGW timing against a real wired LAN gateway (hs485d)                                                                                                           | enqueued      |
