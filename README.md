@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > [!CAUTION]
-> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 1b stehen, die simulierten Geräte noch nicht.
+> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 2 stehen: Modul, LAN-Gateway und ein erster simulierter Schaltaktor.
 
 hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
 **`rfd`** (BidCoS-RF) und **`hs485d`** (Homematic Wired), später möglicherweise auch **`multimacd`**. Die Daemons
@@ -152,7 +152,7 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
   Modul, ohne Verschlüsselung
 - ✅ **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu
   den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
-- 🕵️ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
+- ✅ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
   UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
 - 📥 **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte
 - 📥 **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor

@@ -191,7 +191,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing         | done          |
 | 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | done          |
 | -     | the test report: a Markdown summary per CI run and an HTML report on GitHub Pages with history and upstream links               | done          |
-| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | testing       |
+| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | done          |
 | 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices                                           | enqueued      |
 | 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                      | enqueued      |
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined |
