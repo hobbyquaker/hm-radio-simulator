@@ -128,16 +128,16 @@ event that arrives in that instant is dropped by rfd itself - with a real module
 
 ## Stages
 
-| Stage | Content                                                                                                                         | State             |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                            | built, under test |
-| 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing         | built, under test |
-| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | ready             |
-| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | ready             |
-| 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices                                           | ready             |
-| 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                      | ready             |
-| 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined     |
-| -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | later             |
+| Stage | Content                                                                                                                         | State         |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                            | done          |
+| 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing         | done          |
+| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | ready         |
+| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | ready         |
+| 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices                                           | ready         |
+| 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                      | ready         |
+| 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined |
+| -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | later         |
 
 ## Credits and licences
 
