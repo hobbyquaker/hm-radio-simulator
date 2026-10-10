@@ -32,12 +32,14 @@ for rfd; a wired LAN gateway with a wired actuator for hs485d). See _Stages_ for
 | `test/daemon/rfd-aes-remote.test.js`     | AES devices and a remote (HM-RC-4 from `rf_rc.xml`): the key exchange at pairing, `AES_ACTIVE` puts the channel under authentication in the module (`AUTHENTICATION_ON`), a set runs the challenge-response (the air does what the module firmware does on real hardware: `ACK_W_AES_CHALLENGE`, `AES_SOLUTION`, the signed ACK), a device on another key fails (`UNREACH`); the remote's `PRESS_SHORT`/`PRESS_LONG`, whose keys rfd authenticates by default (`aes_default`), the configuration of a sleeping device (`CONFIG_PENDING`, delivered when its config button is pressed), a direct link between remote and switch (`addLink`, the peer lists on both sides, `getLinks`, the LINK paramset as list 3 in the switch, `removeLink`)                                                                     |
 | `test/daemon/hs485d-lgw.test.js`         | hs485d (`-g`) against the HMW-LGW in JavaScript (`lib/hmwlgw.js`) with a simulated HMW-LC-Sw2-DR on the bus (`lib/wired.js`, from the image's `hs485types`): the connection with the same preamble as the HM-LGW (also encrypted with `-k`), the `K` keepalive every 20 s, discovery (`D` → `d`/`c`, then `h`/`v`/`n` and the EEPROM usage `E`), a set with `x` and the `i` event, a read with `S`, key presses as `PRESS_SHORT`/`PRESS_LONG` (a repeated counter without SYN is dropped), a new device's announcement (`A`), paramsets in the EEPROM (`W`/`R`), a link key → actuator, a silent device (`a 01`, `UNREACH`/`STICKY_UNREACH`), the keepalive timeout with the reconnect, and a restart with the device files, among them a type byte ≥ 0x80 ([#9](https://github.com/OpenCCU/OpenCCU-Base/pull/9)) |
 | `test/daemon/udp-search.test.js`         | the UDP device search of libLanDeviceUtils (`lib/eq3udp.js` answers on 43439): rfd finds an HM-LGW configured by serial only, hs485d its HMW-LGW (`-s`) - and hs485d searches the gateway by serial on every reconnect, even when started with `-h`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `test/daemon/rfd-sweep.test.js`          | the sweeps over rfd: `system.listMethods` equals the dispatcher table read from the source at image-build time (`scripts/method-table.mjs`, 52 methods at 3.89.11); every method with valid, missing, extra and wrong-typed arguments (nine values per position); one device of every `rftypes` type without radio (`addVirtualDeviceInstance`, the announcement built from the type's conditions: 341 of 343, the two central types have none) with the descriptions, paramsets and values of every address. rfd must survive all of it without a sanitizer report; every answer is recorded for the differential                                                                                                                                                                                                |
+| `test/daemon/hs485d-sweep.test.js`       | the same for hs485d (25 methods) against the JavaScript HMW-LGW, and one wired device of every `hs485types` type with a condition (15) on the simulated bus, found by `searchDevices`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `fuzz/`                                  | libFuzzer harnesses for `XmlRpcValue` (BIN-RPC and XML deserializers), the request dispatcher with `system.multicall`, and `xmlParser`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `test/unit/`                             | the simulator itself: framing and CRC, the module state machine, the raw BIN-RPC encoder, the LGW front's cipher streams, the AES handshake, the device model                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 A regression test for a bug the chosen OpenCCU-Base ref does not have the fix for runs as `todo` (`HMRS_KNOWN_BROKEN`,
 set per ref by the Dockerfile), so the run shows what happens without going red. Against `3.89.11` that is #115,
-#116, #138 and #140, plus four findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
+#116, #138 and #140, plus six findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
 The second finding without an issue yet is `read-eof`: a pty slave whose master went away
@@ -49,8 +51,13 @@ reconnected LAN gateway, rfd re-adds every device (`ADD_LINK_PEER`) and the keys
 authenticates the events of AES channels and rfd rejects them (`auth_violate_policy="reject"`) - a remote with AES
 goes silent. The fourth, `wired-maintenance`: hs485d builds the channels of a newly discovered wired device without
 their class, so its maintenance channel does not exist until hs485d restarts and loads the device from its file -
-`UNREACH`, `STICKY_UNREACH` and `CONFIG_PENDING` read as "unknown internal value" and no service event fires. Against
-`main`, `double-join`, `read-eof`, `aes-republish` and `wired-maintenance`. Every finding has an issue draft in
+`UNREACH`, `STICKY_UNREACH` and `CONFIG_PENDING` read as "unknown internal value" and no service event fires. The
+sweeps found two more under AddressSanitizer: `metadata-args` - `setVolatileMetadata` (and `getMetadata`/`setMetadata`)
+takes a pointer into its first argument and then indexes the second; when that is missing, the argument array is
+reallocated under the pointer (heap-use-after-free). And `string-uint-conversion` - libhsscomm's
+`type_conversion_string_unsigned_integer` walks the `c_str()` of a destroyed temporary string (stack-use-after-scope)
+whenever the channels of an HM-OU-LED16 are set up. Against `main`, `double-join`, `read-eof`, `aes-republish`,
+`wired-maintenance`, `metadata-args` and `string-uint-conversion`. Every finding has an issue draft in
 [`upstream-reports/`](upstream-reports/) (German README, English drafts); nothing is reported upstream until the
 maintainer decides.
 
@@ -104,7 +111,7 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
 
 - **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
   that predates the fix it runs as **todo** (known broken, the run stays green);
-- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`), linking to the issue or,
+- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`), linking to the issue or,
   until there is one, to the findings above;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
 
@@ -116,6 +123,11 @@ tracefile and llvm-cov's JSON - file paths and counts, no source text; with an O
 would lose their profile when the suite stops them, so the variant uses clang's continuous mode, where the counters
 live in an mmapped file. clang was chosen because rfd and hs485d build and pass the suite with it unchanged; the
 release and ASan variants stay on gcc.
+
+**The differential:** the release jobs keep the answers of the sweeps (`results/<variant>/sweep/*.json`, short
+summaries: a struct's keys, an array's length and first element, a fault's code and text). The report compares
+`3.89.11` with `main`, and `main` with the commit the previous published report tested (its records are on the site as
+`sweep/main.json`), and lists what changed. A change is not a failure; `getVersion` is ignored by design.
 
 The data is next to the page as `report.json`. Nothing of it is committed: the report is built from the run's
 artifacts by `scripts/report.mjs` (a node:test JSON reporter writes `tests.json`, the entrypoint `meta.json` with the

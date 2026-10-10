@@ -7,6 +7,7 @@
  *   summary.md    a Markdown overview for $GITHUB_STEP_SUMMARY
  *   index.html    a static page (inline CSS, dark mode, no JavaScript) for GitHub Pages
  *   history.json  the last runs, with the new one first
+ *   sweep/<ref>.json  the sweep records of each ref's release job; the next run diffs main against sweep/main.json
  *   runs/<id>/    the page and data of every run kept in the history
  *
  * Usage:
@@ -24,6 +25,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import {describeTest} from '../test/metadata.js';
+import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
@@ -58,6 +60,11 @@ export function collectResults(roots) {
                 const testsFile = path.join(dir, 'tests.json');
                 const tests = fs.existsSync(testsFile) ? readJson(testsFile) : {counts: {}, tests: []};
                 const job = makeJob(meta, tests);
+                const sweep = readSweep(dir);
+                if (sweep) {
+                    // the sweep records, for the differential (not part of report.json: they are large)
+                    Object.defineProperty(job, 'sweep', {value: sweep, enumerable: false});
+                }
                 const summaryFile = path.join(dir, 'coverage-summary.json');
                 if (fs.existsSync(summaryFile)) {
                     // the coverage variant: the per-component summary, and the data files to publish next to the page
@@ -109,7 +116,9 @@ function readJson(file) {
 
 /**
  * @param {{jobs: object[], fuzz: object[]}} results
- * @param {{repoSha?: string, runId?: string, runUrl?: string, ref?: string, generatedAt?: string}} run
+ * @param {{repoSha?: string, runId?: string, runUrl?: string, ref?: string, generatedAt?: string,
+ *   trigger?: string, previousMain?: object|null}} run `previousMain`: the main sweep records the previous report
+ *   published (for the differential against the previously tested commit)
  */
 export function buildReport(results, run = {}) {
     const generatedAt = run.generatedAt || new Date().toISOString();
@@ -128,6 +137,10 @@ export function buildReport(results, run = {}) {
         status,
         jobs: results.jobs,
         fuzz: results.fuzz,
+        differential: buildDifferential(results.jobs, run.previousMain || null).map((s) => ({
+            ...s,
+            diff: {...s.diff, items: s.diff.items.slice(0, DIFF_LIST_LIMIT)},
+        })),
     };
 }
 
@@ -212,6 +225,27 @@ export function renderSummaryMarkdown(report) {
         }
         lines.push('');
     }
+    for (const section of report.differential || []) {
+        const d = section.diff;
+        lines.push(`### Differential: ${escapeMd(section.title)}`);
+        lines.push('');
+        lines.push(
+            `OpenCCU-Base [${short(section.from.baseCommit)}](${BASE}/commit/${section.from.baseCommit}) → [${short(section.to.baseCommit)}](${BASE}/commit/${section.to.baseCommit}): ${d.changed} changed, ${d.added} added, ${d.removed} removed, ${d.equal} equal answers of the RPC and device-type sweeps${d.ignored ? ` (${d.ignored} ignored by design)` : ''}.`,
+        );
+        if (d.items.length) {
+            lines.push('');
+            lines.push('<details><summary>the differences</summary>');
+            lines.push('');
+            for (const item of d.items) {
+                lines.push(
+                    `- \`${escapeMd(item.sweep)}\` ${escapeMd(item.key)}: ${item.from === null ? '(new)' : escapeMd(item.from)} → ${item.to === null ? '(gone)' : escapeMd(item.to)}`,
+                );
+            }
+            lines.push('');
+            lines.push('</details>');
+        }
+        lines.push('');
+    }
     if (report.fuzz.length) {
         lines.push('### Fuzzing');
         lines.push('');
@@ -290,6 +324,7 @@ td.name { overflow-wrap: anywhere; }
 .sub { padding-left: 1.5rem; color: var(--muted); }
 .diag { color: var(--muted); font-size: .85em; } .err { color: var(--fail); font-size: .85em; }
 .overall-pass { color: var(--pass); } .overall-fail { color: var(--fail); }
+ul.diff { padding-left: 1.2rem; overflow-wrap: anywhere; } ul.diff li { margin: .2rem 0; }
 footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
 /* phone: the commit, kind, links and duration columns shrink to a pixel (a zero width would count as auto) (their content moves under the name; the
    cells stay in the fixed layout so nothing shifts into the next <col>), the result columns keep one fixed width,
@@ -538,6 +573,37 @@ export function renderHtml(report, history = []) {
         }
     }
 
+    // Differential: the sweeps' answers compared between refs (scripts/differential.mjs)
+    if ((report.differential || []).length) {
+        h.push(
+            `<h2>Differential</h2><p class="muted">The answers of the RPC method sweep and the device-type sweep (release variant), compared between the refs of this run and with the main commit the previous report tested. A change is not a failure: it shows what a consumer of the daemons sees change.</p>`,
+        );
+        for (const section of report.differential) {
+            const d = section.diff;
+            h.push(
+                `<h3>${esc(section.title)}: <a class="mono" href="${BASE}/commit/${esc(section.from.baseCommit)}">${esc(short(section.from.baseCommit))}</a> → <a class="mono" href="${BASE}/commit/${esc(section.to.baseCommit)}">${esc(short(section.to.baseCommit))}</a></h3>`,
+            );
+            h.push(
+                `<p>${d.changed} changed, ${d.added} added, ${d.removed} removed, ${d.equal} equal${d.ignored ? `, ${d.ignored} ignored by design` : ''}.</p>`,
+            );
+            if (d.items.length) {
+                h.push(
+                    `<details><summary>the differences${d.items.length < d.changed + d.added + d.removed ? ` (the first ${d.items.length})` : ''}</summary>`,
+                );
+                // a list, not a table: the answers are long texts that do not fit the tables' column scheme
+                h.push(
+                    `<ul class="diff">${d.items
+                        .map(
+                            (item) =>
+                                `<li><span class="muted">${esc(item.sweep)}</span> <span class="mono">${esc(item.key)}</span>: ${item.from === null ? '<span class="muted">(new)</span>' : `<span class="mono">${esc(item.from)}</span>`} → ${item.to === null ? '<span class="muted">(gone)</span>' : `<span class="mono">${esc(item.to)}</span>`}</li>`,
+                        )
+                        .join('\n')}</ul>`,
+                );
+                h.push(`</details>`);
+            }
+        }
+    }
+
     // Fuzzing: name | commit | harness | time | executions | exec/s | findings
     if (report.fuzz.length) {
         h.push(`<h2>Fuzzing (libFuzzer)</h2>`);
@@ -715,6 +781,14 @@ export function writeSite(report, {out, previous, keep = 20}) {
         }
         delete job.coverageFiles;
     }
+    // the sweep records of the release jobs: the next run diffs main against sweep/main.json
+    for (const job of report.jobs.filter((j) => j.variant === 'release' && j.sweep)) {
+        fs.mkdirSync(path.join(out, 'sweep'), {recursive: true});
+        fs.writeFileSync(
+            path.join(out, 'sweep', `${job.ref.replace(/[^A-Za-z0-9.-]/g, '_')}.json`),
+            JSON.stringify({ref: job.ref, baseCommit: job.baseCommit, records: job.sweep}) + '\n',
+        );
+    }
     const html = renderHtml(report, history);
     fs.writeFileSync(path.join(runDir, 'index.html'), html);
     fs.writeFileSync(path.join(runDir, 'report.json'), JSON.stringify(report, null, 1) + '\n');
@@ -728,6 +802,19 @@ export function writeSite(report, {out, previous, keep = 20}) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // command line
+
+/** The main sweep records of the published report before this run (`<previous>/sweep/main.json`), or null. */
+function readPreviousMain(previous) {
+    const file = previous ? path.join(previous, 'sweep', 'main.json') : null;
+    if (!file || !fs.existsSync(file)) {
+        return null;
+    }
+    try {
+        return readJson(file);
+    } catch {
+        return null;
+    }
+}
 
 function parseArgs(argv) {
     const options = {roots: []};
@@ -773,6 +860,7 @@ function main(argv) {
             runUrl: options.runUrl,
             ref: options.ref,
             trigger: options.trigger,
+            previousMain: readPreviousMain(options.previous),
         });
         const history = writeSite(report, {
             out: options.out,

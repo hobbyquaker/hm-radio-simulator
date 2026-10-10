@@ -83,6 +83,15 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 - **Die UDP-Gerätesuche** (libLanDeviceUtils, `lib/eq3udp.js`): ein simuliertes eQ-3-LAN-Gerät beantwortet die
   Suche auf UDP 43439 - rfd findet so ein nur per Seriennummer konfiguriertes HM-LGW, hs485d sein HMW-LGW (`-s`), und
   hs485d sucht das Gateway bei jeder Wiederverbindung so, auch wenn es mit `-h` gestartet wurde.
+- **Die Durchläufe (Sweeps):** jede RPC-Methode von rfd (52) und hs485d (25) mit gültigen, fehlenden, überzähligen
+  und falsch typisierten Argumenten (neun Werte je Position: Integer-Ränder, Double, Boolean, ein langer String,
+  Array, Struct). `system.listMethods` muss der Dispatcher-Tabelle aus dem Quelltext entsprechen, die das Image beim
+  Bau liest (`scripts/method-table.mjs`); eine upstream hinzugefügte oder entfernte Methode fällt so auf. Dazu je ein
+  Gerät jedes Typs aus `rftypes` (341 von 343, ohne Funk über `addVirtualDeviceInstance`, die Ansage aus den
+  Bedingungen des Typs gebaut) und jedes Typs aus `hs485types` (15, auf dem simulierten Bus gesucht), von dem
+  Gerätebeschreibung, Paramset-Beschreibungen, Paramsets und Werte jeder Adresse abgefragt werden. Der Daemon muss
+  alles überstehen, ohne Sanitizer-Bericht. Jede Antwort wird kurz festgehalten; der Testbericht vergleicht die
+  Antworten von `3.89.11` und `main` und die des zuletzt geprüften `main`-Commits mit dem aktuellen (_Differential_).
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -90,7 +99,7 @@ Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitize
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
-sowie vier Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie sechs Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -102,8 +111,14 @@ neu startet oder die Konfiguration des Kanals erneut geschrieben wird, authentif
 AES-Kanäle nicht mehr, und rfd verwirft sie (`auth_violate_policy="reject"`) - eine Fernbedienung mit AES verstummt.
 Der vierte, `wired-maintenance`: hs485d baut die Kanäle eines neu gefundenen Wired-Geräts ohne ihre Klasse, der
 Wartungskanal fehlt also, bis hs485d neu startet und das Gerät aus seiner Datei lädt - `UNREACH`, `STICKY_UNREACH` und
-`CONFIG_PENDING` sind bis dahin "unknown internal value", und keine Servicemeldung kommt. Gegen `main` bleiben
-`double-join`, `read-eof`, `aes-republish` und `wired-maintenance`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+`CONFIG_PENDING` sind bis dahin "unknown internal value", und keine Servicemeldung kommt. Zwei weitere haben die
+Durchläufe unter AddressSanitizer gefunden: `metadata-args` - `setVolatileMetadata` (ebenso `getMetadata` und
+`setMetadata`) nimmt einen Zeiger in sein erstes Argument und greift dann auf das zweite zu; fehlt es, wird das
+Argument-Array neu angelegt und der Zeiger zeigt auf freigegebenen Speicher (heap-use-after-free). Und
+`string-uint-conversion` - die Typumwandlung `type_conversion_string_unsigned_integer` in libhsscomm liest den
+`c_str()` eines schon zerstörten temporären Strings (stack-use-after-scope), sobald die Kanäle eines HM-OU-LED16
+angelegt werden. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`
+und `string-uint-conversion`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -185,7 +200,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
@@ -196,6 +211,12 @@ Daemons selbst und jede Bibliothek als eigene Zeile sowie je Datei die Prozente,
 Commit rendert `genhtml --prefix /openccu-base coverage.info` die annotierte Ansicht). Die Daemons haben keinen
 SIGTERM-Handler und würden ihr Profil beim Stoppen verlieren; die Variante nutzt deshalb clangs Continuous Mode, in
 dem die Zähler in einer eingeblendeten Datei liegen.
+
+**Das Differential:** Die Release-Jobs halten die Antworten der Durchläufe fest (`results/<variante>/sweep/*.json`,
+kurze Zusammenfassungen: die Schlüssel eines Structs, die Länge eines Arrays und sein erstes Element, Code und Text
+eines Faults). Der Bericht vergleicht `3.89.11` mit `main` und `main` mit dem Commit, den der zuvor veröffentlichte
+Bericht geprüft hat (dessen Antworten liegen als `sweep/main.json` auf der Seite), und listet, was sich geändert hat.
+Eine Änderung ist kein Fehler; `getVersion` wird bewusst ignoriert.
 
 Die Daten dahinter liegen als `report.json` neben der Seite. Nichts davon ist im Repository eingecheckt; der Bericht
 entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run report` nach `scripts/run-tests.sh`.

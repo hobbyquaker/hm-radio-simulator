@@ -1,0 +1,7 @@
+{
+  "rf_s.xml/HM-LC-Sw1-Pl": {
+    "type": "HM-LC-Sw1-Pl",
+    "channels": 1,
+    "addresses": {"device": {"MASTER": ["INTERNAL_KEYS_VISIBLE:BOOL"]}}
+  }
+}

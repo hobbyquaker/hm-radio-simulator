@@ -1,0 +1,6 @@
+{
+  "getVersion()": "string \"1.0.0\"",
+  "listDevices()": "array[5] of struct{10}",
+  "getValue(\"NOSUCH0001:1\", \"STATE\")": "fault -2 Unknown instance",
+  "setTeam(\"SWPMETH001:1\", \"\")": "boolean true"
+}
