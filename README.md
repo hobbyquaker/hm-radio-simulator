@@ -95,9 +95,9 @@ lässt jeden Fuzzer 60 s laufen.
 
 ## Roadmap
 
-- 🕵️ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests der Daemons, Regressionstests
-- 🕵️ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
-- 🕵️ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
+- ✅ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests der Daemons, Regressionstests
+- ✅ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
+- ✅ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
   Frame-Fuzzing
 - ☑️ **Stufe 1b:** LAN-Gateway über
   [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
