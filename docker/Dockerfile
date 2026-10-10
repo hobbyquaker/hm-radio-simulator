@@ -89,7 +89,7 @@ CMD ["fuzz/run.sh"]
 
 # the test environment
 FROM ${NODE_IMAGE} AS test
-ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance
+ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion
 RUN apt-get update \
  && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata llvm \
  && rm -rf /var/lib/apt/lists/*
@@ -100,16 +100,24 @@ COPY --from=base-src /openccu-base/src/devicetypes/hs485types /opt/openccu-base/
 COPY --from=base-src /openccu-base/licenses /opt/openccu-base/licenses
 COPY --from=base-src /openccu-base/.openccu-base-commit /opt/openccu-base/commit
 COPY --from=base-src /openccu-base/.openccu-base-ref /opt/openccu-base/ref
+# the daemons' RPC dispatcher sources, for the method sweep's table (scripts/method-table.mjs below)
+COPY --from=base-src /openccu-base/src/rfd/XmlRpcMethods.cpp /openccu-base/src/rfd/rfd.cpp /opt/openccu-base/methods-src/rfd/
+COPY --from=base-src /openccu-base/src/hs485d/XmlRpcMethods.cpp /openccu-base/src/hs485d/hs485d.cpp /opt/openccu-base/methods-src/hs485d/
 ENV HMRS_RFTYPES=/opt/openccu-base/rftypes \
     HMRS_HS485TYPES=/opt/openccu-base/hs485types \
     HMRS_HMLANGW=/opt/hmlangw/bin/hmlangw \
     HMRS_KNOWN_BROKEN=${KNOWN_BROKEN} \
+    HMRS_METHODS=/opt/openccu-base/methods \
     TZ=Europe/Berlin
 WORKDIR /opt/hm-radio-simulator
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-RUN chmod +x scripts/*.sh fuzz/*.sh
+RUN chmod +x scripts/*.sh fuzz/*.sh \
+ && mkdir -p /opt/openccu-base/methods \
+ && for d in rfd hs485d; do \
+      node scripts/method-table.mjs /opt/openccu-base/methods-src/$d/*.cpp > /opt/openccu-base/methods/$d.json || exit 1; \
+    done
 VOLUME /results
 ENTRYPOINT ["scripts/docker-entrypoint.sh"]
 CMD ["npm", "run", "test:daemon"]

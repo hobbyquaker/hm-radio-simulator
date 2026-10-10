@@ -44,22 +44,22 @@ jobs:
         include:
           - base_ref: '3.89.11'
             variant: release
-            known_broken: '115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance'
+            known_broken: '115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion'
           - base_ref: '3.89.11'
             variant: asan
-            known_broken: '115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance'
+            known_broken: '115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion'
           - base_ref: main
             variant: release
-            known_broken: 'double-join,read-eof,aes-republish,wired-maintenance'
+            known_broken: 'double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion'
           - base_ref: main
             variant: asan
-            known_broken: 'double-join,read-eof,aes-republish,wired-maintenance'
+            known_broken: 'double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion'
           - base_ref: '3.89.11'
             variant: coverage
-            known_broken: '115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance'
+            known_broken: '115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion'
           - base_ref: main
             variant: coverage
-            known_broken: 'double-join,read-eof,aes-republish,wired-maintenance'
+            known_broken: 'double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion'
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -153,6 +153,9 @@ jobs:
         run: |
           site=https://hobbyquaker.github.io/hm-radio-simulator
           mkdir -p previous
+          # the main sweep records of the previous run, for the differential against the previously tested commit
+          mkdir -p previous/sweep
+          curl -fsSL "$site/sweep/main.json" -o previous/sweep/main.json || rm -f previous/sweep/main.json
           if curl -fsSL "$site/history.json" -o previous/history.json; then
             for id in $(node -e 'console.log(JSON.parse(require("fs").readFileSync("previous/history.json","utf8")).map((e) => e.id).join(" "))'); do
               mkdir -p "previous/runs/$id"

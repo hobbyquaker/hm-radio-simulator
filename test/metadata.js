@@ -85,6 +85,16 @@ export const FINDINGS = Object.freeze({
         draft: '006-wired-maintenance-channel.md',
         issue: null,
     },
+    'metadata-args': {
+        title: 'rfd: setVolatileMetadata (and getMetadata/setMetadata) with a missing argument read freed memory - the second index reallocates the parameter array under the first string',
+        draft: '007-metadata-missing-argument.md',
+        issue: null,
+    },
+    'string-uint-conversion': {
+        title: 'libhsscomm: type_conversion_string_unsigned_integer reads a destroyed temporary string (HM-OU-LED16 channel set-up)',
+        draft: '008-string-uint-conversion-dangling.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

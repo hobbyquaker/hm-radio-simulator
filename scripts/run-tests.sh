@@ -30,8 +30,8 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -z "${KNOWN}" ]; then
   case "${REF}" in
-    3.89.11) KNOWN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance ;;
-    *) KNOWN=double-join,read-eof,aes-republish,wired-maintenance ;;
+    3.89.11) KNOWN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion ;;
+    *) KNOWN=double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion ;;
   esac
 fi
 
