@@ -1,0 +1,47 @@
+{
+  "name": "hm-radio-simulator",
+  "version": "0.1.0",
+  "description": "A simulated Homematic radio module and a test suite for the CCU's radio daemons (rfd, hs485d) of OpenCCU-Base",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write . && eslint --fix .",
+    "test": "npm run test:unit",
+    "test:unit": "node --test 'test/unit/*.test.js'",
+    "test:daemon": "node --test --test-concurrency=1 'test/daemon/*.test.js'",
+    "test:all": "node --test 'test/unit/*.test.js' 'test/daemon/*.test.js'",
+    "docker:test": "scripts/run-tests.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hobbyquaker/hm-radio-simulator.git"
+  },
+  "keywords": [
+    "Homematic",
+    "BidCoS",
+    "rfd",
+    "hs485d",
+    "OpenCCU",
+    "simulator",
+    "test"
+  ],
+  "author": "Sebastian Raff <hobbyquaker@gmail.com>",
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "binrpc": "^4.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "homematic-xmlrpc": "^2.0.0",
+    "prettier": "^3.9.6"
+  }
+}

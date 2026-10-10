@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: lint and unit tests (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:unit
+
+  daemons:
+    name: daemon suite (OpenCCU-Base ${{ matrix.base_ref }}, ${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - base_ref: '3.89.11'
+            variant: release
+            known_broken: '115,116,138,140,double-join'
+          - base_ref: '3.89.11'
+            variant: asan
+            known_broken: '115,116,138,140,double-join'
+          - base_ref: main
+            variant: release
+            known_broken: 'double-join'
+          - base_ref: main
+            variant: asan
+            known_broken: 'double-join'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: build the test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: test
+          load: true
+          tags: hm-radio-simulator:test
+          build-args: |
+            BASE_REF=${{ matrix.base_ref }}
+            KNOWN_BROKEN=${{ matrix.known_broken }}
+          cache-from: type=gha,scope=base-${{ matrix.base_ref }}
+          cache-to: type=gha,mode=max,scope=base-${{ matrix.base_ref }}
+      - name: run the daemon suite
+        run: |
+          mkdir -p results
+          docker run --rm --init -e HMRS_VARIANT=${{ matrix.variant }} -v "$PWD/results:/results" hm-radio-simulator:test npm run test:daemon
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daemon-results-${{ matrix.base_ref }}-${{ matrix.variant }}
+          path: results
+          if-no-files-found: ignore
+
+  fuzz:
+    name: fuzz (OpenCCU-Base ${{ matrix.base_ref }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - base_ref: main
+            expect_findings: '0'
+          - base_ref: '3.89.11'
+            expect_findings: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: build the fuzz image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: fuzz
+          load: true
+          tags: hm-radio-simulator:fuzz
+          build-args: |
+            BASE_REF=${{ matrix.base_ref }}
+          cache-from: type=gha,scope=base-${{ matrix.base_ref }}
+          cache-to: type=gha,mode=max,scope=base-${{ matrix.base_ref }}
+      - name: run the harnesses (60 s each)
+        run: |
+          mkdir -p results/fuzz
+          docker run --rm -e FUZZ_SECONDS=60 -e FUZZ_EXPECT_FINDINGS=${{ matrix.expect_findings }} -v "$PWD/results/fuzz:/results" hm-radio-simulator:fuzz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzz-results-${{ matrix.base_ref }}
+          path: results/fuzz/artifacts
+          if-no-files-found: ignore

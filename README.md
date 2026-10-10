@@ -1,5 +1,7 @@
 # hm-radio-simulator
 
+[:uk: English README](README.en.md)
+
 [![CI](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -26,8 +28,10 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 
 ## Was getestet wird
 
-- **rfd ohne Funkmodul:** Methodenliste über BIN-RPC und XML-RPC, `listDevices`, `listBidcosInterfaces`, `init`
-  mit einem Event-Empfänger.
+- **Die RPC-Schnittstelle von rfd:** Methodenliste über BIN-RPC und XML-RPC auf demselben Port, `listDevices`,
+  `listBidcosInterfaces`, `init` mit einem Event-Empfänger. Dazu die Messung, dass rfd 3.89.11 ohne konfiguriertes
+  Interface gar nicht startet ("No BidCoS-Interface available"), weshalb auch diese Tests mit dem simulierten
+  Funkmodul laufen.
 - **Robustheit der RPC-Schnittstellen:** verschachteltes `system.multicall`
   ([#138](https://github.com/OpenCCU/OpenCCU-Base/pull/138)), fehlerhafte BIN-RPC-Requests
   ([#140](https://github.com/OpenCCU/OpenCCU-Base/pull/140)), feindliches XML-RPC, ein Event-Empfänger, der
@@ -40,8 +44,11 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer. Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
-Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140,
-gegen `main` nichts.
+Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
+sowie einen Fund dieser Suite ohne Issue bisher, `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
+zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Gegen `main` nur
+`double-join`.
 
 ## Wie es funktioniert
 
@@ -75,15 +82,19 @@ scripts/run-tests.sh           # Image für OpenCCU-Base 3.89.11 bauen, Suite no
 scripts/run-tests.sh --ref main --variants release --fuzz 60
 ```
 
+Das Image basiert absichtlich auf Debian trixie: Die Sanitizer-Laufzeiten von bookworm (LLVM 14, GCC 12) stürzen auf
+Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer Segfault in jedem vierten ASan-Lauf
+aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
+
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
 `results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet `3.89.11` und `main` in beiden Varianten und
 lässt jeden Fuzzer 60 s laufen.
 
 ## Roadmap
 
-- 🏗️ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests ohne Funkmodul, Regressionstests
-- 🏗️ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
-- 🏗️ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
+- 🕵️ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests der Daemons, Regressionstests
+- 🕵️ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
+- 🕵️ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
   Frame-Fuzzing
 - ☑️ **Stufe 1b:** LAN-Gateway über
   [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
@@ -95,7 +106,7 @@ lässt jeden Fuzzer 60 s laufen.
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 💤 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 
-🏗️ in Arbeit · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
+✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 
 ## Credits und Lizenzen
 
