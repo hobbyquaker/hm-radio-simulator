@@ -100,6 +100,17 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   hängender Empfänger bremst nur sich selbst (die anderen bekommen ihre Events nach rund 20 ms, RPC antwortet sofort).
   Servicemeldungen werden einem später angemeldeten Empfänger nachgeschickt; ein `replaceDevice` erreicht alle
   angemeldeten Empfänger.
+- **Neustart, Gerätedateien und Konfiguration:** je ein Gerät jedes `rftypes`-Typs, rfd über seine RPC-Methode
+  `exit` sauber beendet (exit(0) in Millisekunden) und neu gestartet - alle Adressen, Typen, Versionen und Kanäle sind
+  wieder da (dazu die Team-Geräte der Rauchmelder, die erst das Laden aus der Datei anlegt); dasselbe für jeden
+  `hs485types`-Typ. Eine halbierte Gerätedatei wird verworfen, Müll und leere Dateien übergangen, übrig gebliebene
+  `.bak`/`.new`-Kopien ignoriert, ein fehlender Kanal neu angelegt. `BidCoS-Address = 0` (der erste Start eines neuen
+  Systems): rfd übernimmt die Standardadresse des Moduls und schreibt sie in die Adressdatei; `changeKey` schreibt
+  Schlüssel und Index in die Schlüsseldatei, ein Neustart lädt sie; angemeldete Empfänger überstehen den Neustart
+  (`XmlRpcHandlersFile`). Die Start-Matrix: fehlende Konfigurationsdatei, unbekannter Interface-`Type`, `Log
+Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exit-Code 0), zwei Interfaces, die alte
+  Coprozessor-Initialisierung, der Sniffing-Modus (`-s`), hs485d mit zusätzlichen Beschreibungen in
+  `/etc/config/hs485types`.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 

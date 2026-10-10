@@ -18,6 +18,7 @@ import {createHmlangwGateway} from '../../lib/hmlangw.js';
 import {createLgwFront} from '../../lib/lgw.js';
 import {createHmwLgwFront} from '../../lib/hmwlgw.js';
 import {WiredBus} from '../../lib/wired.js';
+import {Air} from '../../lib/air.js';
 import {BinRpcClient, XmlRpcClient, freePort} from './rpc.js';
 
 export const DAEMONS = process.env.HMRS_DAEMONS || '';
@@ -161,6 +162,16 @@ export class Daemon {
         return Number(fields[11]) + Number(fields[12]);
     }
 
+    /**
+     * Stops rfd the clean way, through its `exit` RPC method (rfd.cpp: the main loop ends, exit(0) runs the atexit
+     * handlers - a coverage build writes its data), and waits for the process to end.
+     * @returns {Promise<{code: number|null, signal: string|null, at: number}|null>} null when it did not end in time
+     */
+    async exitViaRpc(timeout = 15000) {
+        await this.call('exit', [], {timeout: 5000}).catch(() => {});
+        return Promise.race([this.exited, sleep(timeout).then(() => null)]);
+    }
+
     /** Stops the daemon, closes the RPC client (its reconnect timer would keep the test process alive) and the pty. */
     async stop() {
         if (this.alive) {
@@ -234,7 +245,10 @@ export function tmpdir(prefix) {
  * should differ from the gateway's). With `lgwFront`, the JavaScript gateway (lib/lgw.js) is used instead, with its
  * options (`key` = the LAN key for the AES transport, `serial`, ...; `configuredSerial` and `configuredKey` for what
  * rfd.conf says).
- * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string}} [options]
+ * With `dir`, an earlier daemon's directory is used again (a restart: its device files, address, keys and handlers
+ * stay; only rfd.conf is written anew). `console: false` leaves out `-c`, so the configured `Log Destination` counts;
+ * `args` replaces the command line after the binary (`{config}` is replaced by the config file's path).
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
@@ -246,15 +260,29 @@ export async function spawnRfd({
     logLevel = 0,
     address = CENTRAL_ADDRESS,
     extra = '',
+    dir = null,
+    console = true,
+    args = null,
+    logDestination = 'Console',
+    port = null,
+    improvedInit = true,
+    quietAir = false,
 } = {}) {
-    const dir = tmpdir('hmrs-rfd');
-    const port = await freePort();
+    const fresh = !dir;
+    dir = dir || tmpdir('hmrs-rfd');
+    port = port ?? (await freePort());
     let module = null;
     let pty = null;
     let gateway = null;
     let front = null;
+    let air = null;
     if (!interfaces && !noInterface) {
         module = new RadioModule(moduleOptions);
+        if (quietAir) {
+            // an empty air from the first command on, in which a telegram to an absent device fails after the
+            // module's failDelayMs - for daemons with many devices nobody answers for (the sweeps, the restarts)
+            air = new Air({module, absentFails: true});
+        }
         if (lgwFront) {
             // `search: true` leaves the IP out of rfd.conf: rfd then looks for the gateway's serial over UDP (an
             // Eq3LanDevice of lib/eq3udp.js answers) and connects to the fixed ports 2000/2001
@@ -278,14 +306,18 @@ export async function spawnRfd({
         }
     }
     interfaces = interfaces || [];
-    fs.mkdirSync(path.join(dir, 'devices'));
-    fs.mkdirSync(path.join(dir, 'firmware'));
-    fs.writeFileSync(path.join(dir, 'ids'), `BidCoS-Address = ${address}\n`);
-    fs.writeFileSync(path.join(dir, 'keys'), `Current Index = 1\nLast Index = 1\nKey 1 = ${TEST_KEY_HEX}\n`);
+    fs.mkdirSync(path.join(dir, 'devices'), {recursive: true});
+    fs.mkdirSync(path.join(dir, 'firmware'), {recursive: true});
+    if (fresh || !fs.existsSync(path.join(dir, 'ids'))) {
+        fs.writeFileSync(path.join(dir, 'ids'), `BidCoS-Address = ${address}\n`);
+    }
+    if (fresh || !fs.existsSync(path.join(dir, 'keys'))) {
+        fs.writeFileSync(path.join(dir, 'keys'), `Current Index = 1\nLast Index = 1\nKey 1 = ${TEST_KEY_HEX}\n`);
+    }
     const lines = [
         'Listen IP = 127.0.0.1',
         `Listen Port = ${port}`,
-        'Log Destination = Console',
+        `Log Destination = ${logDestination}`,
         `Log Level = ${logLevel}`,
         'Log Identifier = rfd',
         'Persist Keys = 1',
@@ -300,7 +332,7 @@ export async function spawnRfd({
         // /var/rfd.handlers, so every later rfd in the same container would start with earlier tests' dead receivers
         `XmlRpcHandlersFile = ${path.join(dir, 'rfd.handlers')}`,
         'Fire NACK Error Events = true',
-        'Improved Coprocessor Initialization = true',
+        `Improved Coprocessor Initialization = ${improvedInit}`,
         extra,
     ];
     interfaces.forEach((iface, i) => {
@@ -320,14 +352,12 @@ export async function spawnRfd({
     });
     const config = path.join(dir, 'rfd.conf');
     fs.writeFileSync(config, lines.join('\n') + '\n');
-    const daemon = new Daemon(
-        'rfd',
-        path.join(DAEMONS, 'bin', 'rfd'),
-        ['-f', config, '-c', '-l', String(logLevel)],
-        dir,
-        port,
-    );
+    const cmdline = args
+        ? args.map((a) => a.replace('{config}', config))
+        : ['-f', config, ...(console ? ['-c'] : []), '-l', String(logLevel)];
+    const daemon = new Daemon('rfd', path.join(DAEMONS, 'bin', 'rfd'), cmdline, dir, port);
     daemon.module = module;
+    daemon.air = air;
     daemon.pty = pty;
     daemon.gateway = gateway;
     daemon.lgw = front;
