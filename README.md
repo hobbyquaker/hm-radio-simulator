@@ -99,7 +99,7 @@ lässt jeden Fuzzer 60 s laufen.
 - ✅ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
 - ✅ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
   Frame-Fuzzing
-- ☑️ **Stufe 1b:** LAN-Gateway über
+- 🏗️ **Stufe 1b:** LAN-Gateway über
   [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
   Modul, ohne Verschlüsselung
 - ☑️ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
