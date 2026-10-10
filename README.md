@@ -39,6 +39,12 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 - **rfd mit simuliertem Funkmodul:** die Initialisierung bis `CONNECTED`, das Modul im Bootloader, `BUSY` mit
   Wiederholung, Modul weg ([#115](https://github.com/OpenCCU/OpenCCU-Base/pull/115),
   [#116](https://github.com/OpenCCU/OpenCCU-Base/pull/116)) und wieder da, Events, Fuzzing der Funk-Frames.
+- **rfd am LAN-Gateway (HM-LGW):** [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw)
+  vor dem simulierten Modul, rfd mit `Type = HMLGW2` - das ist auch der HM-LGW-Modus von openccu-lite. Die
+  Initialisierung bis `CONNECTED`, das Keepalive auf Port 2001, eine Seriennummer in anderer Schreibweise
+  ([#17](https://github.com/OpenCCU/OpenCCU-Base/pull/17)), eine falsche Seriennummer, kein Gateway beim Start,
+  Gateway weg und wieder da (rfd meldet `CONNECTED = false`, verbindet neu und initialisiert das Modul erneut), der
+  Takt der Wiederverbindung, hmlangw ohne `-b` (das Modul wird ohne Client im Bootloader geparkt).
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -60,6 +66,15 @@ Verlust des Moduls deshalb weiter mit 100 % CPU und meldet `CONNECTED = true`. G
 - Das simulierte Funkmodul (`lib/`, Node.js) spricht das serielle Protokoll des Moduls: Framing mit CRC, die
   System- und BidCoS-Befehle, Adresse, Schlüssel, Peers, Uhrzeit, Duty Cycle. Es hängt über ein Pseudo-Terminal
   (`socat`) als Gerätedatei am Daemon. rfd öffnet es wie einen echten `ComPortFile`.
+- Das LAN-Gateway ist hmlangw selbst (MIT, beim Bau des Images aus dem OpenCCU-Repository geholt, Commit
+  festgepinnt): Es lauscht auf den HM-LGW-Ports 2000 und 2001 und reicht die Frames an das simulierte Modul auf dem
+  Pseudo-Terminal durch. Zwei Eigenheiten von hmlangw 1.1.1 zeigen sich dabei: Es startet seine Threads mit
+  `SCHED_RR`, was im Container `--cap-add SYS_NICE` braucht (sonst endet es still mit Exit-Code 1), und seine
+  Debug-Ausgabe (`-D`) stürzt in `sendEnterBootloader()` ab, weil die `fprintf`-Argumente vertauscht sind; die Suite
+  nutzt `-D` deshalb nur zusammen mit `-b`. Gemessen an rfd 3.89.11: Mit konfigurierter `IP Address` fragt rfd die
+  Seriennummer nicht vom Modul ab, `CONNECTED` wird schon mit dem Text-Vorspiel wahr (die Modul-Initialisierung folgt
+  erst), und der Wiederverbindungsversuch kommt konstant alle 5 s (`basetimeout`) plus 2 s Hello-Wartezeit; das
+  Anwachsen auf etwa 60 s gilt nur für die Suche per Seriennummer.
 - Das eigentliche Funk-Timing (Frames in der Luft, ACK-Fenster, Burst, CSMA/CA, Duty Cycle) passiert in der Firmware
   des Moduls. Der Daemon sieht davon nur Statusmeldungen, auf die er sekundenlang wartet. Die Simulation bildet das
   logisch nach und muss nur die Antwortfenster auf der seriellen Seite einhalten (rfd: 1 s pro Befehl, 4 s bis zum
@@ -85,6 +100,8 @@ scripts/run-tests.sh           # Image für OpenCCU-Base 3.89.11 bauen, Suite no
 scripts/run-tests.sh --ref main --variants release --fuzz 60
 ```
 
+Der Container läuft mit `--cap-add SYS_NICE` (für hmlangw, siehe oben); `scripts/run-tests.sh` und die CI setzen das.
+
 Das Image basiert absichtlich auf Debian trixie: Die Sanitizer-Laufzeiten von bookworm (LLVM 14, GCC 12) stürzen auf
 Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer Segfault in jedem vierten ASan-Lauf
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
@@ -99,9 +116,11 @@ lässt jeden Fuzzer 60 s laufen.
 - ✅ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
 - ✅ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
   Frame-Fuzzing
-- 🏗️ **Stufe 1b:** LAN-Gateway über
+- 🕵️ **Stufe 1b:** LAN-Gateway über
   [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
   Modul, ohne Verschlüsselung
+- 📥 **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu
+  den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
 - ☑️ **Stufe 2:** ein simulierter Schaltaktor aus den `rftypes`-Beschreibungen: Anlernen, Schalten mit ACK, Status,
   UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
 - ☑️ **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte
@@ -109,7 +128,7 @@ lässt jeden Fuzzer 60 s laufen.
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 💤 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 
-✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
+✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 
 ## Credits und Lizenzen
 
@@ -120,7 +139,7 @@ lässt jeden Fuzzer 60 s laufen.
 - [ReGaHss-Test](https://github.com/OpenCCU/ReGaHss-Test) (Jens Maus, Sebastian Raff; MIT): das Vorbild für Image
   und Suite, dieselbe Idee für die ReGaHss.
 - [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) (Oliver Kastl,
-  Jens Maus, Jérôme Pech; MIT): die Grundlage für das LAN-Gateway in Stufe 1b.
+  Jens Maus, Jérôme Pech; MIT): das LAN-Gateway der Suite, beim Bau des Images geholt und gebaut.
 - `00_HMUARTLGW.pm` aus [FHEM](https://fhem.de) (GPL) und [Homegear](https://github.com/Homegear) (GPL): als
   Dokumentation des Modulprotokolls gelesen, kein Code übernommen.
 - [binrpc](https://github.com/hobbyquaker/binrpc) und

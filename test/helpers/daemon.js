@@ -14,15 +14,21 @@ import path from 'node:path';
 
 import {RadioModule} from '../../lib/module.js';
 import {createPtyModule} from '../../lib/pty.js';
+import {createHmlangwGateway} from '../../lib/hmlangw.js';
 import {BinRpcClient, XmlRpcClient, freePort} from './rpc.js';
 
 export const DAEMONS = process.env.HMRS_DAEMONS || '';
 export const RFTYPES = process.env.HMRS_RFTYPES || '/opt/openccu-base/rftypes';
 export const HS485TYPES = process.env.HMRS_HS485TYPES || '/opt/openccu-base/hs485types';
+export const HMLANGW = process.env.HMRS_HMLANGW || '';
 export const haveDaemons = DAEMONS !== '' && fs.existsSync(path.join(DAEMONS, 'bin', 'rfd'));
+export const haveHmlangw = haveDaemons && HMLANGW !== '' && fs.existsSync(HMLANGW);
 export const skipWithoutDaemons = haveDaemons
     ? {}
     : {skip: 'HMRS_DAEMONS is not set: the daemon tests run in the docker image'};
+export const skipWithoutHmlangw = haveHmlangw
+    ? {}
+    : {skip: 'HMRS_HMLANGW is not set: the LAN-gateway tests run in the docker image'};
 
 /** The BidCoS address the test central uses (any value works; rfd only needs one that is not zero). */
 export const CENTRAL_ADDRESS = 0x3a2b1c;
@@ -60,6 +66,8 @@ export class Daemon {
         this.module = null;
         /** @type {import('../../lib/pty.js').PtyModule|null} */
         this.pty = null;
+        /** @type {import('../../lib/hmlangw.js').HmlangwGateway|null} the LAN gateway, when the daemon got one */
+        this.gateway = null;
     }
 
     start() {
@@ -159,6 +167,10 @@ export class Daemon {
             }
         }
         this.rpc.client.close();
+        if (this.gateway) {
+            await this.gateway.close();
+            this.gateway = null;
+        }
         if (this.pty) {
             await this.pty.close();
             this.pty = null;
@@ -168,21 +180,47 @@ export class Daemon {
         }
         return this.exit;
     }
+
+    /** What the simulator side saw, for error messages. */
+    simulatorView() {
+        let text = '';
+        if (this.module) {
+            text += `\n--- module saw: ${this.module.commands.map((c) => c.name).join(' ') || 'nothing'}`;
+        }
+        if (this.pty) {
+            text += `\n--- socat: ${this.pty.socatLog.join(' | ')}`;
+        }
+        if (this.gateway) {
+            text += `\n--- hmlangw: ${this.gateway.lines.slice(-20).join(' | ')}`;
+        }
+        return text;
+    }
 }
 
-function tmpdir(prefix) {
+/** A fresh working directory under HMRS_WORKDIR (the results volume in the image) or the temp dir. */
+export function tmpdir(prefix) {
     return fs.mkdtempSync(path.join(process.env.HMRS_WORKDIR || os.tmpdir(), `${prefix}-`));
 }
 
 /**
+ * An [Interface n] section of rfd.conf: `type` CCU2 / HM-MOD-UART with `dev` (the ComPortFile), or HMLGW2 with
+ * `serial`, `ip` (skips the UDP search) and optionally `key` (the LAN key; empty means plaintext).
+ * @typedef {{type?: string, dev?: string, serial?: string, ip?: string, key?: string}} InterfaceConfig
+ */
+
+/**
  * Writes rfd's configuration and spawns it. Without `interfaces`, a simulated module on a pty is created
- * (`module` are its options) unless `noInterface` is set, which is what rfd refuses to start with.
- * @param {{interfaces?: Array<{type?: string, dev: string, serial?: string}>, module?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string}} [options]
+ * (`module` are its options) unless `noInterface` is set, which is what rfd refuses to start with. With `lgw`, the
+ * module is put behind an hmlangw LAN gateway instead and rfd gets a `Type = HMLGW2` interface (`lgw` are the
+ * gateway's options, e.g. `{serial, bootloaderOnDisconnect}`; `lgw.configuredSerial` is what rfd.conf says when it
+ * should differ from the gateway's).
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
     interfaces,
     module: moduleOptions = {},
+    lgw = null,
     noInterface = false,
     logLevel = 0,
     address = CENTRAL_ADDRESS,
@@ -192,10 +230,17 @@ export async function spawnRfd({
     const port = await freePort();
     let module = null;
     let pty = null;
+    let gateway = null;
     if (!interfaces && !noInterface) {
         module = new RadioModule(moduleOptions);
-        pty = await createPtyModule({module, link: path.join(dir, 'uart0')});
-        interfaces = [{type: 'CCU2', dev: pty.link}];
+        if (lgw) {
+            const {configuredSerial, key, ...gatewayOptions} = lgw;
+            gateway = await createHmlangwGateway({module, dir, ...gatewayOptions});
+            interfaces = [{type: 'HMLGW2', serial: configuredSerial ?? gateway.serial, ip: gateway.host, key}];
+        } else {
+            pty = await createPtyModule({module, link: path.join(dir, 'uart0')});
+            interfaces = [{type: 'CCU2', dev: pty.link}];
+        }
     }
     interfaces = interfaces || [];
     fs.mkdirSync(path.join(dir, 'devices'));
@@ -221,15 +266,18 @@ export async function spawnRfd({
         extra,
     ];
     interfaces.forEach((iface, i) => {
-        lines.push(
-            `[Interface ${i}]`,
-            `Type = ${iface.type || 'CCU2'}`,
-            `ComPortFile = ${iface.dev}`,
-            'AccessFile = /dev/null',
-            'ResetFile = /dev/null',
-        );
+        lines.push(`[Interface ${i}]`, `Type = ${iface.type || 'CCU2'}`);
+        if (iface.dev) {
+            lines.push(`ComPortFile = ${iface.dev}`, 'AccessFile = /dev/null', 'ResetFile = /dev/null');
+        }
         if (iface.serial) {
             lines.push(`Serial Number = ${iface.serial}`);
+        }
+        if (iface.ip) {
+            lines.push(`IP Address = ${iface.ip}`);
+        }
+        if (iface.key !== undefined) {
+            lines.push(`Encryption Key = ${iface.key}`);
         }
     });
     const config = path.join(dir, 'rfd.conf');
@@ -243,6 +291,7 @@ export async function spawnRfd({
     );
     daemon.module = module;
     daemon.pty = pty;
+    daemon.gateway = gateway;
     return daemon.start();
 }
 
@@ -256,10 +305,7 @@ export async function startRfd(options = {}) {
     try {
         return await rfd.waitReady();
     } catch (error) {
-        if (rfd.module) {
-            error.message += `\n--- module saw: ${rfd.module.commands.map((c) => c.name).join(' ') || 'nothing'}`;
-            error.message += `\n--- socat: ${rfd.pty.socatLog.join(' | ')}`;
-        }
+        error.message += rfd.simulatorView();
         await rfd.stop();
         throw error;
     }
@@ -309,9 +355,7 @@ export async function withDaemon(daemon, body) {
         if (reports.length) {
             error.message += `\n--- sanitizer ---\n${reports.map((r) => r.text).join('\n')}`;
         }
-        if (daemon.module) {
-            error.message += `\n--- module saw: ${daemon.module.commands.map((c) => c.name).join(' ') || 'nothing'}`;
-        }
+        error.message += daemon.simulatorView();
         throw error;
     } finally {
         await daemon.stop();

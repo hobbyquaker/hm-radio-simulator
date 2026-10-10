@@ -52,7 +52,7 @@ echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; 
   for variant in "${variants[@]}"; do
     echo "=== daemon suite, ${variant}" | tee -a "${log}"
     rm -rf "${HERE}/results/${variant}"
-    docker run --rm --init -e "HMRS_VARIANT=${variant}" -v "${HERE}/results:/results" "${tag}" npm run test:daemon 2>&1 | tee -a "${log}"
+    docker run --rm --init --cap-add SYS_NICE -e "HMRS_VARIANT=${variant}" -v "${HERE}/results:/results" "${tag}" npm run test:daemon 2>&1 | tee -a "${log}"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
   done
   if [ "${FUZZ}" != 0 ]; then

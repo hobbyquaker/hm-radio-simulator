@@ -23,7 +23,9 @@ function harness(options = {}) {
     module.attach(moduleSide);
     const parser = new FrameParser();
     const frames = [];
+    const raw = [];
     fromModule.on('data', (chunk) => {
+        raw.push(Buffer.from(chunk));
         for (const r of parser.push(chunk)) {
             if (r.payload) {
                 frames.push(Buffer.from(r.payload));
@@ -44,7 +46,7 @@ function harness(options = {}) {
         assert.ok(frames.length >= n, `expected ${n} frames, got ${frames.length}`);
         return frames;
     };
-    return {module, send, frames, waitFrames};
+    return {module, send, frames, raw, waitFrames};
 }
 
 test('IDENTIFY answers Co_CPU_App with the request counter', async () => {
@@ -65,7 +67,7 @@ test('GETVERSION and GET_SERIALNR carry the configured values', async () => {
     assert.equal(serial.subarray(4).toString('ascii'), 'ABC1234567');
 });
 
-test('bootloader: STARTBOOTLOADER is acknowledged, then the module announces Co_CPU_App as an event', async () => {
+test('bootloader: STARTBOOTLOADER is acknowledged, then the restarted module announces Co_CPU_App with counter 0', async () => {
     const h = harness({mode: 'bootloader'});
     h.send(TYPE.SYSTEM, SYSTEM.IDENTIFY);
     const [identify] = await h.waitFrames(1);
@@ -73,10 +75,37 @@ test('bootloader: STARTBOOTLOADER is acknowledged, then the module announces Co_
     const cnt = h.send(TYPE.SYSTEM, SYSTEM.STARTBOOTLOADER);
     const [, ok, event] = await h.waitFrames(3);
     assert.deepEqual([...ok.subarray(0, 4)], [TYPE.SYSTEM, cnt, SYSTEM.RESPONSE_STATUS, SYSTEM_STATUS.OK]);
-    assert.equal(event[0], TYPE.SYSTEM);
-    assert.equal(event[2], SYSTEM.IDENTIFY);
+    assert.deepEqual([...event.subarray(0, 3)], [TYPE.SYSTEM, 0, SYSTEM.IDENTIFY], 'the announcement, counter 0');
     assert.equal(event.subarray(3).toString('ascii'), IDENTIFY_APP);
     assert.equal(h.module.mode, 'app');
+});
+
+test('a STARTBOOTLOADER during the restart is lost: no toggling back, no answer', async () => {
+    const h = harness();
+    h.send(TYPE.SYSTEM, SYSTEM.STARTBOOTLOADER);
+    h.send(TYPE.SYSTEM, SYSTEM.STARTBOOTLOADER);
+    await h.waitFrames(2);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(h.frames.length, 2, 'one OK and one announcement');
+    assert.equal(h.module.mode, 'bootloader');
+});
+
+test('the announcement after entering the bootloader is the frame hmlangw expects from a real module', async () => {
+    // hmlangw (MIT) waits for exactly these bytes after its enter-bootloader command: FD 00 0C 00 00 00 "Co_CPU_BL" 72 51
+    const h = harness();
+    h.send(TYPE.SYSTEM, SYSTEM.STARTBOOTLOADER);
+    await h.waitFrames(2);
+    const raw = h.raw[h.raw.length - 1];
+    assert.equal(raw.toString('hex'), 'fd000c000000436f5f4350555f424c7251');
+});
+
+test('without startBootloaderAcknowledged the command gets no answer, only the announcement', async () => {
+    const h = harness({startBootloaderAcknowledged: false});
+    h.send(TYPE.SYSTEM, SYSTEM.STARTBOOTLOADER);
+    const [event] = await h.waitFrames(1);
+    assert.deepEqual([...event.subarray(0, 3)], [TYPE.SYSTEM, 0, SYSTEM.IDENTIFY]);
+    assert.equal(event.subarray(3).toString('ascii'), IDENTIFY_BOOTLOADER);
+    assert.equal(h.module.mode, 'bootloader');
 });
 
 test('SET_CLOCK stores the time, SET_RF_ADDRESS the address, GET_RF_ADDRESS returns it as DATA', async () => {
