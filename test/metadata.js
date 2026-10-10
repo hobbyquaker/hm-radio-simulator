@@ -80,6 +80,11 @@ export const FINDINGS = Object.freeze({
         draft: '005-aes-policy-after-reinit.md',
         issue: null,
     },
+    'wired-maintenance': {
+        title: 'hs485d: a newly discovered wired device gets plain channels - its maintenance channel (UNREACH, STICKY_UNREACH, CONFIG_PENDING) works only after a restart',
+        draft: '006-wired-maintenance-channel.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

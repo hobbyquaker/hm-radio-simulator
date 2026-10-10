@@ -15,10 +15,11 @@ import path from 'node:path';
 
 import {startHs485d, withDaemon, skipWithoutDaemons, HS485TYPES} from '../helpers/daemon.js';
 import {startReceiver} from '../helpers/rpc.js';
-import {waitForEvent} from '../helpers/switch.js';
+import {waitForEvent, waitForValue} from '../helpers/switch.js';
 import {loadDeviceDescription} from '../../lib/rftypes.js';
 import {WiredBus, WiredDevice} from '../../lib/wired.js';
 import {createEq3LanDevice} from '../../lib/eq3udp.js';
+import {regression} from '../helpers/known.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const options = (extra = {}) => ({...skipWithoutDaemons, timeout: 240000, ...extra});
@@ -176,7 +177,12 @@ test(
             for (const name of ["rx 'h'", "rx 'v'", "rx 'n'", "rx 'E'"]) {
                 assert.ok(names.includes(name), `${name} in ${names.join(' | ')}`);
             }
-            assert.deepEqual(lgw.commandLines().slice(0, 3), ['rx D', 'tx d', 'tx c']);
+            // before the discovery hs485d broadcasts the sleep mode (z twice, Z twice afterwards): S frames answered a
+            const commands = lgw.commandLines();
+            const d = commands.indexOf('rx D');
+            assert.ok(d > 0, commands.join(' '));
+            assert.deepEqual(commands.slice(d, d + 3), ['rx D', 'tx d', 'tx c'], commands.join(' '));
+            assert.deepEqual(sw.traceLines().slice(0, 4), ["rx 'z'", "rx 'z'", "rx 'Z'", "rx 'Z'"]);
             const devices = await hs485d.call('listDevices');
             assert.ok(devices.some((d) => d.ADDRESS === SW3 && d.TYPE === 'SWITCH'));
             assert.equal(await hs485d.call('getValue', [`${SERIAL}:0`, 'UNREACH']), false);
@@ -250,7 +256,11 @@ test('a device announces itself (A, broadcast): hs485d adds it without a search'
             call.params[1].some((d) => d.ADDRESS === 'SIMW000002:3'),
             'with its channels',
         );
-        assert.ok(second.traceLines().includes("rx 'h'"), 'hs485d asked the new device for its type');
+        // the announcement carries the sysinfo and the serial, so hs485d asks neither h/v nor n - it goes straight
+        // to the EEPROM (the usage bits, the lists)
+        const names = second.traceLines();
+        assert.ok(!names.includes("rx 'h'") && !names.includes("rx 'n'"), names.join(' | '));
+        assert.ok(names.includes("rx 'E'") && names.includes("rx 'R'"), names.join(' | '));
         assert.equal(await hs485d.call('getValue', ['SIMW000002:0', 'UNREACH']), false);
     }).finally(cleanup);
 });
@@ -317,7 +327,7 @@ test(
 );
 
 test(
-    'a silent device: the send fails (a 01 after the retry), UNREACH and STICKY_UNREACH; the device returns',
+    'a silent device: the send fails (a 01, two tries), the set faults; the maintenance channel of a discovered device (wired-maintenance)',
     options(),
     async (t) => {
         const sw = makeSwitch();
@@ -338,29 +348,54 @@ test(
                 'error' in outcome || (outcome.result && outcome.result.faultCode !== undefined),
                 'the set faults',
             );
-            // measured on 3.89.11: a failed setValue (the gateway's a 01 after each of the two tries) faults but does
-            // not touch UNREACH - that is raised by HS485Device::SendMessage, which the EEPROM path uses
-            await sleep(1000);
             assert.equal(
-                await hs485d.call('getValue', [`${SERIAL}:0`, 'UNREACH']),
-                false,
-                'no UNREACH from a failed set',
+                hs485d.grep(/Send failed\.\.\.retrying/).length,
+                2,
+                'two tries (HS485ControllerLGW::SendMessage)',
             );
+            // the EEPROM path: the cache flush writes W twice, fails - HS485Device::SendMessage sets the UNREACH flags
             await hs485d
                 .call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 3.0}}], {timeout: 30000})
                 .catch(() => null);
-            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', true, {from});
-            await waitForEvent(receiver, `${SERIAL}:0`, 'STICKY_UNREACH', true, {from});
-            assert.equal(await hs485d.call('getValue', [`${SERIAL}:0`, 'UNREACH']), true);
+            await waitUntil(() => hs485d.grep(/WriteChunk\(0\) failed/).length >= 1, 15000, 'the failed EEPROM write');
+            await sleep(1000);
+            // the finding: a discovered device's channels are plain HS485Channels (SetDeviceDescription uses
+            // CreateChannel() for all of them, the description's class="maintenance" is used only when a device is
+            // loaded from its file), so UNREACH is "unknown internal value" here and no service event is fired
+            const maintenanceEvents = (since) =>
+                receiver.received
+                    .slice(since)
+                    .filter((r) => r.method === 'event' && r.params[1] === `${SERIAL}:0`)
+                    .map((r) => `${r.params[2]}=${r.params[3]}`);
+            const unreach = await hs485d.call('getValue', [`${SERIAL}:0`, 'UNREACH']);
+            t.diagnostic(
+                `UNREACH after the failed write: ${unreach}; events: ${maintenanceEvents(from).join(', ') || 'none'}`,
+            );
+            await t.test('UNREACH can be read on the maintenance channel', regression('wired-maintenance'), () => {
+                assert.equal(
+                    hs485d.grep(/Tried to get unknown internal value UNREACH/).length,
+                    0,
+                    'getValue UNREACH is answered by HS485Device',
+                );
+                assert.equal(unreach, true);
+            });
+            await t.test(
+                'UNREACH and STICKY_UNREACH events after the failed write',
+                regression('wired-maintenance'),
+                () => {
+                    assert.ok(
+                        maintenanceEvents(from).includes('UNREACH=true'),
+                        maintenanceEvents(from).join(', ') || 'none',
+                    );
+                    assert.ok(maintenanceEvents(from).includes('STICKY_UNREACH=true'));
+                },
+            );
+            // the device returns: the next write goes through
             sw.answering = true;
-            const from2 = receiver.received.length;
-            await hs485d.call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 3.0}}], {
+            await hs485d.call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 3.5}}], {
                 timeout: 30000,
             });
-            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', false, {from: from2});
-            assert.equal(await hs485d.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), true, 'sticky stays');
-            await hs485d.call('setValue', [`${SERIAL}:0`, 'STICKY_UNREACH', false]);
-            assert.equal(await hs485d.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), false);
+            assert.equal(sw.eeprom[1], 35);
         }).finally(cleanup);
     },
 );
@@ -490,6 +525,28 @@ test(
                 'the config from the file',
             );
             assert.equal(await second.call('getValue', ['SIMW000091:0', 'UNREACH']), false);
+            // loaded from the file, the channels come with their class: now the maintenance channel answers UNREACH
+            // and fires the service events when a write fails (compare the wired-maintenance finding above)
+            const sw = bus.devices.get(ADDRESS);
+            sw.answering = false;
+            const from = receiver.received.length;
+            await second
+                .call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 4.0}}], {timeout: 30000})
+                .catch(() => null);
+            await waitForValue(second, `${SERIAL}:0`, 'UNREACH', true, 20000);
+            assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), true);
+            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', true, {from});
+            await waitForEvent(receiver, `${SERIAL}:0`, 'STICKY_UNREACH', true, {from});
+            assert.equal(second.grep(/Tried to get unknown internal value UNREACH/).length, 0);
+            sw.answering = true;
+            const from2 = receiver.received.length;
+            await second.call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 4.5}}], {
+                timeout: 30000,
+            });
+            await waitForEvent(receiver, `${SERIAL}:0`, 'UNREACH', false, {from: from2});
+            assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), true, 'sticky stays');
+            await second.call('setValue', [`${SERIAL}:0`, 'STICKY_UNREACH', false]);
+            assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), false);
         }).finally(() => receiver.stop());
     },
 );

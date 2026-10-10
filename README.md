@@ -7,8 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > [!CAUTION]
-> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 3 stehen: Modul, LAN-Gateway (auch mit AES), ein simulierter
-> Schaltaktor und eine Fernbedienung; an Stufe 4 (hs485d) wird gearbeitet.
+> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 4 stehen: Modul, LAN-Gateway (auch mit AES), ein simulierter
+> Schaltaktor und eine Fernbedienung für rfd, ein Wired-LAN-Gateway mit einem Wired-Aktor für hs485d. Was folgt, steht
+> unter _Roadmap_.
 
 hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
 **`rfd`** (BidCoS-RF) und **`hs485d`** (Homematic Wired), später möglicherweise auch **`multimacd`**. Die Daemons
@@ -70,6 +71,18 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   eines schlafenden Geräts (`CONFIG_PENDING`, geliefert beim nächsten Druck auf die Anlerntaste), eine
   Direktverknüpfung zwischen Fernbedienung und Aktor (`addLink`, Peer-Listen auf beiden Seiten, `getLinks`, das
   LINK-Paramset als Liste 3 im Aktor, `removeLink`).
+- **hs485d am Wired-LAN-Gateway (HMW-LGW, `lib/hmwlgw.js`)** mit einem simulierten Schaltaktor (HMW-LC-Sw2-DR aus
+  den `hs485types`-Beschreibungen des Images) am Bus (`lib/wired.js`): der Verbindungsaufbau mit demselben Vorspiel wie
+  beim HM-LGW (auch verschlüsselt mit `-k`), das Keepalive `K` alle 20 s, die Gerätesuche (`D` → `d`/`c`, dann `h`/`v`/`n`
+  und die EEPROM-Belegung `E`), Schalten mit `x` und dem `i`-Event, Lesen mit `S`, Tastendrücke als `PRESS_SHORT`/
+  `PRESS_LONG` (ein wiederholter Zähler ohne SYN wird verworfen), die Ansage eines neuen Geräts (`A`), Paramsets im
+  EEPROM (`W`/`R`), eine Verknüpfung Taste → Aktor, ein stummes Gerät (`a 01`, `UNREACH`/`STICKY_UNREACH`), der
+  Keepalive-Ausfall mit Wiederverbindung und der Neustart mit den Gerätedateien, darunter ein Typ-Byte ≥ 0x80
+  ([#9](https://github.com/OpenCCU/OpenCCU-Base/pull/9)) - und nach dem Neustart der Wartungskanal, der dem neu
+  gefundenen Gerät fehlt (`wired-maintenance`).
+- **Die UDP-Gerätesuche** (libLanDeviceUtils, `lib/eq3udp.js`): ein simuliertes eQ-3-LAN-Gerät beantwortet die
+  Suche auf UDP 43439 - rfd findet so ein nur per Seriennummer konfiguriertes HM-LGW, hs485d sein HMW-LGW (`-s`), und
+  hs485d sucht das Gateway bei jeder Wiederverbindung so, auch wenn es mit `-h` gestartet wurde.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -77,7 +90,7 @@ Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitize
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
-sowie drei Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie vier Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -87,7 +100,10 @@ der Coprozessor hinter einem wiederverbundenen LAN-Gateway neu initialisiert, me
 (`ADD_LINK_PEER`) und die Schlüssel neu an, nicht aber die AES-Richtlinie je Kanal (`AUTHENTICATION_ON`); bis rfd
 neu startet oder die Konfiguration des Kanals erneut geschrieben wird, authentifiziert das Modul die Events der
 AES-Kanäle nicht mehr, und rfd verwirft sie (`auth_violate_policy="reject"`) - eine Fernbedienung mit AES verstummt.
-Gegen `main` bleiben `double-join`, `read-eof` und `aes-republish`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+Der vierte, `wired-maintenance`: hs485d baut die Kanäle eines neu gefundenen Wired-Geräts ohne ihre Klasse, der
+Wartungskanal fehlt also, bis hs485d neu startet und das Gerät aus seiner Datei lädt - `UNREACH`, `STICKY_UNREACH` und
+`CONFIG_PENDING` sind bis dahin "unknown internal value", und keine Servicemeldung kommt. Gegen `main` bleiben
+`double-join`, `read-eof`, `aes-republish` und `wired-maintenance`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -109,6 +125,12 @@ erst, wenn der Maintainer es entscheidet.
 - Das LAN-Gateway gibt es zweimal: hmlangw selbst (unten) für den Klartext und ein Gegenstück in JavaScript
   (`lib/lgw.js`) für `Encryption Key`, den `V`-Handshake und AES-128-CFB auf beiden Ports - mit Schaltern für die
   Reconnect-Szenarien (Port weg, Gateway weg und wieder da, stummes Keepalive, falsche Seriennummer).
+- Für hs485d gibt es das Wired-LAN-Gateway in JavaScript (`lib/hmwlgw.js`): dasselbe Vorspiel auf einem Port, dann die
+  binären Transport-Frames (`0xFD`, Länge, Nutzlast mit `0xFC`-Escapes) mit den Befehlen `K`, `D`, `S`, `L` und den
+  Antworten `a`, `d`/`c`, `r` und `e`, wie hs485d sie erwartet (HMWLGWCommand.h in OpenCCU-Base; Homegears HMW-LGW.cpp
+  als Dokumentation gelesen). Dahinter ein Bus (`lib/wired.js`) mit Geräten aus den `hs485types`-Beschreibungen:
+  Sysinfo für `h`/`v`, Seriennummer für `n`, ein EEPROM für `R`/`W`/`E`, die Kontrollbyte-Zähler, die hs485d prüft, und
+  ein dünnes Verhalten je Typ (der Schaltaktor). Die UDP-Gerätesuche beantwortet `lib/eq3udp.js`.
 - hmlangw (MIT, beim Bau des Images aus dem OpenCCU-Repository geholt, Commit
   festgepinnt): Es lauscht auf den HM-LGW-Ports 2000 und 2001 und reicht die Frames an das simulierte Modul auf dem
   Pseudo-Terminal durch. Zwei Eigenheiten von hmlangw 1.1.1 zeigen sich dabei: Es startet seine Threads mit
@@ -163,7 +185,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
@@ -202,7 +224,8 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
   UNREACH, CONFIG_PENDING, Duty Cycle; Vergleich alte gegen neue OpenCCU-Base-Version
 - ✅ **Stufe 3:** eine Fernbedienung, das LAN-Gateway mit AES-Handshake und Reconnects, AES-gesicherte Geräte,
   Direktverknüpfungen, das Modul stromlos hinter dem Gateway
-- 🏗️ **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
+- ✅ **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor: Suche, Schalten, Tasten,
+  EEPROM-Paramsets, Verknüpfung, Keepalive-Ausfall, Neustart; dazu die UDP-Gerätesuche für beide Daemons
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - ✅ **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu
   den Upstream-Fixes und -Issues, den OpenCCU-Base-Commits je Version und den Fuzzing-Ergebnissen
