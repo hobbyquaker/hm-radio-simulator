@@ -301,13 +301,19 @@ export async function spawnRfd({
  * @returns {Promise<Daemon>}
  */
 export async function startRfd(options = {}) {
-    const rfd = await spawnRfd(options);
-    try {
-        return await rfd.waitReady();
-    } catch (error) {
-        error.message += rfd.simulatorView();
-        await rfd.stop();
-        throw error;
+    for (let attempt = 0; ; attempt++) {
+        const rfd = await spawnRfd(options);
+        try {
+            return await rfd.waitReady();
+        } catch (error) {
+            error.message += rfd.simulatorView();
+            await rfd.stop();
+            // the port was taken between the probe and rfd's bind (a race with the kernel's ephemeral ports)
+            if (attempt < 2 && rfd.grep(/Could not bind to TCP port/).length > 0) {
+                continue;
+            }
+            throw error;
+        }
     }
 }
 

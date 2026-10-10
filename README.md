@@ -145,8 +145,8 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 - 📥 **Stufe 4:** hs485d gegen ein simuliertes Wired-LAN-Gateway mit einem Wired-Aktor
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
-- 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
-- ☑️ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
+- ✅ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
+- 📥 **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 

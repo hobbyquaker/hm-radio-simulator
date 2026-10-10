@@ -11,18 +11,24 @@ const binrpc = require('binrpc');
 const xmlrpc = require('homematic-xmlrpc');
 
 /**
- * @param {number} port
- * @returns {Promise<number>} a free TCP port on 127.0.0.1
+ * A free TCP port on 127.0.0.1 for a daemon to listen on, taken from a range below Linux's ephemeral ports
+ * (32768..60999): a port the kernel handed out for port 0 can be handed out again to a client socket before the
+ * daemon binds it (seen in CI: "Could not bind to TCP port 41207"), a port in this range cannot.
+ * @returns {Promise<number>}
  */
-export function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.on('error', reject);
-        server.listen(0, '127.0.0.1', () => {
-            const {port} = server.address();
-            server.close(() => resolve(port));
+export async function freePort() {
+    for (let attempt = 0; attempt < 50; attempt++) {
+        const port = 20000 + Math.floor(Math.random() * 10000);
+        const free = await new Promise((resolve) => {
+            const server = net.createServer();
+            server.once('error', () => resolve(false));
+            server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
         });
-    });
+        if (free) {
+            return port;
+        }
+    }
+    throw new Error('no free port found in 20000..29999');
 }
 
 function withTimeout(promise, ms, what) {
@@ -126,8 +132,8 @@ export function sendRawXml(port, xml, options) {
 
 /**
  * A logic-layer stand-in the daemon calls back after `init`: it answers the methods rfd and hs485d use and records
- * every call.
- * @param {{methods?: Record<string, (params: any[]) => any>}} [options]
+ * every call. BIN-RPC (`xmlrpc_bin://`) by default, XML-RPC over HTTP with `protocol: 'xmlrpc'`.
+ * @param {{methods?: Record<string, (params: any[]) => any>, protocol?: 'binrpc'|'xmlrpc'}} [options]
  * @returns {Promise<Receiver>}
  */
 export async function startReceiver(options = {}) {
@@ -137,7 +143,8 @@ export async function startReceiver(options = {}) {
 }
 
 export class Receiver {
-    constructor({methods = {}} = {}) {
+    constructor({methods = {}, protocol = 'binrpc'} = {}) {
+        this.protocol = protocol;
         this.methods = {
             'system.listMethods': () => [
                 'system.listMethods',
@@ -147,6 +154,8 @@ export class Receiver {
                 'deleteDevices',
                 'event',
             ],
+            // rfd batches its events into system.multicall; dispatch() unpacks it
+            'system.multicall': () => [],
             listDevices: () => [],
             newDevices: () => '',
             deleteDevices: () => '',
@@ -161,19 +170,22 @@ export class Receiver {
 
     async start() {
         this.port = await freePort();
+        const lib = this.protocol === 'xmlrpc' ? xmlrpc : binrpc;
         await new Promise((resolve, reject) => {
-            this.server = binrpc.createServer({host: '127.0.0.1', port: this.port}, resolve);
+            this.server = lib.createServer({host: '127.0.0.1', port: this.port}, resolve);
             this.server.on('error', reject);
             for (const method of Object.keys(this.methods)) {
                 this.server.on(method, (_error, params, callback) => this.dispatch(method, params, callback));
             }
             this.server.on('NotFound', (method, params) => this.record(method, params));
         });
-        this.server.server.on('connection', (socket) => {
+        // binrpc keeps its net.Server as .server, homematic-xmlrpc its http.Server as .httpServer
+        this.netServer = this.server.server || this.server.httpServer;
+        this.netServer.on('connection', (socket) => {
             this.sockets.add(socket);
             socket.on('close', () => this.sockets.delete(socket));
         });
-        this.url = `xmlrpc_bin://127.0.0.1:${this.port}`;
+        this.url = this.protocol === 'xmlrpc' ? `http://127.0.0.1:${this.port}` : `xmlrpc_bin://127.0.0.1:${this.port}`;
     }
 
     dispatch(method, params, callback) {
@@ -235,6 +247,6 @@ export class Receiver {
         for (const socket of this.sockets) {
             socket.destroy();
         }
-        await new Promise((resolve) => this.server.server.close(() => resolve()));
+        await new Promise((resolve) => this.netServer.close(() => resolve()));
     }
 }
