@@ -112,6 +112,17 @@ artifacts by `scripts/report.mjs` (a node:test JSON reporter writes `tests.json`
 OpenCCU-Base commit, `fuzz/run.sh` a `fuzz-summary.json`; `test/metadata.js` holds the upstream links), locally with
 `npm run report` after `scripts/run-tests.sh`.
 
+## When OpenCCU-Base moves
+
+A push in someone else's repository cannot trigger our workflow, so `upstream-watch.yml` polls the head of
+OpenCCU-Base `main` every 15 minutes, keeps the last tested commit on the branch `upstream-state` (written only by
+this workflow), and when the head is new runs the suite for that exact commit - through the CI workflow as a reusable
+workflow, with `3.89.11` next to it as always. The run shows up on the report and in its history as "triggered by
+OpenCCU-Base `<sha>`" with the commit linked. Several upstream commits within one interval are tested as their newest
+head; the commit on the state branch also counts as repository activity, so GitHub does not disable the schedule. A red
+run leaves a warning on the run; it does not open an issue unless the maintainer wants that. `workflow_dispatch` with
+`force` re-tests the current head.
+
 ## The simulated module
 
 `lib/` is a small library:
@@ -206,9 +217,9 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined |
 | -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | enqueued      |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                        | in progress   |
-| -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | testing       |
+| -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | done          |
 | -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                             | done          |
-| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | enqueued      |
+| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | testing       |
 | -     | more daemon tests (the collection, split into the items below)                                                                  | not as such   |
 | -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                           | ready         |
 | -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                      | ready         |

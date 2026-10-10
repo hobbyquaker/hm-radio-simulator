@@ -149,6 +149,17 @@ dem die Zähler in einer eingeblendeten Datei liegen.
 Die Daten dahinter liegen als `report.json` neben der Seite. Nichts davon ist im Repository eingecheckt; der Bericht
 entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run report` nach `scripts/run-tests.sh`.
 
+## Wenn sich OpenCCU-Base bewegt
+
+Ein Push in ein fremdes Repository kann unseren Workflow nicht auslösen. Deshalb fragt der Workflow
+`upstream-watch.yml` alle 15 Minuten den Stand von OpenCCU-Base `main` ab, merkt sich den zuletzt geprüften Commit auf
+dem Branch `upstream-state` (nur dieser Workflow schreibt ihn) und lässt bei einem neuen Commit die Suite genau dafür
+laufen - über den CI-Workflow als wiederverwendbaren Workflow, mit `3.89.11` daneben wie sonst auch. Der Lauf erscheint
+im Bericht und im Verlauf mit "triggered by OpenCCU-Base `<sha>`" und verlinktem Commit. Mehrere Commits innerhalb
+eines Intervalls prüft er als ihren neuesten Stand; der Commit auf dem Zustandsbranch zählt zugleich als Aktivität, so
+dass GitHub den Zeitplan nicht abschaltet. Ein roter Lauf hinterlässt eine Warnung im Lauf; ein Issue dazu öffnet er
+nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force` prüft den aktuellen Stand erneut.
+
 ## Roadmap
 
 - ✅ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests der Daemons, Regressionstests
@@ -167,10 +178,10 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 - 🤷 **Stufe 5:** multimacd in einer VM mit `eq3_char_loop` und dem Protokoll des Dual-Coprozessor-Moduls
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
 - 🏗️ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
-- 🕵️ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
+- ✅ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 - ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
   Daemons (`double-join`, `read-eof`, die `exit`-RPC-Methode, kein SIGTERM-Handler); gemeldet wird noch nichts
-- 📥 **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
+- 🕵️ **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
   Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
 - 🚫 **Mehr Daemon-Tests** (die Sammlung, aufgeteilt in die folgenden Punkte)
 - ☑️ **RPC-Methoden-Durchlauf,** Gerätetyp-Durchlauf über alle `rftypes`-Beschreibungen, der Vergleich 3.89.11 gegen main

@@ -1,0 +1,107 @@
+name: upstream watch
+
+# Runs the suite whenever OpenCCU-Base main moves. GitHub has no cross-repository push trigger, so this polls the
+# head of OpenCCU-Base main every 15 minutes, keeps the last tested commit on the branch `upstream-state` (written
+# only here), and when the head is new runs the CI workflow for that exact commit (labelled "main" on the report,
+# with "triggered by OpenCCU-Base <sha>"). Several upstream commits within one interval are tested as their newest
+# head. The state commit also counts as repository activity, which keeps GitHub from disabling the schedule.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: run the suite even if the head was tested already
+        type: boolean
+        default: false
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+# contents: the state branch; pages and id-token: the called CI workflow deploys the report (a called workflow's
+# permissions cannot exceed the caller's)
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  check:
+    name: is OpenCCU-Base main new?
+    runs-on: ubuntu-latest
+    outputs:
+      new: ${{ steps.compare.outputs.new }}
+      sha: ${{ steps.head.outputs.sha }}
+      last: ${{ steps.compare.outputs.last }}
+    steps:
+      - name: the head of OpenCCU-Base main
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh api repos/OpenCCU/OpenCCU-Base/commits/main --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "OpenCCU-Base main is at $sha"
+      - name: the last tested commit (branch upstream-state)
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh api "repos/$GITHUB_REPOSITORY/contents/last-tested?ref=upstream-state" --jq .content 2>/dev/null | base64 -d | tr -d '[:space:]' || true)
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.force }}" = "true" ] || [ "$last" != "${{ steps.head.outputs.sha }}" ]; then
+            echo "new=true" >> "$GITHUB_OUTPUT"
+            echo "new: last tested ${last:-none}, head ${{ steps.head.outputs.sha }}"
+          else
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            echo "nothing new since $last"
+          fi
+
+  suite:
+    name: the suite for the new commit
+    needs: check
+    if: needs.check.outputs.new == 'true'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      upstream_sha: ${{ needs.check.outputs.sha }}
+      trigger: OpenCCU-Base ${{ needs.check.outputs.sha }}
+
+  record:
+    name: remember the tested commit
+    needs: [check, suite]
+    if: always() && needs.check.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: write the state branch
+        env:
+          SHA: ${{ needs.check.outputs.sha }}
+          RESULT: ${{ needs.suite.result }}
+        run: |
+          git config user.name "upstream watch"
+          git config user.email "actions@users.noreply.github.com"
+          if git fetch origin upstream-state 2>/dev/null; then
+            git checkout -q upstream-state
+          else
+            git checkout -q --orphan upstream-state
+            git rm -rfq . >/dev/null 2>&1 || true
+            printf '# upstream-state\n\nWritten by the upstream-watch workflow: the OpenCCU-Base main commit the suite ran for last.\n' > README.md
+            git add README.md
+          fi
+          echo "$SHA" > last-tested
+          printf '%s %s %s\n' "$(date -u +%FT%TZ)" "$SHA" "$RESULT" >> history
+          git add last-tested history
+          git commit -qm "OpenCCU-Base main $SHA: suite $RESULT" || echo "nothing to commit"
+          git push -q origin upstream-state
+      - name: a failed upstream run
+        if: needs.suite.result == 'failure'
+        run: |
+          echo "::warning title=OpenCCU-Base main ${{ needs.check.outputs.sha }}::the suite failed for this upstream commit - see the report. Opening an issue is not enabled (the maintainer decides)."
