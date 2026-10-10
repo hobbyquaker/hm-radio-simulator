@@ -219,7 +219,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | the test report: the four result columns right-aligned and the same width in every table                                        | in progress   |
 | -     | the test report: code coverage of rfd and hs485d from the suite                                                                 | done          |
 | -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                             | done          |
-| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | testing       |
+| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report          | done          |
 | -     | more daemon tests (the collection, split into the items below)                                                                  | not as such   |
 | -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                           | ready         |
 | -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                      | ready         |

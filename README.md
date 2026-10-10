@@ -181,7 +181,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 - ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
   Daemons (`double-join`, `read-eof`, die `exit`-RPC-Methode, kein SIGTERM-Handler); gemeldet wird noch nichts
-- 🕵️ **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
+- ✅ **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
   Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
 - 🚫 **Mehr Daemon-Tests** (die Sammlung, aufgeteilt in die folgenden Punkte)
 - ☑️ **RPC-Methoden-Durchlauf,** Gerätetyp-Durchlauf über alle `rftypes`-Beschreibungen, der Vergleich 3.89.11 gegen main
