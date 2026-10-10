@@ -240,7 +240,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report                          | done          |
 | -     | more daemon tests (the collection, split into the items below)                                                                                  | not as such   |
 | -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                           | enqueued      |
-| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                      | ready         |
+| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                      | enqueued      |
 | -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                              | enqueued      |
 | -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                               | ready         |
 | -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                     | ready         |
