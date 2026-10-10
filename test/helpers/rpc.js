@@ -48,6 +48,8 @@ export class BinRpcClient {
     }
 
     call(method, params = [], {timeout = 10000} = {}) {
+        // binrpc gives up on its own after `responseTimeout` (5 s by default) - longer than that only when asked
+        this.client.responseTimeout = Math.max(5000, timeout + 1000);
         const call = new Promise((resolve, reject) => {
             this.client.methodCall(method, params, (error, result) => (error ? reject(error) : resolve(result)));
         });
@@ -166,10 +168,18 @@ export class Receiver {
         this.received = [];
         this.waiters = [];
         this.sockets = new Set();
+        /** When true, calls are recorded but never answered: a receiver that hangs. */
+        this.stalled = false;
+        /** @type {Function[]} the callbacks of the calls held while stalled */
+        this.held = [];
     }
 
-    async start() {
-        this.port = await freePort();
+    /**
+     * Starts listening, on `port` when given (a receiver coming back on its old address).
+     * @param {number} [port]
+     */
+    async start(port) {
+        this.port = port ?? (await freePort());
         const lib = this.protocol === 'xmlrpc' ? xmlrpc : binrpc;
         await new Promise((resolve, reject) => {
             this.server = lib.createServer({host: '127.0.0.1', port: this.port}, resolve);
@@ -190,6 +200,10 @@ export class Receiver {
 
     dispatch(method, params, callback) {
         this.record(method, params);
+        if (this.stalled) {
+            this.held.push(callback);
+            return;
+        }
         if (method === 'system.multicall') {
             const calls = params[0] || [];
             const results = calls.map((c) => {

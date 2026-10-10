@@ -92,6 +92,14 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Gerätebeschreibung, Paramset-Beschreibungen, Paramsets und Werte jeder Adresse abgefragt werden. Der Daemon muss
   alles überstehen, ohne Sanitizer-Bericht. Jede Antwort wird kurz festgehalten; der Testbericht vergleicht die
   Antworten von `3.89.11` und `main` und die des zuletzt geprüften `main`-Commits mit dem aktuellen (_Differential_).
+- **Der Empfänger-Vertrag** (rfd und hs485d, beide über libhsscomm): drei Empfänger gleichzeitig, jeder mit seiner
+  eigenen ID synchronisiert; `ping` schickt `PONG` an alle, 20 Events kommen bei jedem in Reihenfolge an. Beim `init`
+  entscheidet die `listDevices`-Antwort des Empfängers: Unbekanntes wird gelöscht, eine andere `VERSION` neu
+  geschickt, dieselbe ausgelassen. Die Unerreichbar-Regel, gemessen: Zehn fehlgeschlagene Zustellungen in Folge, und
+  das elfte Event entfernt den Empfänger samt Eintrag in der Handler-Datei; ein Erfolg setzt die Zählung zurück. Ein
+  hängender Empfänger bremst nur sich selbst (die anderen bekommen ihre Events nach rund 20 ms, RPC antwortet sofort).
+  Servicemeldungen werden einem später angemeldeten Empfänger nachgeschickt; ein `replaceDevice` erreicht alle
+  angemeldeten Empfänger.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -99,7 +107,7 @@ Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitize
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
-sowie sechs Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie sieben Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -117,8 +125,10 @@ Durchläufe unter AddressSanitizer gefunden: `metadata-args` - `setVolatileMetad
 Argument-Array neu angelegt und der Zeiger zeigt auf freigegebenen Speicher (heap-use-after-free). Und
 `string-uint-conversion` - die Typumwandlung `type_conversion_string_unsigned_integer` in libhsscomm liest den
 `c_str()` eines schon zerstörten temporären Strings (stack-use-after-scope), sobald die Kanäle eines HM-OU-LED16
-angelegt werden. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`
-und `string-uint-conversion`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+angelegt werden. Und `replace-callback`: Ein Empfänger, der sich nach einem Gerätetausch anmeldet und das alte Gerät noch kennt,
+bekommt es als gelöscht statt `replaceDevice` - in rfd liefert `IsDeviceReplaced()` immer `false`, in hs485d steht
+im Verlauf die neue Seriennummer statt der alten. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`,
+`wired-maintenance`, `metadata-args`, `string-uint-conversion` und `replace-callback`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -200,7 +210,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 

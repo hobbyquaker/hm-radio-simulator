@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {BinRpcClient} from './rpc.js';
+import {sysinfoSatisfying, loadDeviceDescription} from '../../lib/rftypes.js';
+import {RFTYPES} from './daemon.js';
+import {encodeTelegram, FT} from '../../lib/telegram.js';
 
 /** Where the image keeps the dispatcher tables (scripts/method-table.mjs, run at image-build time). */
 export const METHODS_DIR = process.env.HMRS_METHODS || '/opt/openccu-base/methods';
@@ -129,7 +132,7 @@ export class SweepCaller {
             result = await this.client.call(method, params, {timeout});
             summary = summarize(result);
         } catch (error) {
-            if (/no answer within/.test(error.message)) {
+            if (/no answer within|response timeout/.test(error.message)) {
                 summary = 'timeout';
                 this.timeouts.push(key);
                 this.client.client.close();
@@ -186,4 +189,55 @@ export function writeRecord(name, data) {
     const file = path.join(dir, `${name}.json`);
     fs.writeFileSync(file, JSON.stringify(data, null, 1) + '\n');
     return file;
+}
+
+/**
+ * The announcement (sysinfo telegram) of a device of `typeId`, as `addVirtualDeviceInstance` takes it: the bytes of
+ * the telegram from the counter on, with every condition of the type's `<supported_types>` entry satisfied.
+ * Two channels for a `count_from_sysinfo` channel type; a peering channel when the description expects one.
+ */
+export function announcement(description, typeId, address, serial) {
+    const base = encodeTelegram({
+        counter: 1,
+        ctrl: 0x84,
+        type: FT.SYSINFO,
+        src: address,
+        dst: 0,
+        payload: [
+            0x10,
+            0x00,
+            0x00,
+            ...Buffer.from(serial, 'ascii'),
+            0x00,
+            0x02,
+            description.peeringSysinfoExpectChannel ? 0x01 : 0x00,
+            0x00,
+        ],
+    });
+    return sysinfoSatisfying(description, typeId, base);
+}
+
+/** The descriptions that use type_conversion_string_unsigned_integer (the string-uint-conversion finding). */
+export function usesStringUint(file) {
+    return fs.readFileSync(path.join(RFTYPES, file), 'latin1').includes('"string_unsigned_integer"');
+}
+
+/** Every type of every rftypes file, in a fixed order. */
+export function allTypes() {
+    const out = [];
+    for (const file of fs
+        .readdirSync(RFTYPES)
+        .filter((f) => f.endsWith('.xml'))
+        .sort()) {
+        let description;
+        try {
+            description = loadDeviceDescription(path.join(RFTYPES, file));
+        } catch {
+            continue;
+        }
+        for (const type of description.types) {
+            out.push({file, description, typeId: type.id});
+        }
+    }
+    return out;
 }

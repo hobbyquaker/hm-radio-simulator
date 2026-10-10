@@ -14,11 +14,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {startRfd, withDaemon, skipWithoutDaemons, RFTYPES} from '../helpers/daemon.js';
-import {SweepCaller, readMethodTable, writeRecord, summarize} from '../helpers/sweep.js';
+import {
+    SweepCaller,
+    readMethodTable,
+    writeRecord,
+    summarize,
+    announcement,
+    allTypes,
+    usesStringUint,
+} from '../helpers/sweep.js';
 import {regression, isKnownBroken} from '../helpers/known.js';
-import {Air} from '../../lib/air.js';
-import {loadDeviceDescription, sysinfoSatisfying} from '../../lib/rftypes.js';
-import {encodeTelegram, FT} from '../../lib/telegram.js';
+import {loadDeviceDescription} from '../../lib/rftypes.js';
 
 const CENTRAL = 'BidCoS-RF';
 const UNKNOWN = 'NOSUCH0001';
@@ -26,39 +32,11 @@ const SWITCH_FILE = 'rf_s.xml';
 const SWITCH_TYPE = 'HM-LC-Sw1-Pl';
 
 /**
- * The announcement (sysinfo telegram) of a device of `typeId`, as `addVirtualDeviceInstance` takes it: the bytes of
- * the telegram from the counter on, with every condition of the type's `<supported_types>` entry satisfied.
- * Two channels for a `count_from_sysinfo` channel type; a peering channel when the description expects one.
- */
-export function announcement(description, typeId, address, serial) {
-    const base = encodeTelegram({
-        counter: 1,
-        ctrl: 0x84,
-        type: FT.SYSINFO,
-        src: address,
-        dst: 0,
-        payload: [
-            0x10,
-            0x00,
-            0x00,
-            ...Buffer.from(serial, 'ascii'),
-            0x00,
-            0x02,
-            description.peeringSysinfoExpectChannel ? 0x01 : 0x00,
-            0x00,
-        ],
-    });
-    return sysinfoSatisfying(description, typeId, base);
-}
-
-/**
  * rfd with the simulated module and an empty air in which a telegram to an absent device fails fast (50 ms instead
  * of the module's 3 s of retries): the sweeps make rfd ask its virtual devices for their config, and nobody answers.
  */
 async function startSweepRfd() {
-    const rfd = await startRfd({module: {failDelayMs: 50}});
-    rfd.air = new Air({module: rfd.module, absentFails: true});
-    return rfd;
+    return startRfd({module: {failDelayMs: 50}, quietAir: true});
 }
 
 /**
@@ -73,31 +51,6 @@ function skipKnown(method, params) {
         return 'metadata-args';
     }
     return null;
-}
-
-/** The descriptions that use type_conversion_string_unsigned_integer (the string-uint-conversion finding). */
-function usesStringUint(file) {
-    return fs.readFileSync(path.join(RFTYPES, file), 'latin1').includes('"string_unsigned_integer"');
-}
-
-/** Every type of every rftypes file, in a fixed order. */
-function allTypes() {
-    const out = [];
-    for (const file of fs
-        .readdirSync(RFTYPES)
-        .filter((f) => f.endsWith('.xml'))
-        .sort()) {
-        let description;
-        try {
-            description = loadDeviceDescription(path.join(RFTYPES, file));
-        } catch {
-            continue;
-        }
-        for (const type of description.types) {
-            out.push({file, description, typeId: type.id});
-        }
-    }
-    return out;
 }
 
 /** The valid calls of the method sweep, in the order they run (the destructive ones last). */

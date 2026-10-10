@@ -95,6 +95,11 @@ export const FINDINGS = Object.freeze({
         draft: '008-string-uint-conversion-dangling.md',
         issue: null,
     },
+    'replace-callback': {
+        title: 'rfd and hs485d: a receiver that registers after a device was replaced gets deleteDevices instead of replaceDevice (rfd IsDeviceReplaced() always false; hs485d stores the new serial in the history)',
+        draft: '009-replace-callback.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',
