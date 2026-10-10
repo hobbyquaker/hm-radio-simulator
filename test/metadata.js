@@ -100,6 +100,16 @@ export const FINDINGS = Object.freeze({
         draft: '009-replace-callback.md',
         issue: null,
     },
+    'init-blocks': {
+        title: 'rfd and hs485d: init with a receiver that does not answer freezes the whole daemon - the init callbacks run without a timeout on the main loop',
+        draft: '010-init-blocks-main-loop.md',
+        issue: null,
+    },
+    'async-callback-threads': {
+        title: 'rfd and hs485d: every unanswered newDevices/deleteDevices/replaceDevice leaves a thread and a socket behind for good',
+        draft: '011-async-callback-threads.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

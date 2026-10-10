@@ -111,6 +111,13 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exit-Code 0), zwei Interfaces, die alte
   Coprozessor-Initialisierung, der Sniffing-Modus (`-s`), hs485d mit zusätzlichen Beschreibungen in
   `/etc/config/hs485types`.
+- **Ein Empfänger, der sich danebenbenimmt** (rfd und hs485d, Rückrufe über BIN-RPC und XML-RPC): ein Empfänger
+  auf Byte-Ebene schließt mitten in der Anfrage, verschwindet, antwortet nie oder liest nicht mehr, antwortet mit
+  HTTP-Fehler, Fault, Müll, abgeschnitten, mit falschem Typ, mit mehreren MB, Byte für Byte oder doppelt - der zweite
+  Empfänger bekommt seine Events weiter in rund 10 ms, RPC antwortet, das Funkgerät schaltet, Threads und Dateien des
+  Daemons sind danach wie vorher. Dazu riesige und ungültige `listDevices`-Antworten beim `init`, 100 Anmeldungen in
+  Folge, zwei Empfänger mit einer ID, eine URL ohne Gegenstelle. Zwei Funde: `init-blocks` und
+  `async-callback-threads` (siehe unten).
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -118,7 +125,7 @@ Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitize
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
-sowie sieben Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie neun Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -138,8 +145,12 @@ Argument-Array neu angelegt und der Zeiger zeigt auf freigegebenen Speicher (hea
 `c_str()` eines schon zerstörten temporären Strings (stack-use-after-scope), sobald die Kanäle eines HM-OU-LED16
 angelegt werden. Und `replace-callback`: Ein Empfänger, der sich nach einem Gerätetausch anmeldet und das alte Gerät noch kennt,
 bekommt es als gelöscht statt `replaceDevice` - in rfd liefert `IsDeviceReplaced()` immer `false`, in hs485d steht
-im Verlauf die neue Seriennummer statt der alten. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`,
-`wired-maintenance`, `metadata-args`, `string-uint-conversion` und `replace-callback`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, der sich danebenbenimmt, fand zwei mehr: `init-blocks` - `init` ruft den Empfänger
+(`system.listMethods`, `listDevices`) ohne Timeout in der Hauptschleife des Daemons zurück; antwortet er nicht, steht
+der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
+`async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
+einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks` und `async-callback-threads`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -221,7 +232,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
