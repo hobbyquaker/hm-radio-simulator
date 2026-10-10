@@ -3,10 +3,11 @@
 [:uk: English README](README.en.md)
 
 [![CI](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml)
+[![Testbericht](https://img.shields.io/badge/Testbericht-GitHub%20Pages-2ea44f)](https://hobbyquaker.github.io/hm-radio-simulator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > [!CAUTION]
-> hm-radio-simulator ist in Entwicklung. Die ersten Stufen stehen, vieles ist noch nicht gebaut.
+> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 1b stehen, die simulierten Geräte noch nicht.
 
 hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
 **`rfd`** (BidCoS-RF) und **`hs485d`** (Homematic Wired), später möglicherweise auch **`multimacd`**. Die Daemons
@@ -110,13 +111,30 @@ Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitiz
 `results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet `3.89.11` und `main` in beiden Varianten und
 lässt jeden Fuzzer 60 s laufen.
 
+## Testbericht
+
+Jeder CI-Lauf schreibt eine Markdown-Übersicht in seine Zusammenfassung auf GitHub (je Job, und für den ganzen Lauf im
+Job "test report"). Der Lauf auf `main` veröffentlicht dazu einen HTML-Bericht auf GitHub Pages:
+**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die OpenCCU-Base-Versionen nebeneinander (`3.89.11` und
+`main`, jeweils normal und mit ASan), je Test der Ausgang, die Dauer und die Diagnosen, dazu die Fuzzing-Läufe und
+ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
+
+- **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
+  Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`); verlinkt das Issue oder,
+  solange es keins gibt, den Abschnitt oben;
+- **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
+
+Die Daten dahinter liegen als `report.json` neben der Seite. Nichts davon ist im Repository eingecheckt; der Bericht
+entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run report` nach `scripts/run-tests.sh`.
+
 ## Roadmap
 
 - ✅ **Stufe 0:** Docker-Image mit den Daemons aus OpenCCU-Base, RPC-Tests der Daemons, Regressionstests
 - ✅ **Stufe 0:** libFuzzer für libXmlRpc und libxmlparser
 - ✅ **Stufe 1a:** simuliertes RPI-RF-MOD an einem Pseudo-Terminal: Initialisierung, Modul weg und wieder da,
   Frame-Fuzzing
-- 🕵️ **Stufe 1b:** LAN-Gateway über
+- ✅ **Stufe 1b:** LAN-Gateway über
   [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw) vor dem simulierten
   Modul, ohne Verschlüsselung
 - 🏗️ **Testbericht:** Markdown-Übersicht in jedem CI-Lauf und ein HTML-Bericht auf GitHub Pages mit Verlauf, Links zu

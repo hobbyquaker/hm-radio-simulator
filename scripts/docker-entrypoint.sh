@@ -19,9 +19,19 @@ if [ -d /results ] && [ "$#" -gt 0 ] && [ "$1" = "npm" ]; then
   mkdir -p "/results/${variant}"
   export HMRS_WORKDIR="/results/${variant}/work"
   mkdir -p "${HMRS_WORKDIR}"
+  # what the report needs to know about this job (scripts/report.mjs)
+  node -e '
+    const [ref, commit, variant, known, out] = process.argv.slice(1);
+    require("fs").writeFileSync(out, JSON.stringify({
+      ref, baseCommit: commit, variant,
+      knownBroken: known.split(",").map((s) => s.trim()).filter(Boolean),
+      node: process.version, startedAt: new Date().toISOString(),
+    }, null, 1) + "\n");
+  ' "$(cat /opt/openccu-base/ref)" "$(cat /opt/openccu-base/commit)" "${variant}" "${HMRS_KNOWN_BROKEN:-}" "/results/${variant}/meta.json"
   node --test --test-concurrency=1 \
     --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="/results/${variant}/junit.xml" \
+    --test-reporter=./scripts/json-reporter.mjs --test-reporter-destination="/results/${variant}/tests.json" \
     'test/daemon/*.test.js'
   exit $?
 fi

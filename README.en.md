@@ -3,6 +3,7 @@
 [:de: Deutsches README](README.md)
 
 [![CI](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml)
+[![Test report](https://img.shields.io/badge/test%20report-GitHub%20Pages-2ea44f)](https://hobbyquaker.github.io/hm-radio-simulator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A simulated Homematic **radio module** and a **test suite for the CCU's radio daemons** - `rfd` and `hs485d` of
@@ -80,6 +81,25 @@ CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, the daemo
 both variants, and 60 s of each fuzz harness against `main` (findings fail the job) and `3.89.11` (findings are
 expected there and only reported). The docker layers are cached per ref.
 
+## The test report
+
+Every CI run writes a Markdown overview into its summary on GitHub (per job, and for the whole run in the "test report"
+job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://hobbyquaker.github.io/hm-radio-simulator/>**
+
+- the OpenCCU-Base refs side by side (`3.89.11` and `main`, release and ASan each), every test's outcome, duration and
+  diagnostics, the fuzz runs, and the history of the last 20 runs (`runs/<id>/`). How to read it:
+
+- **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
+  that predates the fix it runs as **todo** (known broken, the run stays green);
+- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`), linking to the issue or,
+  until there is one, to the findings above;
+- **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
+
+The data is next to the page as `report.json`. Nothing of it is committed: the report is built from the run's
+artifacts by `scripts/report.mjs` (a node:test JSON reporter writes `tests.json`, the entrypoint `meta.json` with the
+OpenCCU-Base commit, `fuzz/run.sh` a `fuzz-summary.json`; `test/metadata.js` holds the upstream links), locally with
+`npm run report` after `scripts/run-tests.sh`.
+
 ## The simulated module
 
 `lib/` is a small library:
@@ -153,7 +173,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | ----- | ------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                            | done          |
 | 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing         | done          |
-| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | testing       |
+| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | done          |
 | -     | the test report: a Markdown summary per CI run and an HTML report on GitHub Pages with history and upstream links               | in progress   |
 | 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | ready         |
 | 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices                                           | ready         |

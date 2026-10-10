@@ -1,0 +1,12 @@
+{
+  "ref": "main",
+  "baseCommit": "030dba79b5e76cb10178a20e87a1b050df09faa9",
+  "seconds": 60,
+  "expected": false,
+  "status": "clean",
+  "harnesses": [
+    {"name": "fuzz_xmlrpc_value", "seconds": 60, "status": 0, "execs": 1234567, "execPerSec": 20576, "findings": []},
+    {"name": "fuzz_xmlrpc_request", "seconds": 60, "status": 0, "execs": 234567, "execPerSec": 3909, "findings": []},
+    {"name": "fuzz_xmlparser", "seconds": 60, "status": 0, "execs": 3456789, "execPerSec": 57613, "findings": []}
+  ]
+}

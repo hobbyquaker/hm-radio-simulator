@@ -9,6 +9,7 @@
 #   FUZZ_SEEDS    directory with the generated seeds, one subdirectory per harness (default /opt/fuzz/seeds)
 #   FUZZ_CORPUS   corpus directory, kept between runs when mounted (default /results/corpus)
 #   FUZZ_ARTIFACTS where crash inputs go (default /results/artifacts)
+#   FUZZ_RESULTS  where the per-harness logs and fuzz-summary.json go (default /results)
 #   FUZZ_SECONDS  time budget per harness (default 60)
 #   FUZZ_EXPECT_FINDINGS  "1": findings are expected for this ref (an old tag); exit 0 and say so
 #
@@ -18,6 +19,8 @@ FUZZ_BIN=${FUZZ_BIN:-/opt/fuzz/bin}
 FUZZ_SEEDS=${FUZZ_SEEDS:-/opt/fuzz/seeds}
 FUZZ_CORPUS=${FUZZ_CORPUS:-/results/corpus}
 FUZZ_ARTIFACTS=${FUZZ_ARTIFACTS:-/results/artifacts}
+FUZZ_RESULTS=${FUZZ_RESULTS:-/results}
+mkdir -p "$FUZZ_RESULTS"
 FUZZ_SECONDS=${FUZZ_SECONDS:-60}
 FUZZ_EXPECT_FINDINGS=${FUZZ_EXPECT_FINDINGS:-0}
 export ASAN_OPTIONS=${ASAN_OPTIONS:-detect_leaks=0}
@@ -41,8 +44,10 @@ for harness in fuzz_xmlrpc_value fuzz_xmlrpc_request fuzz_xmlparser; do
   echo "=== $harness: $FUZZ_SECONDS s"
   "$bin" -max_total_time="$FUZZ_SECONDS" -timeout=20 -rss_limit_mb=2048 -max_len=4096 \
     -artifact_prefix="$FUZZ_ARTIFACTS/$harness/" -print_final_stats=1 \
-    "$FUZZ_CORPUS/$harness" $seeds 2>&1 | tail -n 60
-  status=${PIPESTATUS[0]}
+    "$FUZZ_CORPUS/$harness" $seeds >"$FUZZ_RESULTS/$harness.log" 2>&1
+  status=$?
+  tail -n 60 "$FUZZ_RESULTS/$harness.log"
+  echo "$status" >"$FUZZ_RESULTS/$harness.status"
   if [ "$status" -ne 0 ]; then
     findings=$((findings + 1))
     summary+=("$harness: FINDING (exit $status), artifacts in $FUZZ_ARTIFACTS/$harness")
@@ -54,6 +59,10 @@ done
 echo
 echo "=== fuzz summary"
 printf '%s\n' "${summary[@]}"
+# the summary for the report (scripts/report.mjs); the fuzz image carries the ref and commit it was built from
+node "$(dirname "$0")/../scripts/fuzz-summary.mjs" "$FUZZ_RESULTS" "$(cat /opt/openccu-base/ref 2>/dev/null || echo unknown)" \
+  "$(cat /opt/openccu-base/commit 2>/dev/null || echo unknown)" "$FUZZ_SECONDS" "$FUZZ_EXPECT_FINDINGS" \
+  fuzz_xmlrpc_value fuzz_xmlrpc_request fuzz_xmlparser || echo "fuzz-summary.json not written" >&2
 if [ "$findings" -gt 0 ]; then
   if [ "$FUZZ_EXPECT_FINDINGS" = "1" ]; then
     echo "findings were expected for this OpenCCU-Base ref (FUZZ_EXPECT_FINDINGS=1); not failing"

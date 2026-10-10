@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Builds the test image for an OpenCCU-Base ref and runs the daemon suite in it, release and ASan, plus a short fuzz
-# run. Results land in ./results/<variant>/ and ./results/fuzz/.
+# run. Results land in ./results/<variant>/ and ./results/fuzz/, the report in ./results/site/ (index.html, summary.md).
 #
 # Usage: scripts/run-tests.sh [options]
 #   --ref <ref>          OpenCCU-Base branch, tag or commit (default 3.89.11)
@@ -66,6 +66,9 @@ echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; 
     docker run --rm -e "FUZZ_SECONDS=${FUZZ}" -e "FUZZ_EXPECT_FINDINGS=${expect}" -v "${HERE}/results/fuzz:/results" "${tag}-fuzz" 2>&1 | tee -a "${log}"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
   fi
+  echo "=== report" | tee -a "${log}"
+  node "${HERE}/scripts/report.mjs" collect --out "${HERE}/results/site" --repo-sha "$(git -C "${HERE}" rev-parse HEAD 2>/dev/null || true)" \
+    --ref "$(git -C "${HERE}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)" "${HERE}/results" 2>&1 | tee -a "${log}" || true
   echo "=== done, status ${status}" | tee -a "${log}"
   exit "${status}"
 ) 9>"${HERE}/.docker.lock"

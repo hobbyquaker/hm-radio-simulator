@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-10-10T18:01:00Z",
+  "counts": {"pass": 3, "fail": 0, "todo": 2, "skip": 0},
+  "tests": [
+    {
+      "name": "#138 on hs485d: a nested system.multicall is refused, hs485d stays up",
+      "file": "test/daemon/hs485d-rpc.test.js",
+      "nesting": 0,
+      "status": "todo",
+      "todo": "OpenCCU-Base #138 is not fixed in this BASE_REF (HMRS_KNOWN_BROKEN)",
+      "durationMs": 1200.5,
+      "error": "hs485d died",
+      "diagnostics": []
+    },
+    {
+      "name": "rfd initialises the simulated module and reports the interface CONNECTED",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 1374.8,
+      "diagnostics": []
+    },
+    {
+      "name": "module lost: the pty hangs up - rfd stays alive without spinning (#115) and reports CONNECTED false (#116)",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 6374.7,
+      "diagnostics": ["rfd used 200 clock ticks in the 2 s after the hangup"]
+    },
+    {
+      "name": "no busy loop after the hangup",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 1,
+      "status": "todo",
+      "todo": "OpenCCU-Base #115 and the read-eof finding is not fixed in this BASE_REF (HMRS_KNOWN_BROKEN)",
+      "durationMs": 0.5,
+      "error": "rfd used 200 clock ticks (of 200) in 2 s after the hangup",
+      "diagnostics": []
+    },
+    {
+      "name": "frame fuzzing: random frames and garbage on the pty do not crash rfd (seeded)",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 4100,
+      "diagnostics": ["HMRS_SEED=644995109"]
+    }
+  ]
+}

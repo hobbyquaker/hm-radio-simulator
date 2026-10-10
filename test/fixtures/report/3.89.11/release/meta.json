@@ -1,0 +1,8 @@
+{
+  "ref": "3.89.11",
+  "baseCommit": "3ed652a404d72cbe403e37c5b8b1f610451b02fb",
+  "variant": "release",
+  "knownBroken": ["115", "116", "138", "140", "double-join", "read-eof"],
+  "node": "v22.23.3",
+  "startedAt": "2026-10-10T18:00:00Z"
+}

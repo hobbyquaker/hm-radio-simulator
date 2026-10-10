@@ -73,7 +73,7 @@ COPY --from=base-src /openccu-base /openccu-base
 WORKDIR /opt/hm-radio-simulator
 COPY fuzz fuzz
 COPY lib lib
-COPY scripts/make-fuzz-seeds.mjs scripts/
+COPY scripts/make-fuzz-seeds.mjs scripts/fuzz-summary.mjs scripts/
 COPY package.json .
 RUN fuzz/build.sh /openccu-base /opt/fuzz/bin \
  && node scripts/make-fuzz-seeds.mjs /opt/fuzz/seeds \

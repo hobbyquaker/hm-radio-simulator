@@ -17,7 +17,8 @@
     "test:unit": "node --test 'test/unit/*.test.js'",
     "test:daemon": "node --test --test-concurrency=1 'test/daemon/*.test.js'",
     "test:all": "node --test 'test/unit/*.test.js' 'test/daemon/*.test.js'",
-    "docker:test": "scripts/run-tests.sh"
+    "docker:test": "scripts/run-tests.sh",
+    "report": "node scripts/report.mjs collect --out results/site results"
   },
   "repository": {
     "type": "git",
