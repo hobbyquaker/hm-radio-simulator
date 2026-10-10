@@ -1,7 +1,9 @@
 #!/bin/bash
 #
 # Builds rfd and hs485d (with the libraries they load) from an OpenCCU-Base checkout for the host architecture with
-# the Base's own CMake project, into a staging directory with bin/ and lib/.
+# the Base's own CMake project, into a staging directory with bin/ and lib/. On main, where components are selectable,
+# only rfd and hs485d are selected (the libraries follow the link graph); on 3.89.11 the extra options are unused and
+# the two targets are built out of the whole tree.
 #
 # Usage: build-daemons.sh <openccu-base dir> release|asan <output dir>
 #
@@ -35,6 +37,11 @@ cmake -S "${SRC}" -B "${BUILD}" \
   -DTARGET_PLATFORM=x86_64-linux-gnu \
   -DCROSS_PREFIX= \
   -DDEPLOY_TO_REPO=OFF \
+  -DBUILD_DEFAULT_COMPONENTS=OFF \
+  -DBUILD_RFD=ON \
+  -DBUILD_HS485D=ON \
+  -DBUILD_TCL_MODULES=OFF \
+  -DBUILD_WEBUI_AND_DEVICETYPES=OFF \
   -DROOTFS_DIR="${OUT}" \
   -DCMAKE_BUILD_TYPE="${build_type}" \
   -DCMAKE_C_FLAGS="${flags}" \

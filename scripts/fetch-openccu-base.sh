@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # Fetches the parts of an OpenCCU-Base revision that the daemon build and the test image need, as a shallow sparse
-# checkout: the CMake build system, the daemon and library sources and the device descriptions. The web UI and the
-# Tcl modules are left out. The sources are HMSL-2/LGPL/GPL licensed by eQ-3 and the OpenCCU project and stay in the
+# checkout: the CMake build system, the complete src/ tree (the daemons, their libraries, the device descriptions;
+# the web UI and Tcl sources come along because the component CMake of newer revisions adds them). The sources are HMSL-2/LGPL/GPL licensed by eQ-3 and the OpenCCU project and stay in the
 # image only; nothing of them is copied into this repository.
 #
 # Usage: fetch-openccu-base.sh <repo-url> <ref> <destdir>
@@ -20,9 +20,10 @@ fi
 
 git init -q "${DEST}"
 git -C "${DEST}" remote add origin "${REPO}"
+# the whole src/ tree: OpenCCU-Base's component CMake (main) adds every component directory, so leaving the web UI
+# or the Tcl modules out breaks the configure even though only rfd and hs485d are built
 git -C "${DEST}" sparse-checkout set --no-cone \
-  '/CMakeLists.txt' '/CMakePresets.json' '/cmake/' '/licenses/' '/src/' \
-  '!/src/webui/' '!/src/tcl_homematic/' '!/src/tclrega/' '!/src/tclrpc/' '!/src/tclticks/'
+  '/CMakeLists.txt' '/CMakePresets.json' '/cmake/' '/licenses/' '/src/'
 git -C "${DEST}" fetch -q --depth 1 --filter=blob:none origin "${REF}"
 git -C "${DEST}" -c advice.detachedHead=false checkout -q FETCH_HEAD
 
@@ -39,4 +40,4 @@ for f in CMakeLists.txt src/rfd/CMakeLists.txt src/hs485d/CMakeLists.txt src/lib
   fi
 done
 
-echo "fetched OpenCCU-Base ${REF} (${commit}) to ${DEST}"
+echo "fetched OpenCCU-Base ${REF} (${commit}) to ${DEST} ($(du -sh "${DEST}" | cut -f1))"

@@ -33,7 +33,10 @@ set per ref by the Dockerfile), so the run shows what happens without going red.
 #116, #138 and #140, plus a finding of this suite that has no upstream issue yet, `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
-Against `main`, `double-join` only.
+The second finding without an issue yet is `read-eof`: a pty slave whose master went away
+answers `read()` with 0 (end of file), which #115/#116 do not treat as an error (they handle -1: `ENODEV` from a stale
+`/dev/mmd_bidcos`, `EIO` from an unplugged adapter), so rfd on `main` still spins at 100 % CPU and keeps
+`CONNECTED = true` after the hangup. Against `main`, `double-join` and `read-eof`.
 
 ## Running it
 
@@ -125,16 +128,16 @@ event that arrives in that instant is dropped by rfd itself - with a real module
 
 ## Stages
 
-| Stage | Content                                                                                                                         | State                 |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                            | built, under test     |
-| 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing         | built, under test     |
-| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | ready                 |
-| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | ready                 |
-| 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices                                           | ready                 |
-| 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                      | ready                 |
-| 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined         |
-| -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | later                 |
+| Stage | Content                                                                                                                         | State             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                            | built, under test |
+| 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing         | built, under test |
+| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                        | ready             |
+| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests | ready             |
+| 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices                                           | ready             |
+| 4     | hs485d against a simulated HMW-LGW with one wired actuator                                                                      | ready             |
+| 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                        | to be refined     |
+| -     | calibration of the module timing against a real RPI-RF-MOD                                                                      | later             |
 
 ## Credits and licences
 

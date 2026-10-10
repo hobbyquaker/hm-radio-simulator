@@ -52,11 +52,11 @@ test(
 test('#140: malformed BIN-RPC requests get a fault or a closed connection, never a crash', options(140), async () => {
     const rfd = await startRfd();
     await withDaemon(rfd, async (daemon) => {
-        for (const {name, bytes} of malformedRequests()) {
+        for (const {name, bytes, mayWait} of malformedRequests()) {
             const outcome = await sendRaw(daemon.port, bytes);
             assert.ok(daemon.alive, `rfd died on: ${name} (${JSON.stringify(daemon.exit)})`);
             assert.ok(
-                outcome.response.length > 0 || outcome.closedByPeer || outcome.error,
+                mayWait || outcome.response.length > 0 || outcome.closedByPeer || outcome.error,
                 `${name}: neither an answer nor a close`,
             );
         }

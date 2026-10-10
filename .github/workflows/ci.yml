@@ -33,16 +33,16 @@ jobs:
         include:
           - base_ref: '3.89.11'
             variant: release
-            known_broken: '115,116,138,140,double-join'
+            known_broken: '115,116,138,140,double-join,read-eof'
           - base_ref: '3.89.11'
             variant: asan
-            known_broken: '115,116,138,140,double-join'
+            known_broken: '115,116,138,140,double-join,read-eof'
           - base_ref: main
             variant: release
-            known_broken: 'double-join'
+            known_broken: 'double-join,read-eof'
           - base_ref: main
             variant: asan
-            known_broken: 'double-join'
+            known_broken: 'double-join,read-eof'
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

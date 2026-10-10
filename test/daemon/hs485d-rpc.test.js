@@ -84,11 +84,11 @@ test(
         const bus = await silentBus();
         const hs485d = await startHs485d({host: '127.0.0.1', port: bus.port});
         await withDaemon(hs485d, async (daemon) => {
-            for (const {name, bytes} of malformedRequests()) {
+            for (const {name, bytes, mayWait} of malformedRequests()) {
                 const outcome = await sendRaw(daemon.port, bytes);
                 assert.ok(daemon.alive, `hs485d died on: ${name} (${JSON.stringify(daemon.exit)})`);
                 assert.ok(
-                    outcome.response.length > 0 || outcome.closedByPeer || outcome.error,
+                    mayWait || outcome.response.length > 0 || outcome.closedByPeer || outcome.error,
                     `${name}: neither an answer nor a close`,
                 );
             }

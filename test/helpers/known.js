@@ -12,12 +12,16 @@ const broken = new Set(
 );
 
 /**
- * @param {number|string} issue the OpenCCU-Base pull request or issue number
+ * @param {...(number|string)} issues OpenCCU-Base pull request numbers or finding names; the test is a todo when any
+ *   of them is listed as known broken
  * @returns {{todo?: string}} options for node:test
  */
-export function regression(issue) {
-    if (broken.has(String(issue))) {
-        const what = /^\d+$/.test(String(issue)) ? `OpenCCU-Base #${issue}` : `the ${issue} finding`;
+export function regression(...issues) {
+    const listed = issues.filter((issue) => broken.has(String(issue)));
+    if (listed.length > 0) {
+        const what = listed
+            .map((issue) => (/^\d+$/.test(String(issue)) ? `OpenCCU-Base #${issue}` : `the ${issue} finding`))
+            .join(' and ');
         return {todo: `${what} is not fixed in this BASE_REF (HMRS_KNOWN_BROKEN)`};
     }
     return {};
