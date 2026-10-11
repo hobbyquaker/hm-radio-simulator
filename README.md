@@ -386,7 +386,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **Drei OpenCCU-Base-Stände nebeneinander:** die zwei neuesten Tags und der Stand von `main`, automatisch gewählt
 - 🏗️ **Regressionstests beweisen:** jeder Test einmal gegen den Commit vor dem Fix (dort rot) und gegen den Fix (grün), im
   Bericht als „bewiesen“ markiert
-- 🏗️ **Lesefehler am seriellen Gerät (#115/#116):** ein `read()`, das wirklich mit ENODEV/EIO scheitert, damit die Tests
+- 🕵️ **Lesefehler am seriellen Gerät (#115/#116):** ein `read()`, das wirklich mit ENODEV/EIO scheitert, damit die Tests
   den reparierten Code erreichen
 - 🏗️ **LAN-Gateway, was noch fehlt (#13/#17):** gescheiterte Wiederherstellung nach dem Reconnect, keine Telegramme
   währenddessen, der Keepalive-Thread, Hello ohne Seriennummer, die Statusdatei, auf TCP-Segmente verteilte Frames,
