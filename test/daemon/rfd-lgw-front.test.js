@@ -114,7 +114,7 @@ test('plaintext through the JavaScript front: no V, the same init as through hml
 for (const kind of ['bidcos', 'keepalive']) {
     test(
         `AES: port ${kind === 'bidcos' ? '2000' : '2001'} dropped - rfd reconnects both ports and re-initialises the module (#13)`,
-        options(),
+        options(regression(13)),
         async (t) => {
             const rfd = await startRfd({lgwFront: {serial: SERIAL, key: KEY}});
             await withDaemon(rfd, async () => {
@@ -166,7 +166,7 @@ test('AES: a silent keepalive - no >K within 4 s makes rfd reconnect', options()
 
 test(
     'AES: the gateway gone and back; the first hello after it says another serial and is rejected, the next one accepted (#17)',
-    options(),
+    options(regression(17)),
     async (t) => {
         const rfd = await startRfd({lgwFront: {serial: SERIAL, key: KEY}});
         await withDaemon(rfd, async () => {
@@ -187,7 +187,7 @@ test(
 
 test(
     'AES: port 2000 dropped while a telegram is in flight - no crash, the set fails, the reconnect follows (#16 shape)',
-    options(),
+    options(regression(16)),
     async (t) => {
         const rfd = await startRfd({lgwFront: {serial: SERIAL, key: KEY}});
         const receiver = await startReceiver();

@@ -1,6 +1,6 @@
 /**
  * A node:test reporter that writes the run as JSON: one record per test (and subtest) with its file, status
- * (pass, fail, todo, skip), duration, error message and the diagnostics the test printed. The report script
+ * (pass, fail, todo, skip), its outcome (pass or fail, also for a todo), duration, error message and the diagnostics the test printed. The report script
  * (scripts/report.mjs) reads these files; the JUnit output stays for the artifacts.
  *
  *   node --test --test-reporter=./scripts/json-reporter.mjs --test-reporter-destination=results/tests.json ...
@@ -21,6 +21,9 @@ export default async function* jsonReporter(source) {
                     file: data.file ? data.file.replace(/^.*\/test\//, 'test/') : null,
                     nesting: data.nesting,
                     status,
+                    // whether the test body passed, also for a todo or skip (a todo that fails still has status todo):
+                    // the proof (scripts/prove.mjs) needs to know whether a regression test failed on a ref without its fix
+                    outcome: event.type === 'test:pass' ? 'pass' : 'fail',
                     todo: typeof data.todo === 'string' ? data.todo : data.todo ? true : undefined,
                     skip: typeof data.skip === 'string' ? data.skip : data.skip ? true : undefined,
                     durationMs: data.details ? Math.round(data.details.duration_ms * 1000) / 1000 : null,

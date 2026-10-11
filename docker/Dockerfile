@@ -22,6 +22,7 @@
 #   HMLANGW_REF   its commit
 #   KNOWN_BROKEN  OpenCCU-Base issue numbers (or named findings without an issue yet, e.g. double-join) known to be
 #                 unfixed in that ref; their regression tests run as todo
+#   DAEMON_VARIANTS  the daemon variants to build (default "release asan coverage"; release and asan are always built)
 #   NODE_IMAGE    the node base image
 #
 # The OpenCCU-Base sources (HMSL 2, LGPL, GPL) and hmlangw (MIT) are fetched at build time and stay in the image.
@@ -61,7 +62,12 @@ COPY --from=base-src /openccu-base /openccu-base
 COPY scripts/build-daemons.sh /usr/local/bin/
 RUN build-daemons.sh /openccu-base release /opt/daemons/release
 RUN build-daemons.sh /openccu-base asan /opt/daemons/asan
-RUN build-daemons.sh /openccu-base coverage /opt/daemons/coverage
+# DAEMON_VARIANTS: the proof images (scripts/prove.mjs) need release and asan only and leave coverage out
+ARG DAEMON_VARIANTS="release asan coverage"
+RUN case " ${DAEMON_VARIANTS} " in \
+      *" coverage "*) build-daemons.sh /openccu-base coverage /opt/daemons/coverage ;; \
+      *) echo "coverage variant not built (DAEMON_VARIANTS=${DAEMON_VARIANTS})" ;; \
+    esac
 # the fault shim (test scaffolding: read()/select() on one device fail with a chosen errno; shim/hmrs-faults.c)
 COPY shim/hmrs-faults.c /tmp/hmrs-faults.c
 RUN mkdir -p /opt/hmrs && gcc -shared -fPIC -O2 -Wall -o /opt/hmrs/libhmrs-faults.so /tmp/hmrs-faults.c -ldl

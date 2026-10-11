@@ -34,7 +34,12 @@ if [ -d /results ] && [ "$#" -gt 0 ] && [ "$1" = "npm" ]; then
     mkdir -p "/results/${variant}/profiles"
     export LLVM_PROFILE_FILE="/results/${variant}/profiles/%c%p-%m.profraw"
   fi
-  node --test --test-concurrency=1 \
+  # HMRS_TEST_NAME_PATTERN: run only the tests whose (top-level) name matches - the proof runs (scripts/prove.mjs)
+  filter=()
+  if [ -n "${HMRS_TEST_NAME_PATTERN:-}" ]; then
+    filter=(--test-name-pattern="${HMRS_TEST_NAME_PATTERN}")
+  fi
+  node --test --test-concurrency=1 "${filter[@]}" \
     --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="/results/${variant}/junit.xml" \
     --test-reporter=./scripts/json-reporter.mjs --test-reporter-destination="/results/${variant}/tests.json" \

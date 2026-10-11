@@ -142,6 +142,14 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
 
 - **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
   that predates the fix it runs as **todo** (known broken, the run stays green);
+- **proven** / **not proven** - whether a regression test was shown to fail without its fix: `scripts/prove.mjs` builds
+  the daemons at the fix's parent commit and at its merge commit and runs only the tests carrying the fix's number
+  there, release and ASan (races and lifetime bugs up to five times under ASan on the parent). **proven**: the test
+  fails on the parent and passes on the merge commit; **not proven**: it passes on the parent too, so it does not reach
+  what the fix changed; **inconclusive**: it fails on both. Each test's `proof` field in `report.json` carries the
+  result, and `proof.json` the whole proof. The proof costs two image builds per fix, so CI runs it weekly, on request
+  (`workflow_dispatch` with `prove`) and on a push that changes the fix list or a regression test; in between the
+  report keeps the last one. Locally: `node scripts/prove.mjs local [--fixes 9,16]`;
 - **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`), linking to the issue or,
   until there is one, to the findings above;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.

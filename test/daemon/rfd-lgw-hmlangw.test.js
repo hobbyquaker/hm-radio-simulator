@@ -18,6 +18,7 @@ import net from 'node:net';
 import {RadioModule} from '../../lib/module.js';
 import {createHmlangwGateway, LGW_BIDCOS_PORT, LGW_KEEPALIVE_PORT} from '../../lib/hmlangw.js';
 import {startRfd, spawnRfd, withDaemon, skipWithoutHmlangw, tmpdir} from '../helpers/daemon.js';
+import {regression} from '../helpers/known.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const options = (extra = {}) => ({...skipWithoutHmlangw, timeout: 180000, ...extra});
@@ -82,7 +83,7 @@ test(
     },
 );
 
-test('a serial that differs only in case is accepted (OpenCCU-Base #17)', options(), async () => {
+test('a serial that differs only in case is accepted (OpenCCU-Base #17)', options(regression(17)), async () => {
     const rfd = await startRfd({lgw: {serial: SERIAL, configuredSerial: SERIAL.toLowerCase()}});
     await withDaemon(rfd, async () => {
         assert.ok(await connected(rfd));

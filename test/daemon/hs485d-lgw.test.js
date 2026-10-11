@@ -459,7 +459,7 @@ test(
 
 test(
     'restart: the device file keeps the device, its sysinfo and config; a type byte >= 0x80 survives (#9 shape)',
-    options(),
+    options(regression(9)),
     async (t) => {
         // a description of our own with a type byte above 0x7f, next to the image's descriptions
         const descriptions = fs.mkdtempSync(path.join('/tmp', 'hmrs-hs485types-'));
@@ -515,6 +515,9 @@ test(
             const m = /sysinfo="([0-9A-Fa-f]+)"/.exec(hiFile);
             t.diagnostic(`sysinfo attribute of the 0x91 device: ${m ? m[1] : 'none'}`);
             assert.ok(m && m[1].toUpperCase() === '91000305', 'the sysinfo bytes as unsigned hex (#9)');
+        } catch (err) {
+            await receiver.stop(); // else its server keeps the test file from ending (seen on #9's parent)
+            throw err;
         } finally {
             await first.stop();
         }

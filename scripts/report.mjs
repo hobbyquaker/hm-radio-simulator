@@ -15,6 +15,10 @@
  *                      [--run-id <id>] [--run-url <url>] [--ref <git ref>] [--trigger <text>] [--keep 20]
  *                      <results dir>...
  *   report.mjs summary <results dir>...        print the Markdown overview of these results only
+ *
+ * `--proof <proof.json>` (scripts/prove.mjs collect): the proof of the regression tests. report.json then carries it as
+ * `proof`, it is published as proof.json, and every test the proof ran gets a field
+ * `proof: {status: 'proven'|'not-proven'|'inconclusive'|'no-build'|'incomplete', fix, parent, merge, date}` (prove.mjs proofForTest).
  *   report.mjs check <results dir>...          fail when a test has no description (test/descriptions.js)
  *
  * The test names carry their upstream references (see test/metadata.js), so a regression test links to the pull
@@ -32,6 +36,7 @@ import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
 import {renderFilterBar, FILTER_SCRIPT, FILTER_CSS} from './filter.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
 import {compareRefs} from './refs.mjs';
+import {proofForTest} from './prove.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
@@ -137,6 +142,16 @@ export function buildReport(results, run = {}) {
     const sha = run.repoSha || '';
     const id = `${generatedAt.slice(0, 16).replace(/[-:]/g, '').replace('T', '-')}${sha ? `-${sha.slice(0, 7)}` : ''}`;
     const status = overallStatus(results);
+    if (run.proof) {
+        for (const job of results.jobs) {
+            for (const t of job.tests) {
+                const proof = proofForTest(t, run.proof);
+                if (proof) {
+                    t.proof = proof;
+                }
+            }
+        }
+    }
     return {
         id,
         generatedAt,
@@ -155,6 +170,7 @@ export function buildReport(results, run = {}) {
             ...s,
             diff: {...s.diff, items: s.diff.items.slice(0, DIFF_LIST_LIMIT)},
         })),
+        ...(run.proof ? {proof: run.proof} : {}),
     };
 }
 
@@ -1188,6 +1204,10 @@ export function writeSite(report, {out, previous, keep = 20}) {
     fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1) + '\n');
     fs.writeFileSync(path.join(out, 'summary.md'), renderSummaryMarkdown(report) + '\n');
     fs.writeFileSync(path.join(out, 'history.json'), JSON.stringify(history, null, 1) + '\n');
+    if (report.proof) {
+        // the next run keeps it when it does not prove (scripts/prove.mjs collect --previous)
+        fs.writeFileSync(path.join(out, 'proof.json'), JSON.stringify(report.proof, null, 1) + '\n');
+    }
     fs.writeFileSync(path.join(out, '.nojekyll'), '');
     return history;
 }
@@ -1198,6 +1218,18 @@ export function writeSite(report, {out, previous, keep = 20}) {
 /** The main sweep records of the published report before this run (`<previous>/sweep/main.json`), or null. */
 function readPreviousMain(previous) {
     const file = previous ? path.join(previous, 'sweep', 'main.json') : null;
+    if (!file || !fs.existsSync(file)) {
+        return null;
+    }
+    try {
+        return readJson(file);
+    } catch {
+        return null;
+    }
+}
+
+/** The proof of the regression tests (scripts/prove.mjs collect), or null. */
+function readProof(file) {
     if (!file || !fs.existsSync(file)) {
         return null;
     }
@@ -1265,6 +1297,7 @@ function main(argv) {
             ref: options.ref,
             trigger: options.trigger,
             previousMain: readPreviousMain(options.previous),
+            proof: readProof(options.proof),
         });
         const history = writeSite(report, {
             out: options.out,

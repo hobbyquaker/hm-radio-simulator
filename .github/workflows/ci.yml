@@ -8,6 +8,14 @@ on:
     paths-ignore: ['README.md', 'README.en.md', 'upstream-reports/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      prove:
+        description: also prove the regression tests on their fixes' parent commits (scripts/prove.mjs)
+        type: boolean
+        default: false
+  # weekly: the whole suite, and the proof of the regression tests (the fixes' commits do not move, the harness does)
+  schedule:
+    - cron: '17 3 * * 0'
   # the upstream watch (upstream-watch.yml) runs the suite for a new OpenCCU-Base main commit through this workflow
   workflow_call:
     inputs:
@@ -46,6 +54,8 @@ jobs:
     outputs:
       daemons: ${{ steps.resolve.outputs.daemons }}
       fuzz: ${{ steps.resolve.outputs.fuzz }}
+      prove: ${{ steps.prove.outputs.prove }}
+      proof: ${{ steps.prove.outputs.proof }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,6 +63,34 @@ jobs:
           node-version: '22'
       - id: resolve
         run: node scripts/resolve-refs.mjs --main "${{ inputs.upstream_sha }}" --github-output
+      # the proof of the regression tests costs two image builds per fix, so it runs only when it can change: weekly,
+      # on request, and on a push that changes the fix list or a regression test (scripts/prove.mjs changed); never
+      # for the upstream watch, whose new main commit does not touch the fixes' old commits
+      - id: prove
+        env:
+          EVENT: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+          DISPATCH: ${{ github.event.inputs.prove }}
+          UPSTREAM: ${{ inputs.upstream_sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          prove=false
+          if [ -n "${UPSTREAM}" ]; then
+            prove=false
+          elif [ "${CRON}" = '17 3 * * 0' ] || [ "${DISPATCH}" = true ]; then
+            prove=true
+          elif [ "${EVENT}" = push ]; then
+            if [ -z "${BEFORE}" ] || [ "${BEFORE}" = 0000000000000000000000000000000000000000 ] \
+              || ! git fetch -q --depth=1 origin "${BEFORE}"; then
+              prove=true
+            elif node scripts/prove.mjs changed "${BEFORE}" "${GITHUB_SHA}"; then
+              prove=true
+            fi
+          fi
+          echo "prove=${prove}" >> "$GITHUB_OUTPUT"
+          if [ "${prove}" = true ]; then
+            node scripts/prove.mjs plan --github-output
+          fi
 
   daemons:
     name: daemon suite (OpenCCU-Base ${{ matrix.base_ref }}, ${{ matrix.variant }})
@@ -150,11 +188,55 @@ jobs:
           pattern: 'daemon-results-*'
       - run: node scripts/report.mjs check artifacts
 
+  # the proof of the regression tests: each fix's tests on its merge commit's parent (they must fail) and on the merge
+  # commit (they must pass), release and ASan; the report job judges the runs (scripts/prove.mjs)
+  prove:
+    name: proof (OpenCCU-Base #${{ matrix.fix }}, ${{ matrix.side }})
+    needs: refs
+    if: needs.refs.outputs.prove == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.refs.outputs.proof) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: docker/setup-buildx-action@v3
+      # no build cache: the old commits would push the refs' caches out of the 10 GB, and the build takes minutes
+      - name: build the image at ${{ matrix.sha }}
+        id: build
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: test
+          load: true
+          tags: hm-radio-simulator:proof
+          build-args: |
+            BASE_REF=${{ matrix.sha }}
+            BASE_LABEL=#${{ matrix.fix }} ${{ matrix.side }}
+            DAEMON_VARIANTS=release asan
+      - name: run the tests of #${{ matrix.fix }}
+        run: |
+          node scripts/prove.mjs run --fix "${{ matrix.fix }}" --side "${{ matrix.side }}" --sha "${{ matrix.sha }}" \
+            --image hm-radio-simulator:proof --out proof --known-broken "${{ matrix.known_broken }}" \
+            --repeat "${{ matrix.repeat }}" ${{ steps.build.outcome != 'success' && '--build-failed' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: proof-${{ matrix.fix }}-${{ matrix.side }}
+          path: proof/proof-run.json
+          if-no-files-found: ignore
+
   # the test report: the Markdown overview of the whole run and the static site for GitHub Pages (scripts/report.mjs)
   report:
     name: test report
     runs-on: ubuntu-latest
-    needs: [daemons, fuzz]
+    needs: [daemons, fuzz, prove]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -172,6 +254,8 @@ jobs:
           # the main sweep records of the previous run, for the differential against the previously tested commit
           mkdir -p previous/sweep
           curl -fsSL "$site/sweep/main.json" -o previous/sweep/main.json || rm -f previous/sweep/main.json
+          # the proof of the regression tests, kept when this run does not prove
+          curl -fsSL "$site/proof.json" -o previous/proof.json || rm -f previous/proof.json
           if curl -fsSL "$site/history.json" -o previous/history.json; then
             for id in $(node -e 'console.log(JSON.parse(require("fs").readFileSync("previous/history.json","utf8")).map((e) => e.id).join(" "))'); do
               mkdir -p "previous/runs/$id"
@@ -181,9 +265,20 @@ jobs:
           else
             echo "no published history yet"
           fi
+      - uses: actions/download-artifact@v4
+        if: needs.prove.result != 'skipped'
+        with:
+          path: proofs
+          pattern: 'proof-*'
+      - name: judge the proof runs (or keep the published proof)
+        run: |
+          node scripts/prove.mjs collect proofs --previous previous/proof.json --out proof.json > proof.txt || true
+          if [ -s proof.txt ]; then
+            { echo '### Proof of the regression tests'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: build the report
         run: |
-          node scripts/report.mjs collect --out site --previous previous --keep 20 \
+          node scripts/report.mjs collect --out site --previous previous --keep 20 --proof proof.json \
             --repo-sha "$GITHUB_SHA" --ref "$GITHUB_REF_NAME" --run-id "$GITHUB_RUN_ID" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --trigger "${{ inputs.trigger }}" artifacts

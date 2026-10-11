@@ -352,6 +352,14 @@ man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
+- **proven** / **not proven** - ob ein Regressionstest ohne seinen Fix nachweislich scheitert: `scripts/prove.mjs` baut
+  die Daemons am Commit vor dem Fix und am Merge-Commit und lässt dort nur die Tests mit der Nummer des Fixes laufen,
+  normal und mit ASan (Races und Lebensdauerfehler am Commit davor bis zu fünfmal unter ASan). **proven**: Der Test
+  scheitert vor dem Fix und besteht mit ihm; **not proven**: Er besteht auch vor dem Fix, erreicht also nicht, was der
+  Fix ändert; **inconclusive**: Er scheitert auf beiden. Das Ergebnis steht je Test im Feld `proof` von `report.json`,
+  der ganze Nachweis in `proof.json`. Er kostet zwei Image-Builds je Fix; die CI führt ihn deshalb wöchentlich, auf
+  Anforderung (`workflow_dispatch` mit `prove`) und bei einem Push aus, der die Fix-Liste oder einen Regressionstest
+  ändert; dazwischen behält der Bericht den letzten. Lokal: `node scripts/prove.mjs local [--fixes 9,16]`;
 - **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.

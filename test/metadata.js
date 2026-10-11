@@ -16,8 +16,17 @@ const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
 const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob/main/upstream-reports';
 
 /**
- * The OpenCCU-Base pull requests the regression tests pin, with their merge commits (from the GitHub API).
- * @type {Record<number, {title: string, commit: string}>}
+ * The OpenCCU-Base pull requests the regression tests pin, with their merge commits (from the GitHub API). Every entry
+ * needs at least one daemon test whose top-level name carries its number ("#138: ...", "(#9 shape)") and that uses
+ * `regression(<number>)` (test/unit/prove.test.js checks both): scripts/prove.mjs selects a fix's tests by that
+ * name and runs them on the merge commit's parent, where they must fail, and on the merge commit, where they must pass.
+ *
+ * `proofRepeat`: how often the proof runs the tests on the parent under ASan before it calls the fix "not proven" - for
+ * races and lifetime bugs, which a single run may miss (default 1).
+ *
+ * Not listed: #112 (eq3_char_loop, 769c9eb0) and #22 - eq3_char_loop and multimacd are stage 5 (multimacd in a VM);
+ * they join this list with their tests.
+ * @type {Record<number, {title: string, commit: string, proofRepeat?: number}>}
  */
 export const UPSTREAM_FIXES = Object.freeze({
     4: {
@@ -32,6 +41,7 @@ export const UPSTREAM_FIXES = Object.freeze({
     16: {
         title: 'rfd: synchronize LGW controller lifetime during reconnect',
         commit: '2848a5f8f44b8246a09b0eee93203dc7dfde7d2c',
+        proofRepeat: 5,
     },
     17: {
         title: 'LAN gateway: fix case-sensitive serial mismatch between connection and status',
@@ -40,12 +50,9 @@ export const UPSTREAM_FIXES = Object.freeze({
     27: {
         title: 'libXmlRpc: preserve dispatcher registration during reconnect failure',
         commit: 'ff6939fdc9815a1944b85464052faf83610165e5',
+        proofRepeat: 5,
     },
     63: {title: 'rftypes: migrate patch 0003 CFM-TW fix', commit: '661be9e8829a2404a89f0b64c72f7283cb72dbc4'},
-    112: {
-        title: 'eq3_char_loop: hang up slave connections when their master closes',
-        commit: '769c9eb0709a5e80c8b1079b9c6ad52a11592e9c',
-    },
     115: {
         title: 'rfd: do not crash on read errors of the serial device',
         commit: 'e370dcbdb6ecc94d2555965be72e754dc74c4f5b',
