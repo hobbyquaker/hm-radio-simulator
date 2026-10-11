@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: ['**']
+    # a push that changes only the READMEs or the issue drafts tests nothing new (the roadmap states are pushed often);
+    # a push with any other file runs everything
+    paths-ignore: ['README.md', 'README.en.md', 'upstream-reports/**']
   pull_request:
   workflow_dispatch:
   # the upstream watch (upstream-watch.yml) runs the suite for a new OpenCCU-Base main commit through this workflow
