@@ -338,13 +338,13 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
   falsche Antworten
 - ✅ **Last:** schnelle `setValue`-/`putParamset`-Salven, Funk-Events währenddessen, die Warteschlange von rfd, Grenzen
   aus Sendezeit und Duty Cycle
-- 💤 **Labormessungen, die Handgriffe brauchen:** ein stummes Wired-Gerät, ein Senden an ein abwesendes BidCoS-Gerät,
+- 📥 **Labormessungen, die Handgriffe brauchen** (Vorbereitung): ein stummes Wired-Gerät, ein Senden an ein abwesendes BidCoS-Gerät,
   ein Anlernen, ein Duty-Cycle-Event
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ☑️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - ☑️ **Eine ThreadSanitizer-Variante** des Images
-- ☑️ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
-- ☑️ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
+- 📥 **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
+- 📥 **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 

@@ -301,35 +301,35 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 
 ## Stages
 
-| Stage | Content                                                                                                                                                                               | State         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                                                                                  | done          |
-| 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing                                                               | done          |
-| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                                                                              | done          |
-| -     | the test report: a Markdown summary per CI run and an HTML report on GitHub Pages with history and upstream links                                                                     | done          |
-| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests                                                       | done          |
-| 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices, direct links, the module power-cycled behind the gateway                                       | done          |
-| 4     | hs485d against a simulated HMW-LGW with one wired actuator: discovery, sets, keys, EEPROM paramsets, a link, the keepalive timeout, a restart; the UDP device search for both daemons | done          |
-| 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                                                                              | to be refined |
-| -     | calibration of the module timing against a real RPI-RF-MOD                                                                                                                            | done          |
-| -     | calibration of the HMW-LGW timing against a real wired LAN gateway (hs485d)                                                                                                           | done          |
-| -     | the test report: the four result columns right-aligned and the same width in every table                                                                                              | done          |
-| -     | the test report: code coverage of rfd and hs485d from the suite                                                                                                                       | done          |
-| -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                                                                                   | done          |
-| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report                                                                | done          |
-| -     | more daemon tests (the collection, split into the items below)                                                                                                                        | not as such   |
-| -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                                                                 | done          |
-| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                                                            | done          |
-| -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                                                                    | done          |
-| -     | `listMethods` tells the truth: every listed method is callable, and no callable method is missing                                                                                     | done          |
-| -     | a misbehaving event receiver blocks nothing: server gone mid-callback, no answer, wrong answers                                                                                       | done          |
-| -     | load: fast setValue/putParamset bursts, events meanwhile, rfd's queue, airtime and duty-cycle limits                                                                                  | done          |
-| -     | lab measurements that need hands on a box: a silent wired device, a send to an absent BidCoS device, a pairing, a duty-cycle event                                                    | later         |
-| -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                                                                     | ready         |
-| -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                                                           | ready         |
-| -     | a ThreadSanitizer image variant                                                                                                                                                       | ready         |
-| -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                             | ready         |
-| -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                             | ready         |
+| Stage | Content                                                                                                                                                                               | State                  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 0     | the docker image (release + ASan from an OpenCCU-Base ref), RPC black-box tests, libFuzzer harnesses                                                                                  | done                   |
+| 1a    | the simulated RPI-RF-MOD on a pty: init to `CONNECTED`, bootloader, `BUSY`, module lost and back, events, frame fuzzing                                                               | done                   |
+| 1b    | the LAN gateway, plaintext: hmlangw in front of the pty module, rfd with `Type = HMLGW2`                                                                                              | done                   |
+| -     | the test report: a Markdown summary per CI run and an HTML report on GitHub Pages with history and upstream links                                                                     | done                   |
+| 2     | one simulated switch driven by the `rftypes` XML: pairing, set/ACK, status, UNREACH, CONFIG_PENDING, duty cycle; callback tests                                                       | done                   |
+| 3     | a remote, the LAN gateway with the AES handshake and reconnect scenarios, AES devices, direct links, the module power-cycled behind the gateway                                       | done                   |
+| 4     | hs485d against a simulated HMW-LGW with one wired actuator: discovery, sets, keys, EEPROM paramsets, a link, the keepalive timeout, a restart; the UDP device search for both daemons | done                   |
+| 5     | multimacd in a VM with `eq3_char_loop` and the dual-coprocessor protocol                                                                                                              | to be refined          |
+| -     | calibration of the module timing against a real RPI-RF-MOD                                                                                                                            | done                   |
+| -     | calibration of the HMW-LGW timing against a real wired LAN gateway (hs485d)                                                                                                           | done                   |
+| -     | the test report: the four result columns right-aligned and the same width in every table                                                                                              | done                   |
+| -     | the test report: code coverage of rfd and hs485d from the suite                                                                                                                       | done                   |
+| -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                                                                                   | done                   |
+| -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report                                                                | done                   |
+| -     | more daemon tests (the collection, split into the items below)                                                                                                                        | not as such            |
+| -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                                                                 | done                   |
+| -     | the receiver contract: several receivers, init sync, event order, the unreachable rule, a stalled receiver                                                                            | done                   |
+| -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                                                                    | done                   |
+| -     | `listMethods` tells the truth: every listed method is callable, and no callable method is missing                                                                                     | done                   |
+| -     | a misbehaving event receiver blocks nothing: server gone mid-callback, no answer, wrong answers                                                                                       | done                   |
+| -     | load: fast setValue/putParamset bursts, events meanwhile, rfd's queue, airtime and duty-cycle limits                                                                                  | done                   |
+| -     | lab measurements that need hands on a box: a silent wired device, a send to an absent BidCoS device, a pairing, a duty-cycle event                                                    | enqueued (preparation) |
+| -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                                                                     | ready                  |
+| -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                                                           | ready                  |
+| -     | a ThreadSanitizer image variant                                                                                                                                                       | ready                  |
+| -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                             | enqueued               |
+| -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                             | enqueued               |
 
 ## Credits and licences
 
