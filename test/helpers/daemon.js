@@ -44,15 +44,50 @@ const LOG_KEEP = 400;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function daemonEnv(workdir) {
-    return {
-        ...process.env,
-        LD_LIBRARY_PATH: [path.join(DAEMONS, 'lib'), process.env.LD_LIBRARY_PATH].filter(Boolean).join(':'),
-        ASAN_OPTIONS:
-            process.env.ASAN_OPTIONS || `detect_leaks=0:abort_on_error=1:log_path=${path.join(workdir, 'asan')}`,
-        UBSAN_OPTIONS: process.env.UBSAN_OPTIONS || `print_stacktrace=1:log_path=${path.join(workdir, 'ubsan')}`,
-        TZ: 'Europe/Berlin',
-    };
+/** Variables whose values are lists: combineEnv() joins them instead of replacing one with the other. */
+const LIST_VARIABLES = {LD_PRELOAD: ':', ASAN_OPTIONS: ':', UBSAN_OPTIONS: ':'};
+
+/**
+ * Merges environment additions for a daemon: later ones win, except for LD_PRELOAD and the sanitizer options, whose
+ * values are joined (two preloaded libraries - the fault shim and libfaketime, say - both stay).
+ * @param {...Record<string, string>} envs
+ * @returns {Record<string, string>}
+ */
+export function combineEnv(...envs) {
+    const result = {};
+    for (const env of envs) {
+        for (const [key, value] of Object.entries(env || {})) {
+            if (value === undefined) {
+                continue;
+            }
+            const separator = LIST_VARIABLES[key];
+            result[key] = separator && result[key] ? `${result[key]}${separator}${value}` : value;
+        }
+    }
+    return result;
+}
+
+/**
+ * The daemon's environment: the test's own, the daemons' libraries, the sanitizer options, then `extra` (a test's
+ * `env` option, the fault shim) merged last with combineEnv(). With anything preloaded, ASan is told not to insist
+ * on coming first in the library order (the preloaded library does).
+ */
+function daemonEnv(workdir, extra = {}) {
+    const env = combineEnv(
+        {
+            ...process.env,
+            LD_LIBRARY_PATH: [path.join(DAEMONS, 'lib'), process.env.LD_LIBRARY_PATH].filter(Boolean).join(':'),
+            ASAN_OPTIONS:
+                process.env.ASAN_OPTIONS || `detect_leaks=0:abort_on_error=1:log_path=${path.join(workdir, 'asan')}`,
+            UBSAN_OPTIONS: process.env.UBSAN_OPTIONS || `print_stacktrace=1:log_path=${path.join(workdir, 'ubsan')}`,
+            TZ: 'Europe/Berlin',
+        },
+        extra,
+    );
+    if (env.LD_PRELOAD && !/verify_asan_link_order/.test(env.ASAN_OPTIONS)) {
+        env.ASAN_OPTIONS = `${env.ASAN_OPTIONS}:verify_asan_link_order=0`;
+    }
+    return env;
 }
 
 export class Daemon {
@@ -74,12 +109,14 @@ export class Daemon {
         this.gateway = null;
         /** @type {import('../../lib/lgw.js').LgwFront|null} the JavaScript LAN gateway, when the daemon got one */
         this.lgw = null;
+        /** @type {Record<string, string>} environment additions for the process (merged last, see daemonEnv) */
+        this.extraEnv = {};
     }
 
     start() {
         this.proc = spawn(this.bin, this.args, {
             cwd: this.workdir,
-            env: daemonEnv(this.workdir),
+            env: daemonEnv(this.workdir, this.extraEnv),
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         const logFile = fs.createWriteStream(path.join(this.workdir, `${this.name}.log`));
@@ -248,7 +285,8 @@ export function tmpdir(prefix) {
  * With `dir`, an earlier daemon's directory is used again (a restart: its device files, address, keys and handlers
  * stay; only rfd.conf is written anew). `console: false` leaves out `-c`, so the configured `Log Destination` counts;
  * `args` replaces the command line after the binary (`{config}` is replaced by the config file's path).
- * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean}} [options]
+ * `env` adds to rfd's environment (merged last; LD_PRELOAD and the sanitizer options are joined, see combineEnv).
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
@@ -267,6 +305,7 @@ export async function spawnRfd({
     port = null,
     improvedInit = true,
     quietAir = false,
+    env = {},
 } = {}) {
     const fresh = !dir;
     dir = dir || tmpdir('hmrs-rfd');
@@ -356,6 +395,7 @@ export async function spawnRfd({
         ? args.map((a) => a.replace('{config}', config))
         : ['-f', config, ...(console ? ['-c'] : []), '-l', String(logLevel)];
     const daemon = new Daemon('rfd', path.join(DAEMONS, 'bin', 'rfd'), cmdline, dir, port);
+    daemon.extraEnv = combineEnv(env);
     daemon.module = module;
     daemon.air = air;
     daemon.pty = pty;
@@ -389,7 +429,8 @@ export async function startRfd(options = {}) {
 /**
  * Starts hs485d against a TCP "bus" (a plain socket, the CCU1-style transport) or, with `lgw`, against a simulated
  * HMW-LGW. hs485d's XML-RPC port is fixed at 2000 unless it reads an [Interface] section, so one at a time.
- * @param {{host: string, port: number, logLevel?: number, lgw?: boolean}} options
+ * `env` adds to the daemon's environment (merged last; LD_PRELOAD and the sanitizer options are joined, see combineEnv).
+ * @param {{host: string, port: number, logLevel?: number, lgw?: boolean, env?: Record<string, string>}} options
  */
 export async function startHs485d({
     host = '127.0.0.1',
@@ -401,6 +442,7 @@ export async function startHs485d({
     descriptionDir = HS485TYPES,
     searchSerial = null,
     bus = null,
+    env = {},
 } = {}) {
     dir = dir || tmpdir('hmrs-hs485d');
     if (!fs.existsSync(path.join(dir, 'devices'))) {
@@ -443,6 +485,7 @@ export async function startHs485d({
         args.push('-g', ...keyArgs);
     }
     const daemon = new Daemon('hs485d', path.join(DAEMONS, 'bin', 'hs485d'), args, dir, 2000);
+    daemon.extraEnv = combineEnv(env);
     daemon.lgw = front;
     daemon.bus = bus;
     daemon.dir = dir;
