@@ -20,6 +20,10 @@ const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob
  * @type {Record<number, {title: string, commit: string}>}
  */
 export const UPSTREAM_FIXES = Object.freeze({
+    4: {
+        title: 'fixes compiler error and AES (CBC-MAC without PKCS7 padding; merged via #8)',
+        commit: '8ecd25e953321e1604c5cf309f9adfd2616b10fc',
+    },
     9: {
         title: 'Fix signed-char corruption of .dev sysinfo on x86_64 (type byte >= 0x80)',
         commit: '288e258c3c0802cf740a0b1e273960bf3ae816f1',
@@ -37,6 +41,7 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'libXmlRpc: preserve dispatcher registration during reconnect failure',
         commit: 'ff6939fdc9815a1944b85464052faf83610165e5',
     },
+    63: {title: 'rftypes: migrate patch 0003 CFM-TW fix', commit: '661be9e8829a2404a89f0b64c72f7283cb72dbc4'},
     112: {
         title: 'eq3_char_loop: hang up slave connections when their master closes',
         commit: '769c9eb0709a5e80c8b1079b9c6ad52a11592e9c',

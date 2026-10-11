@@ -81,6 +81,15 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   eines schlafenden Geräts (`CONFIG_PENDING`, geliefert beim nächsten Druck auf die Anlerntaste), eine
   Direktverknüpfung zwischen Fernbedienung und Aktor (`addLink`, Peer-Listen auf beiden Seiten, `getLinks`, das
   LINK-Paramset als Liste 3 im Aktor, `removeLink`).
+- **Mit CBC-MAC signierte Events** ([#4](https://github.com/OpenCCU/OpenCCU-Base/pull/4)): Kein Kanal der
+  `rftypes` von OpenCCU-Base trägt `aes_cbc="true"`, deshalb läuft rfd hier auf einer Kopie, in der der Schaltkanal
+  des HM-LC-Sw1-Pl das Attribut bekommt; der Aktor signiert seine Statusmeldung mit 24-Bit-Zähler und 4-Byte-MIC.
+  Richtig signiert mit steigendem Zähler kommt sie an, ein falscher MIC und ein alter Zähler fallen durch, der Zähler
+  übersteht einen Neustart (`aes_cbc_cnt` in der Gerätedatei); ein Gerät auf dem Standardschlüssel (Index 0) wird
+  nicht geprüft, sein Wert gilt aber als nicht authentifiziert (rfd fragt das Gerät).
+- **Link-Register aus den `rftypes`:** beim HM-OU-CFM-TW landet `LONG_ACT_TYPE` einer Direktverknüpfung in Register
+  0xA4 und `SHORT_ACT_TYPE` bleibt in 0x24 ([#63](https://github.com/OpenCCU/OpenCCU-Base/pull/63); vorher
+  überschrieb die lange Aktion die kurze).
 - **Geräte, die schlafen:** ein Wakeup-Gerät (HM-PB-2-WM55, `CONFIG,WAKEUP`), ein Gerät mit Lazy Config (HM-RC-4-2),
   ein Bewegungsmelder (HM-Sec-MDIR) und ein Burst-Gerät (HM-LC-Sw1-Ba-PCB, `BURST`). Ein Paramset für ein schlafendes
   Wakeup-Gerät versucht rfd einmal sofort, dann bleibt es offen (`CONFIG_PENDING`), und rfd bittet das Modul, das

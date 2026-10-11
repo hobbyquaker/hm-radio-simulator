@@ -162,6 +162,19 @@ export const DESCRIPTIONS = Object.freeze({
         'hs485d reads extra descriptions from /etc/config/hs485types: a type only described there is discovered as that type':
             'A device type described only in the user directory for extra descriptions is recognised.',
     },
+    'test/daemon/rfd-aes-cbc.test.js': {
+        'CBC-MAC: signed events with a growing counter are accepted; a wrong MIC and a replayed counter are dropped (#4)':
+            'Some sensors sign their messages with a counter and a cryptographic checksum (CBC-MAC) instead of the usual AES handshake. On a channel marked for this, rfd must accept correctly signed messages with a rising counter and drop messages with a wrong checksum or an old counter.',
+        'correctly signed events reach the receiver':
+            'Two signed status messages with counters that go up both arrive as events.',
+        'a wrong MIC is dropped': 'A message whose checksum does not match is dropped, and rfd logs the failed check.',
+        'a replayed or lower counter is dropped, even with a valid MIC':
+            'A correctly signed message with a counter that was already used, or a lower one, is dropped as a replay.',
+        'CBC-MAC: the counter survives a restart (aes_cbc_cnt in the device file)':
+            'rfd stores the last accepted counter in the device file. After a restart, a message with an older counter is still dropped and the next one is accepted.',
+        'CBC-MAC: a device with the default key (index 0) passes the check even with a wrong MIC, but its values count as not authenticated (rfd asks the device instead)':
+            'For a device still on the default key rfd skips the checksum check, for compatibility. The message is not treated as authenticated though: rfd does not take its value and asks the device for its state instead.',
+    },
     'test/daemon/rfd-aes-remote.test.js': {
         'an AES-secured switch: the key exchange at pairing, a set runs the challenge-response, AUTHENTICATION_SUCCESS':
             'A switch with secured commands is paired; rfd hands it the key, and switching then runs through the challenge and response that proves the key.',
@@ -171,6 +184,12 @@ export const DESCRIPTIONS = Object.freeze({
             "A setting for a remote that is asleep stays pending and is delivered when the remote's config button is pressed.",
         'a link between the remote and the switch: addLink writes the peer lists, getLinks shows it, removeLink clears it':
             'A direct link from the remote to the switch is created, listed, configured and removed again.',
+    },
+    'test/daemon/rfd-link-registers.test.js': {
+        "HM-OU-CFM-TW: a link's LONG_ACT_TYPE is written to register 0xA4, SHORT_ACT_TYPE stays on 0x24 (#63)":
+            "The MP3 chime's LED has separate settings for a short and a long key press in a direct link. Before fix #63 rfd wrote both into the same device register, so setting the long action overwrote the short one; now the long action goes to its own register.",
+        'the long action on 0xA4, the short one kept on 0x24':
+            'After writing both settings, the device holds the short action in register 0x24 and the long action in register 0xA4.',
     },
     'test/daemon/rfd-lgw-front.test.js': {
         'AES: rfd connects through the encrypted gateway - V handshake on both ports, keepalives, the init':

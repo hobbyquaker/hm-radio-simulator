@@ -328,12 +328,13 @@ export function tmpdir(prefix) {
  * With `dir`, an earlier daemon's directory is used again (a restart: its device files, address, keys and handlers
  * stay; only rfd.conf is written anew). `console: false` leaves out `-c`, so the configured `Log Destination` counts;
  * `args` replaces the command line after the binary (`{config}` is replaced by the config file's path).
+ * `descriptionDir` replaces the image's rftypes directory (a test's patched copy).
  * `faults` loads the fault shim (shim/hmrs-faults.c) on the first interface's device: `daemon.setFault()` orders it.
  * `env` adds to rfd's environment (merged last; LD_PRELOAD and the sanitizer options are joined, see combineEnv).
  * `fdFloor` starts rfd with descriptors 3 .. fdFloor-1 already open (on /dev/null) and the limit raised, so every
  * descriptor rfd opens itself - sockets included - gets a number of at least fdFloor (a busy process, or one started
  * by a supervisor that leaks descriptors).
- * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>, faults?: boolean, fdFloor?: number}} [options]
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>, faults?: boolean, fdFloor?: number, descriptionDir?: string}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
@@ -355,6 +356,7 @@ export async function spawnRfd({
     env = {},
     faults = false,
     fdFloor = 0,
+    descriptionDir = RFTYPES,
 } = {}) {
     const fresh = !dir;
     dir = dir || tmpdir('hmrs-rfd');
@@ -409,7 +411,7 @@ export async function spawnRfd({
         `Log Level = ${logLevel}`,
         'Log Identifier = rfd',
         'Persist Keys = 1',
-        `Device Description Dir = ${RFTYPES}`,
+        `Device Description Dir = ${descriptionDir}`,
         `Device Files Dir = ${path.join(dir, 'devices')}`,
         `Key File = ${path.join(dir, 'keys')}`,
         `Address File = ${path.join(dir, 'ids')}`,

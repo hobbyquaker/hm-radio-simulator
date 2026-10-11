@@ -10,6 +10,8 @@ import {
     verifySignature,
     isChallenge,
     sessionKey,
+    cbcSign,
+    cbcMic,
 } from '../../lib/aes.js';
 import {encodeTelegram, decodeTelegram, FT, ACK} from '../../lib/telegram.js';
 
@@ -63,4 +65,23 @@ test('a wrong key, a tampered frame or a wrong signature fail the handshake', ()
     assert.equal(verifySignature(badAck, pd), false);
     assert.equal(sessionKey(KEY, Buffer.alloc(6)).equals(KEY), true, 'a zero challenge leaves the key');
     assert.notEqual(sessionKey(KEY, crypto.randomBytes(6)).toString('hex'), KEY.toString('hex'));
+});
+
+test('CBC-MAC signing: counter bytes in place, the MIC depends on key, counter and content', () => {
+    const key = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
+    const telegram = Buffer.from('00a41012345601020306010000', 'hex');
+    const signed = cbcSign(key, telegram, 0x123456);
+    assert.equal(signed.length, telegram.length + 6);
+    assert.equal(signed[0], 0x56, 'the low counter byte is the telegram counter');
+    assert.deepEqual([...signed.subarray(telegram.length, telegram.length + 2)], [0x12, 0x34]);
+    const withCounter = Buffer.from(telegram);
+    withCounter[0] = 0x56;
+    assert.deepEqual(signed.subarray(-4), cbcMic(key, withCounter, 0x123456));
+    assert.notDeepEqual(cbcSign(key, telegram, 0x123457).subarray(-4), signed.subarray(-4));
+    const other = Buffer.from(telegram);
+    other[11] ^= 1;
+    assert.notDeepEqual(cbcSign(key, other, 0x123456).subarray(-4), signed.subarray(-4));
+    const bad = cbcSign(key, telegram, 0x123456, {badMic: true});
+    assert.notDeepEqual(bad.subarray(-4), signed.subarray(-4));
+    assert.deepEqual(bad.subarray(0, -4), signed.subarray(0, -4));
 });
