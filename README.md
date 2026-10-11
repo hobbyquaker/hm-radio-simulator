@@ -379,7 +379,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - 📥 **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
   an libXmlRpc, der 49-Tage-Überlauf der Uhr (libfaketime)
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
-- 📥 **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
+- 🏗️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - 📥 **Eine ThreadSanitizer-Variante** des Images
 - ✅ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
 - 🕵️ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
