@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/179
 component: rfd
 refs: [3.89.11 (3ed652a), main (570566e)]
 suite: system-command-slot

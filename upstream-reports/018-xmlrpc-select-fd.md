@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/178
 component: libXmlRpc (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (570566e)]
 suite: xmlrpc-select-fd

@@ -212,8 +212,8 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
-`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data`, `propertymap-long-line` (siehe Fuzzing), `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s) und `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-017 sind als
-OpenCCU-Base #161-#177 gemeldet (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)).
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data`, `propertymap-long-line` (siehe Fuzzing), `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s) und `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-019 sind als
+OpenCCU-Base #161-#179 gemeldet (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)).
 
 ## Wie es funktioniert
 
@@ -405,7 +405,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **Testbericht:** die vier Ergebnisspalten in jeder Tabelle rechtsbündig und gleich breit
 - ✅ **Testbericht:** Code-Abdeckung von rfd und hs485d durch die Suite, im Bericht
 - ✅ **Upstream-Berichte:** der Ordner [`upstream-reports/`](upstream-reports/) mit einem Issue-Entwurf je Fund in den
-  Daemons; 001-017 gemeldet als OpenCCU-Base #161-#177
+  Daemons; 001-019 gemeldet als OpenCCU-Base #161-#179
 - ✅ **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
   Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
 - ✅ Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
