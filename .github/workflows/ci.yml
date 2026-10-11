@@ -191,7 +191,7 @@ jobs:
   # the proof of the regression tests: each fix's tests on its merge commit's parent (they must fail) and on the merge
   # commit (they must pass), release and ASan; the report job judges the runs (scripts/prove.mjs)
   prove:
-    name: proof (OpenCCU-Base #${{ matrix.fix }}, ${{ matrix.side }})
+    name: 'proof (OpenCCU-Base #${{ matrix.fix }}, ${{ matrix.side }})'
     needs: refs
     if: needs.refs.outputs.prove == 'true'
     runs-on: ubuntu-latest
@@ -220,7 +220,7 @@ jobs:
             BASE_REF=${{ matrix.sha }}
             BASE_LABEL=#${{ matrix.fix }} ${{ matrix.side }}
             DAEMON_VARIANTS=release asan
-      - name: run the tests of #${{ matrix.fix }}
+      - name: 'run the tests of #${{ matrix.fix }}'
         run: |
           node scripts/prove.mjs run --fix "${{ matrix.fix }}" --side "${{ matrix.side }}" --sha "${{ matrix.sha }}" \
             --image hm-radio-simulator:proof --out proof --known-broken "${{ matrix.known_broken }}" \
