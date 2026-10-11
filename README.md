@@ -125,6 +125,13 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
   sind aufrufbar, hs485d 28 von 28, kein ungelisteter Name ist aufrufbar (hs485ds nicht registriertes
   `activateLinkParamset` eingeschlossen); `system.methodHelp` kennt `system.multicall` nicht (es steckt in der
   Verbindung), `system.methodSignature` gibt es nicht. Der Testbericht zeigt die Zahlen als Tabelle.
+- **Last (rfd):** sechs Schaltaktoren und eine Fernbedienung auf der Luftstrecke mit berechneter Sendezeit. Eine Salve
+  mit 50 % des Luft-Maximums (8,3 von 16,7 Befehlen pro Sekunde) mit einem `putParamset` mittendrin und
+  Fernbedienungs-Tastendrücken währenddessen: jeder Aufruf beantwortet, jeder Befehl in Reihenfolge in der Luft, jeder
+  Tastendruck beim Empfänger, der letzte Wert gewinnt. 21 Werte an einen Kanal über BIN-RPC und XML-RPC: alle gesendet,
+  nichts zusammengefasst. Ein Dauerlauf mit 50 % des Duty-Cycle-Budgets (Fenster auf 30 s verkürzt): rfd meldet, was
+  das Modul zählt, der Speicher bleibt gleich. Eine Überlast mit 200 % und überschrittenem Duty Cycle: RPC antwortet
+  weiter, Events kommen an, rfd fängt sich danach. Die Zahlen stehen im Testbericht.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
   `system.multicall` und `xmlParser`.
 
@@ -132,7 +139,7 @@ Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitize
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
-sowie neun Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie zehn Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -157,7 +164,7 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
-`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks` und `async-callback-threads`. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` und `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -199,6 +206,19 @@ erst, wenn der Maintainer es entscheidet.
   logisch nach und muss nur die Antwortfenster auf der seriellen Seite einhalten (rfd: 1 s pro Befehl, 4 s bis zum
   Sendestatus; hs485d: 700 ms). Node.js liegt mit unter einer Millisekunde Latenz weit darunter.
 
+- **Sendezeit und Duty Cycle (berechnet, nicht gemessen):** Für die Lasttests kann die Luftstrecke den Kanal selbst
+  nachbilden (`lib/airtime.js`). Aus dem Rahmenformat der öffentlichen BidCoS-Implementierungen (die CC1101-Einstellung
+  von culfw und Homegear, als Dokumentation gelesen): 2-FSK mit 9992,6 Baud, 4 Byte Präambel, zweimal das Sync-Wort,
+  das Längenbyte, das Telegramm, 2 Byte CRC - 0,8 ms pro Byte; ein Schaltbefehl mit 14 Byte dauert 20 ms, die Antwort
+  ebenso, vor dem Senden 10 ms Pause, ein Burst-Telegramm hat 360 ms Weck-Präambel. Ein Austausch dauert so 60 ms:
+  **höchstens etwa 16,7 Schaltbefehle pro Sekunde** über ein Modul. Der Duty Cycle von 1 % erlaubt **36 s eigene
+  Sendezeit pro Stunde, etwa 1800 solcher Befehle**. Das Modell reiht die Sendungen, zählt die Sendezeit der Zentrale
+  über ein (für Tests verkürzbares) Fenster, meldet sie als Duty Cycle des Moduls und lehnt bei 100 % mit
+  `SEND_FAILED_DUTYCYCLE` ab (gewählt). rfd sendet synchron, einen Austausch nach dem anderen, in Reihenfolge, ohne
+  etwas zusammenzufassen oder zu verwerfen; `setValue` antwortet nach dem ACK. Nach zwei fehlgeschlagenen Sendungen an
+  ein Gerät (auch durch Duty-Cycle-Ablehnung) versucht rfd es bis `FAIL_COUNTER_RESET_TIME` nicht mehr und antwortet
+  sofort mit dem Fault "Failure".
+
 ```js
 import {RadioModule, createPtyModule} from 'hm-radio-simulator';
 
@@ -239,7 +259,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 

@@ -38,12 +38,13 @@ for rfd; a wired LAN gateway with a wired actuator for hs485d). See _Stages_ for
 | `test/daemon/restart-config.test.js`        | restart, device files and config: one device of every `rftypes` type, rfd stopped cleanly through its `exit` method and started again - every address, type, version and channel is back (plus the smoke detectors' team devices, which only loading from a file creates); the same for every `hs485types` type. A truncated device file is dropped, garbage and empty files skipped, leftover `.bak`/`.new` copies ignored, a missing channel re-created. Address donation (`BidCoS-Address = 0`, a fresh system's first start: the module's default address, persisted); `changeKey` persists key and index, a restart loads them; receivers survive a restart (`XmlRpcHandlersFile`). The start-up matrix: missing config file, unknown interface `Type`, `Log Destination` File and None, `UDS File`, a taken port ("Could not bind", exit code 0), two interfaces, the legacy coprocessor init, sniffing mode (`-s`), hs485d's extra description dir `/etc/config/hs485types` |
 | `test/daemon/receiver-misbehaviour.test.js` | a misbehaving receiver (rfd and hs485d, BIN-RPC and XML-RPC callbacks; a byte-level receiver in `test/helpers/raw-receiver.js`): it closes mid-request, vanishes, never answers or stops reading, answers with an HTTP error, a fault, garbage, truncated, the wrong type, several MB, byte by byte or twice - the other receiver still gets its events in ~10 ms, RPC answers, the radio side switches, the daemon's threads and fds are back where they were. Plus huge and invalid `listDevices` answers at init, 100 re-registrations, two receivers with one id, a URL nobody answers on. Two findings: `init-blocks` and `async-callback-threads`                                                                                                                                                                                                                                                                                                                            |
 | `test/daemon/listmethods-truth.test.js`     | `listMethods` tells the truth (rfd and hs485d, BIN-RPC and XML-RPC): every listed name is known to the dispatcher (asked through `system.methodHelp`, the harmless ones also called) and no other name is - every name in the daemons' sources (registered or not), the other daemon's, names of other Homematic interfaces, case and whitespace variants; destructive methods are never called. On `3.89.11`: rfd lists 55, all callable; hs485d 28 of 28; no unlisted name is callable (hs485d's unregistered `activateLinkParamset` included); `system.methodHelp` does not know `system.multicall` (built into the connection), there is no `system.methodSignature`. A table on the report                                                                                                                                                                                                                                                                                    |
+| `test/daemon/rfd-load.test.js`              | load on rfd (six switches and a remote on the air with computed airtime): a burst at 50 % of the air maximum (8.3 of 16.7 commands per second) with a `putParamset` in it and remote presses meanwhile - every call answered, every command on the air once and in order, every press delivered, the last value wins; 21 values to one channel over BIN-RPC and XML-RPC, nothing collapsed; a sustained run at 50 % of the duty-cycle budget (window scaled to 30 s) - rfd reports what the module counts, memory flat; an overload at 200 % with the duty cycle exceeded - RPC answers, events arrive, rfd recovers. The numbers on the report                                                                                                                                                                                                                                                                                                                                    |
 | `fuzz/`                                     | libFuzzer harnesses for `XmlRpcValue` (BIN-RPC and XML deserializers), the request dispatcher with `system.multicall`, and `xmlParser`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `test/unit/`                                | the simulator itself: framing and CRC, the module state machine, the raw BIN-RPC encoder, the LGW front's cipher streams, the AES handshake, the device model                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 A regression test for a bug the chosen OpenCCU-Base ref does not have the fix for runs as `todo` (`HMRS_KNOWN_BROKEN`,
 set per ref by the Dockerfile), so the run shows what happens without going red. Against `3.89.11` that is #115,
-#116, #138 and #140, plus nine findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
+#116, #138 and #140, plus ten findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
 The second finding without an issue yet is `read-eof`: a pty slave whose master went away
@@ -67,7 +68,7 @@ answers `false`, hs485d's history holds the new serial instead of the old. The m
 others, timers, the radio side) stands still until the connection closes. And `async-callback-threads` - every
 unanswered `newDevices`/`deleteDevices`/`replaceDevice` leaves a thread and a socket behind for good. Against `main`,
 `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`,
-`replace-callback`, `init-blocks` and `async-callback-threads`. Every finding has an issue draft in
+`replace-callback`, `init-blocks`, `async-callback-threads` and `dutycycle-upper-bound` (when the module reports a 100 % duty cycle, rfd reads past its threshold map; found by the load test). Every finding has an issue draft in
 [`upstream-reports/`](upstream-reports/) (German README, English drafts); nothing is reported upstream until the
 maintainer decides.
 
@@ -121,7 +122,7 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
 
 - **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
   that predates the fix it runs as **todo** (known broken, the run stays green);
-- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`), linking to the issue or,
+- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`), linking to the issue or,
   until there is one, to the findings above;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
 
@@ -244,6 +245,27 @@ Node's event-loop latency is well under a millisecond for a heap this size - two
 every window. Assertions on time use margins, never exact values. The delays the simulator itself uses (`DEFAULTS` in
 `module.js`: 30 ms until "sent", 80 ms until an acknowledgement, 3 s until "failed") are **chosen**, not measured; a
 calibration against a real module is planned.
+
+### Airtime and the duty cycle (computed, not measured)
+
+For the load tests the air can model the channel itself (`new Air({module, airtime: {...}})`, `lib/airtime.js`). The
+numbers come from the frame format of the public BidCoS implementations (culfw's and Homegear's CC1101 setup, read as
+documentation): 2-FSK at 9992.6 baud (MDMCFG4/3 = 0xC8/0x93, 26 MHz), 4 bytes of preamble, the sync word twice
+(4 bytes), the length byte, the telegram, 2 bytes of CRC - 0.8 ms per byte, so a switch command of 14 bytes takes
+20.0 ms and its 14-byte answer as much; culfw waits 10 ms before it transmits, a burst telegram carries a 360 ms
+wake-up preamble. One exchange (gap, command, gap, answer) is 60 ms: **at most ~16.7 switch commands per second** on
+one module. The 868 MHz SRD sub-band allows a 1 % duty cycle - **36 s of the central's own airtime per hour, about
+1800 such commands** (the ACKs count against the devices). The model serialises sends, meters the central's airtime
+over a window (one hour, or scaled down for tests: the budget is always 1 % of it), reports it as the module's duty
+cycle and refuses at 100 % with `SEND_FAILED_DUTYCYCLE` (chosen, as long as the module's check is on - rfd's
+`setDutyCycleCheck(false)` is compiled out of its production build).
+
+What rfd does with a flood (3.89.11 source, confirmed by the load tests): it sends synchronously - the RPC handler
+waits in `CCU2CommController::sendBidcosTelegram` for the module's status (4 s) - so commands go out one exchange at a
+time, in order, nothing is collapsed or dropped, and `setValue` answers after the ACK; received telegrams wait in the
+interface's queue (1024 frames, the oldest dropped beyond) for the main loop. After two failed sends to a device
+(also a duty-cycle refusal) rfd stops trying it until `FAIL_COUNTER_RESET_TIME` and answers further calls at once with
+the fault "Failure".
 
 One daemon behaviour worth knowing: rfd flushes its serial input before every command it sends, so an unsolicited
 event that arrives in that instant is dropped by rfd itself - with a real module too. Over the LAN gateway, measured on

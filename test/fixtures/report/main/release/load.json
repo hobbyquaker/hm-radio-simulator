@@ -1,0 +1,13 @@
+{
+  "burst": {
+    "offeredPerSecond": 8.3,
+    "calls": 50,
+    "achievedPerSecond": 8.4,
+    "airMaxPerSecond": 16.7,
+    "latencyMs": {"n": 50, "median": 64, "p95": 82, "max": 265},
+    "failed": 0,
+    "levelSetFrames": 50,
+    "presses": 19,
+    "pressEvents": 19
+  }
+}

@@ -110,6 +110,11 @@ export const FINDINGS = Object.freeze({
         draft: '011-async-callback-threads.md',
         issue: null,
     },
+    'dutycycle-upper-bound': {
+        title: 'rfd reads past its duty-cycle threshold map when the module reports 100 % (BidcosInterface::GetDutyCycleUpperBound)',
+        draft: '012-dutycycle-upper-bound.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

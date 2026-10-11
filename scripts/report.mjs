@@ -60,6 +60,10 @@ export function collectResults(roots) {
                 const testsFile = path.join(dir, 'tests.json');
                 const tests = fs.existsSync(testsFile) ? readJson(testsFile) : {counts: {}, tests: []};
                 const job = makeJob(meta, tests);
+                const loadFile = path.join(dir, 'load.json');
+                if (fs.existsSync(loadFile)) {
+                    job.load = readJson(loadFile);
+                }
                 const sweep = readSweep(dir);
                 if (sweep) {
                     // the sweep records, for the differential (not part of report.json: they are large)
@@ -138,6 +142,7 @@ export function buildReport(results, run = {}) {
         jobs: results.jobs,
         fuzz: results.fuzz,
         listMethods: listMethodsRows(results.jobs),
+        load: loadRows(results.jobs),
         differential: buildDifferential(results.jobs, run.previousMain || null).map((s) => ({
             ...s,
             diff: {...s.diff, items: s.diff.items.slice(0, DIFF_LIST_LIMIT)},
@@ -171,6 +176,51 @@ export function listMethodsRows(jobs) {
         (a, b) =>
             a.daemon.localeCompare(b.daemon) || a.protocol.localeCompare(b.protocol) || a.ref.localeCompare(b.ref),
     );
+}
+
+/**
+ * The load test's numbers (test/daemon/rfd-load.test.js, results/<variant>/load.json) of the release jobs.
+ * @returns {Array<{ref: string, run: string, offered: number|null, achieved: number|null, p95: number|null, events: string, note: string}>}
+ */
+export function loadRows(jobs) {
+    const rows = [];
+    for (const job of jobs.filter((j) => j.variant === 'release' && j.load)) {
+        const l = job.load;
+        if (l.burst) {
+            rows.push({
+                ref: job.ref,
+                run: `burst (air max ${l.burst.airMaxPerSecond}/s, computed)`,
+                offered: l.burst.offeredPerSecond,
+                achieved: l.burst.achievedPerSecond,
+                p95: l.burst.latencyMs?.p95 ?? null,
+                events: `${l.burst.pressEvents}/${l.burst.presses}`,
+                note: `${l.burst.calls} calls, ${l.burst.failed} failed, ${l.burst.levelSetFrames} on air`,
+            });
+        }
+        if (l.sustained) {
+            rows.push({
+                ref: job.ref,
+                run: `sustained (window ${l.sustained.windowMs / 1000} s)`,
+                offered: null,
+                achieved: null,
+                p95: null,
+                events: '-',
+                note: `meter ${l.sustained.meterPercent} %, rfd ${l.sustained.rfdDutyCycle} %, RSS ${l.sustained.rssKb.join(' -> ')} kB`,
+            });
+        }
+        if (l.overload) {
+            rows.push({
+                ref: job.ref,
+                run: 'overload (200 %, duty cycle exceeded)',
+                offered: l.overload.offeredPerSecond,
+                achieved: null,
+                p95: l.overload.probeLatencyMs?.p95 ?? null,
+                events: `${l.overload.pressEvents}/${l.overload.presses}`,
+                note: `${l.overload.answeredOk} ok, ${l.overload.faults} faults, ${l.overload.refusedByModule} refused by the module, recovered ${l.overload.recovered}`,
+            });
+        }
+    }
+    return rows;
 }
 
 /** Fuzz findings that are not expected on that ref (an old tag has known ones). */
@@ -251,6 +301,18 @@ export function renderSummaryMarkdown(report) {
                     `| ${job.ref} | ${c.component}${c.kind === 'library' ? ' (library)' : ''} | ${pctText(c.lines)} (${c.linesHit}/${c.linesTotal}) | ${pctText(c.functions)} | ${pctText(c.branches)} |`,
                 );
             }
+        }
+        lines.push('');
+    }
+    if ((report.load || []).length) {
+        lines.push('### Load (airtime computed, not measured)');
+        lines.push('');
+        lines.push('| run | OpenCCU-Base | offered/s | achieved/s | p95 latency | events delivered | notes |');
+        lines.push('| --- | --- | ---: | ---: | ---: | ---: | --- |');
+        for (const r of report.load) {
+            lines.push(
+                `| ${r.run} | ${r.ref} | ${r.offered ?? '-'} | ${r.achieved ?? '-'} | ${r.p95 === null ? '-' : `${r.p95} ms`} | ${r.events} | ${escapeMd(r.note)} |`,
+            );
         }
         lines.push('');
     }
@@ -614,6 +676,33 @@ export function renderHtml(report, history = []) {
                 h.push(`</details>`);
             }
         }
+    }
+
+    // Load: run | ref | offered | achieved | p95 | events
+    if ((report.load || []).length) {
+        h.push(
+            `<h2>Load</h2><p class="muted">rfd under fast setValue/putParamset bursts on the air model with computed airtime (9992.6 baud, 0.8 ms per byte, 10 ms gaps; the 1 % duty cycle in a scaled window) - computed, not measured. rfd sends one exchange at a time and answers the call after the ACK.</p>`,
+        );
+        h.push(
+            table(
+                [
+                    {label: 'run'},
+                    {label: 'OpenCCU-Base', cls: 'c'},
+                    {label: 'offered/s', cls: 'r'},
+                    {label: 'achieved/s', cls: 'r'},
+                    {label: 'p95 ms', cls: 'r'},
+                    {label: 'events', cls: 'r'},
+                ],
+                report.load.map((r) => [
+                    `${esc(r.run)}<div class="diag">${esc(r.note)}</div>`,
+                    esc(r.ref),
+                    esc(String(r.offered ?? '-')),
+                    esc(String(r.achieved ?? '-')),
+                    esc(String(r.p95 ?? '-')),
+                    esc(r.events),
+                ]),
+            ),
+        );
     }
 
     // listMethods: daemon over protocol | ref | listed | callable | unlisted callable | help gaps

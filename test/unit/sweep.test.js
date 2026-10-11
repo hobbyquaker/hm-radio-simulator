@@ -146,7 +146,10 @@ test('the report carries the differential of the fixture refs and the previous m
             ['rfd', 'binrpc', 'main', 55, 55],
         ],
     );
+    assert.equal(report.load.length, 1);
+    assert.equal(report.load[0].achieved, 8.4);
     const md = renderSummaryMarkdown(report);
+    assert.match(md, /### Load \(airtime computed, not measured\)/);
     assert.match(md, /### listMethods tells the truth/);
     assert.match(md, /\| rfd \| binrpc \| main \| 55 \| 55 \| none \| system\.multicall \|/);
     assert.match(md, /### Differential: 3\.89\.11 → main/);
