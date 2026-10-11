@@ -206,6 +206,13 @@ erst, wenn der Maintainer es entscheidet.
   logisch nach und muss nur die Antwortfenster auf der seriellen Seite einhalten (rfd: 1 s pro Befehl, 4 s bis zum
   Sendestatus; hs485d: 700 ms). Node.js liegt mit unter einer Millisekunde Latenz weit darunter.
 
+- **Gemessen an echter Hardware (2026-10-11):** Das HMW-LGW (Firmware 1.0.5) mit einem HMW-LC-Sw2-DR (Firmware 3.06),
+  hs485d 3.89.11 auf Log-Level 0: Die Verbindung mit dem verschlüsselten Vorspiel dauert rund 5 ms, der `K`-Keepalive
+  kommt alle 20,0 s und wird in wenigen ms beantwortet, ein `setValue` dauert an hs485ds RPC 57-65 ms, der Aktor meldet
+  seinen neuen Zustand von sich aus (INFO_LEVEL) 2,9-3,0 s nach dem Schalten, eine Suche mit einem Gerät endet 1,79 s
+  nach dem `D`. Die Vorgaben der Simulation folgen dem: der Bus antwortet in 45 ms, die Statusmeldung kommt 2950 ms
+  nach dem Schalten, das Gateway schließt die Suche nach 1750 ms und meldet Firmware 1.0.5. Nicht gemessen: was das
+  Gateway für ein stummes Gerät antwortet (dafür müsste das Gerät vom Bus) - `a 01` bleibt gewählt.
 - **Sendezeit und Duty Cycle (berechnet, nicht gemessen):** Für die Lasttests kann die Luftstrecke den Kanal selbst
   nachbilden (`lib/airtime.js`). Aus dem Rahmenformat der öffentlichen BidCoS-Implementierungen (die CC1101-Einstellung
   von culfw und Homegear, als Dokumentation gelesen): 2-FSK mit 9992,6 Baud, 4 Byte Präambel, zweimal das Sync-Wort,

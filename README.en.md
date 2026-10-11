@@ -246,6 +246,17 @@ every window. Assertions on time use margins, never exact values. The delays the
 `module.js`: 30 ms until "sent", 80 ms until an acknowledgement, 3 s until "failed") are **chosen**, not measured; a
 calibration against a real module is planned.
 
+### Measured against real hardware (2026-10-11)
+
+**The HMW-LGW** (firmware 1.0.5) with an HMW-LC-Sw2-DR (firmware 3.06), hs485d 3.89.11 at log level 0: the connection
+with the encrypted preamble takes ~5 ms; the `K` keepalive goes out every 20.0 s (19.98-20.00 s apart, the first ~20 s
+after the connection) and is answered within a few ms; a `setValue` round trip at hs485d's RPC is 57-65 ms; the
+switch reports its new state on its own (INFO_LEVEL) 2.9-3.0 s after a set; a discovery with one device ends 1.79 s
+after the `D` (the whole `searchDevices` call 2.2 s: 0.2 s sleep-mode broadcast before and after). The simulator's
+defaults follow: the bus answers in 45 ms, the device's status report comes 2950 ms after a set, the gateway closes a
+discovery after 1750 ms and reports firmware 1.0.5. Not measured: what the gateway answers for a silent device (that
+needs the device off the bus) - `a 01` stays chosen.
+
 ### Airtime and the duty cycle (computed, not measured)
 
 For the load tests the air can model the channel itself (`new Air({module, airtime: {...}})`, `lib/airtime.js`). The
