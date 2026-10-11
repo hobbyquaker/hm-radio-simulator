@@ -120,6 +120,11 @@ export const FINDINGS = Object.freeze({
         draft: '013-flush-drops-events.md',
         issue: null,
     },
+    'unknown-interface': {
+        title: 'rfd: setBidcosInterface accepts an interface that does not exist, reports success and stores it',
+        draft: '014-unknown-interface.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

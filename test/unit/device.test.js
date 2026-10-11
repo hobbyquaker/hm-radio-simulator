@@ -310,3 +310,42 @@ test('a sleeping device: deaf between windows, a burst wakes a burst device, the
     assert.ok(ba.awake, 'awake after the burst');
     h.module.close();
 });
+
+test('two modules on one air: each hears the device with its own RSSI, overhears the answers, out of range fails', async () => {
+    const a = moduleHarness();
+    const b = moduleHarness();
+    const air = new Air({modules: [a.module, b.module], eventGapMs: 2});
+    assert.equal(air.module, a.module);
+    const dev = air.add(device());
+    air.setRssi(dev, a.module, -80);
+    air.setRssi(dev, b.module, -50);
+    assert.deepEqual(air.modulesInRange(dev), [a.module, b.module]);
+
+    air.reportStatus(dev, 1);
+    const [ea] = await a.waitFrames(1);
+    const [eb] = await b.waitFrames(1);
+    assert.equal(ea[2], BIDCOS.EVENT);
+    assert.equal(ea[5], 80, 'module A reports -80');
+    assert.equal(eb[5], 50, 'module B reports -50');
+
+    // A sends: A gets the acknowledgement, B overhears the answer as an event
+    a.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 3));
+    const [, status] = await a.waitFrames(2);
+    assert.equal(status[3], BIDCOS_STATUS.TELEGRAM_SENT_RECVD_ACK);
+    assert.equal(status[5], 80, 'the acknowledgement carries A’s RSSI');
+    const [, overheard] = await b.waitFrames(2);
+    assert.equal(overheard[2], BIDCOS.EVENT);
+    assert.equal(decodeTelegram(overheard.subarray(6)).type, FT.ACK_OR_NACK);
+
+    // out of A's range: A's send fails, B still reaches it
+    air.setRssi(dev, a.module, null);
+    a.send(central(FT.CENTRAL, [0x02, 0x01, 0x00, 0, 0], 4));
+    const [, , failed] = await a.waitFrames(3);
+    assert.equal(failed[3], BIDCOS_STATUS.SEND_FAILED);
+    b.send(central(FT.CENTRAL, [0x02, 0x01, 0x00, 0, 0], 5));
+    const [, , ok] = await b.waitFrames(3);
+    assert.equal(ok[3], BIDCOS_STATUS.TELEGRAM_SENT_RECVD_ACK);
+    assert.equal(dev.behaviour.channel(1).STATE, 0);
+    a.module.close();
+    b.module.close();
+});

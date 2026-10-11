@@ -77,6 +77,15 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Aufwachen, `abortDeleteDevice` bricht es ab. Ein Burst-Gerät bekommt sein erstes Telegramm als Burst, das nächste
   innerhalb von 1,8 s ohne, und ein verpasster Versuch wird als Burst wiederholt; antwortet es gar nicht, folgt
   `UNREACH`.
+- **Zwei Interfaces:** ein RPI-RF-MOD am Pseudo-Terminal und ein HM-LGW (mit LAN-Schlüssel) auf einer zweiten
+  Loopback-Adresse, beide an derselben Luftstrecke, jedes hört ein Gerät mit eigener Feldstärke. Beide in
+  `listBidcosInterfaces`, `setInterfaceClock` erreicht beide Module; ein neues Gerät wird über das Interface angelernt,
+  das es besser hört (auch wenn das nicht das Standard-Interface ist); `rssiInfo` mit beiden Werten;
+  `setBidcosInterface` zieht ein Gerät um (`ADD_LINK_PEER` am neuen, `REMOVE_LINK_PEER` am alten Modul). Roaming: kommt
+  die bessere Kopie eines Telegramms als zweite an, wechselt rfd nach 150 ms, nicht innerhalb von 300 ms nach einem
+  Senden; kommt sie als erste an, wechselt rfd erst mit dem nächsten Senden. Fällt ein Interface aus, laufen die Geräte
+  am anderen weiter, und ein Gerät mit Roaming wird übernommen. Die Duty-Cycle-Stufen (0/40/65/80/90/95/98/99 %): ein
+  Event je Stufenwechsel, keins innerhalb einer Stufe, je Interface, abwärts mit Hysterese.
 - **hs485d am Wired-LAN-Gateway (HMW-LGW, `lib/hmwlgw.js`)** mit einem simulierten Schaltaktor (HMW-LC-Sw2-DR aus
   den `hs485types`-Beschreibungen des Images) am Bus (`lib/wired.js`): der Verbindungsaufbau mit demselben Vorspiel wie
   beim HM-LGW (auch verschlüsselt mit `-k`), das Keepalive `K` alle 20 s, die Gerätesuche (`D` → `d`/`c`, dann `h`/`v`/`n`
@@ -170,7 +179,7 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
-`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) und `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren) und `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -192,7 +201,9 @@ erst, wenn der Maintainer es entscheidet.
   Batteriegeräte schlafen: Ein Wakeup-Gerät hört nur kurz nach seinen eigenen Telegrammen zu, ein Burst-Gerät wacht
   auf ein Burst-Telegramm auf. Hat rfd um das Wecken gebeten, antwortet das Modul auf das nächste Telegramm des Geräts
   mit einem WAKEUP-Telegramm und meldet das Event mit `WOKEN_UP`. Die Fenster sind gewählt, nicht gemessen (300 ms
-  nach einem eigenen Telegramm, 1 s nach dem Wecken, 2 s nach einem Burst, 15 s Anlernmodus).
+  nach einem eigenen Telegramm, 1 s nach dem Wecken, 2 s nach einem Burst, 15 s Anlernmodus). Eine Luftstrecke kann
+  mehrere Module bedienen (rfd mit zwei Interfaces): Jedes Modul hört ein Gerät mit eigener Feldstärke oder gar nicht,
+  ein Telegramm des Geräts und seine Antworten erreichen jedes Modul in Reichweite.
 - Das LAN-Gateway gibt es zweimal: hmlangw selbst (unten) für den Klartext und ein Gegenstück in JavaScript
   (`lib/lgw.js`) für `Encryption Key`, den `V`-Handshake und AES-128-CFB auf beiden Ports - mit Schaltern für die
   Reconnect-Szenarien (Port weg, Gateway weg und wieder da, stummes Keepalive, falsche Seriennummer).
@@ -281,7 +292,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
