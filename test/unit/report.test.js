@@ -36,7 +36,7 @@ test('collectResults finds the jobs and fuzz runs below the fixture; buildReport
     const results = collectResults([FIXTURE]);
     assert.deepEqual(
         results.jobs.map((j) => j.id),
-        ['3.89.11-release', 'main-coverage', 'main-release'],
+        ['3.89.11-release', 'main-release', 'main-coverage'],
     );
     assert.equal(results.fuzz.length, 1);
     assert.deepEqual(results.jobs[0].counts, {pass: 3, fail: 0, todo: 2, skip: 0});
@@ -95,7 +95,11 @@ test('the HTML report has a column per job, the links, the diagnostics and no sc
     );
     assert.ok(html.includes('rfd used 200 clock ticks in the 2 s after the hangup'));
     assert.ok(html.includes('runs/x/'), 'the history links to the kept run');
-    assert.equal((html.match(/<th class="r">3\.89\.11<br>/g) || []).length, 2, 'a column per job in both file tables');
+    assert.equal(
+        (html.match(/<th class="r">3\.89\.11 <a class="mono muted" href="[^"]+\/commit\/[0-9a-f]+">/g) || []).length,
+        2,
+        'a column per job in both file tables',
+    );
     // every table shares the column scheme: a colgroup, fixed layout, the result columns right-aligned
     assert.match(html, /table-layout: fixed/);
     const tables = html.match(/<table>[\s\S]*?<\/table>/g);

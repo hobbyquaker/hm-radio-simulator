@@ -45,8 +45,9 @@ for rfd; a wired LAN gateway with a wired actuator for hs485d). See _Stages_ for
 | `test/unit/`                                | the simulator itself: framing and CRC, the module state machine, the raw BIN-RPC encoder, the LGW front's cipher streams, the AES handshake, the device model                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 A regression test for a bug the chosen OpenCCU-Base ref does not have the fix for runs as `todo` (`HMRS_KNOWN_BROKEN`,
-set per ref by the Dockerfile), so the run shows what happens without going red. Against `3.89.11` that is
-#138 and #140, plus eleven findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
+derived per ref, not kept by hand: `scripts/resolve-refs.mjs` checks whether each upstream fix's merge commit is in the
+ref), so the run shows what happens without going red. Against `3.89.9` and `3.89.11` that is #138 and #140, plus
+twelve findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
 The second finding without an issue yet is `read-eof`: a pty slave whose master went away
@@ -110,16 +111,19 @@ Environment inside the image: `HMRS_VARIANT` (`release`, `asan`), `HMRS_KNOWN_BR
 (the frame fuzzer's seed, logged by every run), `HMRS_FUZZ_FRAMES` (default 400). Results: `results/<variant>/junit.xml`,
 the daemons' logs and sanitizer reports under `results/<variant>/work/`, fuzz artifacts under `results/fuzz/artifacts/`.
 
-CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, the daemon suite for `3.89.11` and `main` in
-the release, ASan and coverage variants, and 60 s of each fuzz harness against `main` (findings fail the job) and `3.89.11` (findings are
-expected there and only reported). The docker layers are cached per ref.
+CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and three OpenCCU-Base refs side by side: the
+two newest release tags (today `3.89.9` and `3.89.11`) and the head of `main`, chosen anew on every run
+(`scripts/resolve-refs.mjs`: tags of the form `X.Y.Z`, ordered by version; a new tag pushes the oldest out). Each ref
+gets the daemon suite in the release, ASan and coverage variants and 60 s of each fuzz harness (findings fail the job,
+except on a ref without #140's fixes, where they are expected and only reported). The docker layers are cached per ref.
 
 ## The test report
 
 Every CI run writes a Markdown overview into its summary on GitHub (per job, and for the whole run in the "test report"
 job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://hobbyquaker.github.io/hm-radio-simulator/>**
 
-- the OpenCCU-Base refs side by side (`3.89.11` and `main`, release and ASan each), every test's outcome, duration and
+- the three OpenCCU-Base refs side by side (older tag, newer tag, `main`, each with its commit linked; release, ASan
+  and coverage each), every test's outcome, duration and
   diagnostics, the fuzz runs, and the history of the last 20 runs (`runs/<id>/`). How to read it:
 
 - **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
@@ -139,7 +143,7 @@ release and ASan variants stay on gcc.
 
 **The differential:** the release jobs keep the answers of the sweeps (`results/<variant>/sweep/*.json`, short
 summaries: a struct's keys, an array's length and first element, a fault's code and text). The report compares
-`3.89.11` with `main`, and `main` with the commit the previous published report tested (its records are on the site as
+neighbouring refs (the older tag with the newer one, the newer one with `main`), and `main` with the commit the previous published report tested (its records are on the site as
 `sweep/main.json`), and lists what changed. A change is not a failure; `getVersion` is ignored by design.
 
 The data is next to the page as `report.json`. Nothing of it is committed: the report is built from the run's
@@ -152,7 +156,7 @@ OpenCCU-Base commit, `fuzz/run.sh` a `fuzz-summary.json`; `test/metadata.js` hol
 A push in someone else's repository cannot trigger our workflow, so `upstream-watch.yml` polls the head of
 OpenCCU-Base `main` every 15 minutes, keeps the last tested commit on the branch `upstream-state` (written only by
 this workflow), and when the head is new runs the suite for that exact commit - through the CI workflow as a reusable
-workflow, with `3.89.11` next to it as always. The run shows up on the report and in its history as "triggered by
+workflow, with the two newest tags next to it as always. The run shows up on the report and in its history as "triggered by
 OpenCCU-Base `<sha>`" with the commit linked. Several upstream commits within one interval are tested as their newest
 head; the commit on the state branch also counts as repository activity, so GitHub does not disable the schedule. A red
 run leaves a warning on the run; it does not open an issue unless the maintainer wants that. `workflow_dispatch` with

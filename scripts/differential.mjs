@@ -2,8 +2,8 @@
  * The differential of the sweeps: every daemon job of the release variant leaves the records of the RPC method sweep
  * and the device-type sweep (results/<variant>/sweep/<name>.json, test/helpers/sweep.js); the report compares them
  *
- *   - between the refs of one run (3.89.11 against main): what a consumer sees change between the release and the
- *     upstream head;
+ *   - between neighbouring refs of one run (the older tag against the newer one, the newer one against main): what a
+ *     consumer sees change from release to release and up to the upstream head;
  *   - between main now and main as the previous published report tested it (the upstream watch, task 14), when the
  *     OpenCCU-Base commit changed in between.
  *
@@ -13,6 +13,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+
+import {compareRefs} from './refs.mjs';
 
 /** Keys (flattened paths) whose answers differ between refs by design. */
 export const DIFF_IGNORE = Object.freeze([/^getVersion\(/]);
@@ -103,17 +105,17 @@ export function diffSweeps(from, to, ignore = DIFF_IGNORE) {
  */
 export function buildDifferential(jobs, previousMain = null) {
     const sections = [];
-    const release = jobs.filter((j) => j.variant === 'release' && j.sweep);
+    // neighbours in the report's order: oldest tag -> newer tag -> main
+    const release = jobs.filter((j) => j.variant === 'release' && j.sweep).sort((a, b) => compareRefs(a.ref, b.ref));
     const main = release.find((j) => j.ref === 'main');
-    for (const job of release.filter((j) => j.ref !== 'main')) {
-        if (main) {
-            sections.push({
-                title: `${job.ref} → main`,
-                from: {ref: job.ref, baseCommit: job.baseCommit},
-                to: {ref: 'main', baseCommit: main.baseCommit},
-                diff: diffSweeps(job.sweep, main.sweep),
-            });
-        }
+    for (let i = 0; i + 1 < release.length; i++) {
+        const [from, to] = [release[i], release[i + 1]];
+        sections.push({
+            title: `${from.ref} → ${to.ref}`,
+            from: {ref: from.ref, baseCommit: from.baseCommit},
+            to: {ref: to.ref, baseCommit: to.baseCommit},
+            diff: diffSweeps(from.sweep, to.sweep),
+        });
     }
     if (main && previousMain && previousMain.records && previousMain.baseCommit !== main.baseCommit) {
         sections.push({

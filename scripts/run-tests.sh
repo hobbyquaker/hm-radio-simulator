@@ -6,7 +6,7 @@
 # Usage: scripts/run-tests.sh [options]
 #   --ref <ref>          OpenCCU-Base branch, tag or commit (default 3.89.11)
 #   --variants <list>    comma-separated: release, asan, coverage (default release,asan,coverage)
-#   --known-broken <l>   OpenCCU-Base issues known unfixed in the ref (default per ref, see below)
+#   --known-broken <l>   OpenCCU-Base issues known unfixed in the ref (default: derived, scripts/resolve-refs.mjs)
 #   --fuzz <seconds>     also run the fuzz harnesses for that long each (default 0 = skip)
 #   --no-build           reuse the images
 #
@@ -29,10 +29,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 if [ -z "${KNOWN}" ]; then
-  case "${REF}" in
-    3.89.11) KNOWN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events,unknown-interface ;;
-    *) KNOWN=double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events,unknown-interface ;;
-  esac
+  # derived from the fixes' merge commits and the findings (test/metadata.js), as in CI
+  KNOWN=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}") || { echo "cannot derive the known-broken list for ${REF} (pass --known-broken)" >&2; exit 2; }
 fi
 
 tag="hm-radio-simulator:${REF//\//-}"
@@ -62,7 +60,7 @@ echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; 
     fi
     echo "=== fuzz, ${FUZZ}s per harness" | tee -a "${log}"
     expect=0
-    [ -n "${KNOWN}" ] && expect=1
+    case ",${KNOWN}," in *,140,*) expect=1 ;; esac
     docker run --rm -e "FUZZ_SECONDS=${FUZZ}" -e "FUZZ_EXPECT_FINDINGS=${expect}" -v "${HERE}/results/fuzz:/results" "${tag}-fuzz" 2>&1 | tee -a "${log}"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
   fi

@@ -106,7 +106,8 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Bedingungen des Typs gebaut) und jedes Typs aus `hs485types` (15, auf dem simulierten Bus gesucht), von dem
   Gerätebeschreibung, Paramset-Beschreibungen, Paramsets und Werte jeder Adresse abgefragt werden. Der Daemon muss
   alles überstehen, ohne Sanitizer-Bericht. Jede Antwort wird kurz festgehalten; der Testbericht vergleicht die
-  Antworten von `3.89.11` und `main` und die des zuletzt geprüften `main`-Commits mit dem aktuellen (_Differential_).
+  Antworten benachbarter Versionen (älteres Tag → neueres Tag → `main`) und die des zuletzt geprüften `main`-Commits mit dem
+  aktuellen (_Differential_).
 - **Der Empfänger-Vertrag** (rfd und hs485d, beide über libhsscomm): drei Empfänger gleichzeitig, jeder mit seiner
   eigenen ID synchronisiert; `ping` schickt `PONG` an alle, 20 Events kommen bei jedem in Reihenfolge an. Beim `init`
   entscheidet die `listDevices`-Antwort des Empfängers: Unbekanntes wird gelöscht, eine andere `VERSION` neu
@@ -153,8 +154,10 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer; dazu
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
-Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #138 und #140
-sowie elf Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+Der Lauf zeigt dann, was passiert, ohne rot zu werden. Welche Tests das je Version sind, wird nicht von Hand gepflegt:
+`scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist. Gegen
+`3.89.9` und `3.89.11` betrifft das #138 und #140
+sowie zwölf Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -279,15 +282,17 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet `3.89.11` und `main` in den Varianten normal, ASan und coverage und
-lässt jeden Fuzzer 60 s laufen.
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet drei OpenCCU-Base-Versionen nebeneinander: die beiden neuesten
+Release-Tags (heute `3.89.9` und `3.89.11`) und den aktuellen Stand von `main`. Sie werden bei jedem Lauf neu bestimmt
+(`scripts/resolve-refs.mjs`: Tags der Form `X.Y.Z`, nach Version sortiert); kommt ein neues Tag dazu, fällt das älteste
+heraus. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
 
 ## Testbericht
 
 Jeder CI-Lauf schreibt eine Markdown-Übersicht in seine Zusammenfassung auf GitHub (je Job, und für den ganzen Lauf im
 Job "test report"). Der Lauf auf `main` veröffentlicht dazu einen HTML-Bericht auf GitHub Pages:
-**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die OpenCCU-Base-Versionen nebeneinander (`3.89.11` und
-`main`, jeweils normal und mit ASan), je Test der Ausgang, die Dauer und die Diagnosen, dazu die Fuzzing-Läufe und
+**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die drei OpenCCU-Base-Versionen nebeneinander (älteres
+Tag, neueres Tag, `main`, je mit verlinktem Commit, jeweils normal, mit ASan und coverage), je Test der Ausgang, die Dauer und die Diagnosen, dazu die Fuzzing-Läufe und
 ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
@@ -306,7 +311,7 @@ dem die Zähler in einer eingeblendeten Datei liegen.
 
 **Das Differential:** Die Release-Jobs halten die Antworten der Durchläufe fest (`results/<variante>/sweep/*.json`,
 kurze Zusammenfassungen: die Schlüssel eines Structs, die Länge eines Arrays und sein erstes Element, Code und Text
-eines Faults). Der Bericht vergleicht `3.89.11` mit `main` und `main` mit dem Commit, den der zuvor veröffentlichte
+eines Faults). Der Bericht vergleicht benachbarte Versionen (älteres Tag mit neuerem, neueres mit `main`) und `main` mit dem Commit, den der zuvor veröffentlichte
 Bericht geprüft hat (dessen Antworten liegen als `sweep/main.json` auf der Seite), und listet, was sich geändert hat.
 Eine Änderung ist kein Fehler; `getVersion` wird bewusst ignoriert.
 
@@ -318,7 +323,7 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 Ein Push in ein fremdes Repository kann unseren Workflow nicht auslösen. Deshalb fragt der Workflow
 `upstream-watch.yml` alle 15 Minuten den Stand von OpenCCU-Base `main` ab, merkt sich den zuletzt geprüften Commit auf
 dem Branch `upstream-state` (nur dieser Workflow schreibt ihn) und lässt bei einem neuen Commit die Suite genau dafür
-laufen - über den CI-Workflow als wiederverwendbaren Workflow, mit `3.89.11` daneben wie sonst auch. Der Lauf erscheint
+laufen - über den CI-Workflow als wiederverwendbaren Workflow, mit den beiden neuesten Tags daneben wie sonst auch. Der Lauf erscheint
 im Bericht und im Verlauf mit "triggered by OpenCCU-Base `<sha>`" und verlinktem Commit. Mehrere Commits innerhalb
 eines Intervalls prüft er als ihren neuesten Stand; der Commit auf dem Zustandsbranch zählt zugleich als Aktivität, so
 dass GitHub den Zeitplan nicht abschaltet. Ein roter Lauf hinterlässt eine Warnung im Lauf; ein Issue dazu öffnet er

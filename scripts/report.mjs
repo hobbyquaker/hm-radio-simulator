@@ -26,6 +26,7 @@ import {fileURLToPath} from 'node:url';
 
 import {describeTest} from '../test/metadata.js';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
+import {compareRefs} from './refs.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
@@ -86,8 +87,10 @@ export function collectResults(roots) {
     for (const root of roots) {
         walk(root);
     }
-    jobs.sort((a, b) => a.ref.localeCompare(b.ref) || a.variant.localeCompare(b.variant));
-    fuzz.sort((a, b) => a.ref.localeCompare(b.ref));
+    // oldest tag -> newer tag -> main; per ref release, asan, coverage
+    const variantOrder = (v) => ['release', 'asan', 'coverage'].indexOf(v) + 1 || 9;
+    jobs.sort((a, b) => compareRefs(a.ref, b.ref) || variantOrder(a.variant) - variantOrder(b.variant));
+    fuzz.sort((a, b) => compareRefs(a.ref, b.ref));
     return {jobs, fuzz};
 }
 
@@ -525,7 +528,9 @@ export function renderHtml(report, history = []) {
     h.push(`</div>`);
 
     // Jobs: name | commit | daemons | duration | pass | fail | todo | skip
-    h.push(`<h2>Jobs</h2>`);
+    h.push(
+        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side, oldest first: the two newest release tags and the head of main, chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix's merge commit.</p>`,
+    );
     h.push(
         table(
             [
@@ -560,7 +565,7 @@ export function renderHtml(report, history = []) {
         {label: 'kind', cls: 'k'},
         {label: 'links', cls: 'l'},
         ...jobs.map((job) => ({
-            label: `${esc(job.ref)}<br><span class="muted">${esc(job.variant)}</span>`,
+            label: `${esc(job.ref)} <a class="mono muted" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a><br><span class="muted">${esc(job.variant)}</span>`,
             cls: 'r',
             raw: true,
         })),
