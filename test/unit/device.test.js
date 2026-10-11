@@ -254,3 +254,59 @@ test('an AES-secured device: challenge, the module answers with the key rfd set,
     assert.equal(dev.behaviour.channel(1).STATE, 200, 'the command did not take effect');
     h.module.close();
 });
+
+test('a sleeping device: deaf between windows, a burst wakes a burst device, the module wakes a wake-up device on request', async () => {
+    const h = moduleHarness();
+    const air = new Air({module: h.module, eventGapMs: 2});
+    const dev = air.add(device({rxMode: 'wakeup', awakeMs: 50, listenAfterSendMs: 20}));
+    assert.equal(dev.sleeps, true);
+    assert.equal(dev.awake, false);
+    h.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 1));
+    const [failed] = await h.waitFrames(1);
+    assert.equal(failed[3], BIDCOS_STATUS.SEND_FAILED, 'a sleeping device does not hear the central');
+    assert.equal(dev.behaviour.channel(1).STATE, 0);
+
+    // rfd asks for the wake-up: ADD_LINK_PEER address, key index, wake-up 1, lazy 0
+    h.module.receive(encodeFrame(Buffer.from([TYPE.BIDCOS, 4, BIDCOS.ADD_LINK_PEER, 0x12, 0x34, 0x56, 0, 1, 0])));
+    await h.waitFrames(2);
+    assert.deepEqual(h.module.wakeupRequest(DEVICE), {lazy: false});
+    air.reportStatus(dev, 1);
+    const [, , event] = await h.waitFrames(3);
+    assert.equal(event[2], BIDCOS.EVENT);
+    assert.equal(event[3] & 0x10, 0x10, 'the event carries WOKEN_UP');
+    assert.ok(dev.awake, 'woken up');
+    assert.deepEqual(air.traceLines().slice(-3), [
+        'rx INFO_LEVEL ch1 STATE=0 STATE_FLAGS=0 [bidi]',
+        'tx WAKEUP',
+        'rx ACK',
+    ]);
+    h.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 2));
+    const [, , , ok] = await h.waitFrames(4);
+    assert.equal(ok[3], BIDCOS_STATUS.TELEGRAM_SENT_RECVD_ACK, 'heard while awake');
+    assert.equal(dev.behaviour.channel(1).STATE, 200);
+
+    // rfd clears the request: the next event is a plain one
+    h.module.receive(encodeFrame(Buffer.from([TYPE.BIDCOS, 5, BIDCOS.ADD_LINK_PEER, 0x12, 0x34, 0x56, 0, 0, 0])));
+    await h.waitFrames(5);
+    assert.equal(h.module.wakeupRequest(DEVICE), null);
+    dev.sleep();
+    air.reportStatus(dev, 1);
+    const [, , , , , plain] = await h.waitFrames(6);
+    assert.equal(plain[3] & 0x10, 0, 'no WOKEN_UP without a request');
+    assert.equal(air.wakeups.length, 1);
+
+    // a burst device: the burst flag wakes it, a plain telegram does not
+    const ba = air.add(device({rxMode: 'burst', awakeMs: 50}));
+    ba.address = DEVICE; // same address, replaces the wake-up device on the air
+    air.devices.set(DEVICE, ba);
+    h.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 3));
+    const frames7 = await h.waitFrames(7);
+    assert.equal(frames7[6][3], BIDCOS_STATUS.SEND_FAILED);
+    const started = Date.now();
+    h.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 4, CTRL.BIDI | CTRL.RPT_ENABLE | CTRL.BURST));
+    const frames8 = await h.waitFrames(8, 2000);
+    assert.equal(frames8[7][3], BIDCOS_STATUS.TELEGRAM_SENT_RECVD_ACK, 'the burst woke it');
+    assert.ok(Date.now() - started >= 360, 'the burst preamble takes 360 ms');
+    assert.ok(ba.awake, 'awake after the burst');
+    h.module.close();
+});

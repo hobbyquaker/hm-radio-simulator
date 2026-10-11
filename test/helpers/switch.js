@@ -17,6 +17,18 @@ export const SWITCH_TYPE = 'HM-LC-Sw1-Pl';
 export const REMOTE_SERIAL = 'SIMRC00001';
 export const REMOTE_ADDRESS = 0x234567;
 export const REMOTE_TYPE = 'HM-RC-4';
+export const BUTTON_SERIAL = 'SIMPB00001';
+export const BUTTON_ADDRESS = 0x345678;
+export const BUTTON_TYPE = 'HM-PB-2-WM55';
+export const LAZY_SERIAL = 'SIMRC42001';
+export const LAZY_ADDRESS = 0x456789;
+export const LAZY_TYPE = 'HM-RC-4-2';
+export const MOTION_SERIAL = 'SIMMD00001';
+export const MOTION_ADDRESS = 0x6789ab;
+export const MOTION_TYPE = 'HM-Sec-MDIR';
+export const BURST_SERIAL = 'SIMBA00001';
+export const BURST_ADDRESS = 0x56789a;
+export const BURST_TYPE = 'HM-LC-Sw1-Ba-PCB';
 
 const descriptions = new Map();
 
@@ -80,6 +92,90 @@ export function attachRemote(rfd, options = {}) {
             // the start, so a remote that could not answer the module's challenge would never get a PRESS event
             // through (auth_violate_policy="reject")
             aes: true,
+            ...options,
+        }),
+    );
+    return {air, device};
+}
+
+/**
+ * A wake-up device: the HM-PB-2-WM55 push button (rf_pb-2-wm55_le_v1_3.xml, rx_modes CONFIG,WAKEUP; two key channels
+ * with aes_default, KEY_SIM_SHORT/LONG as commands). It sleeps; it listens only after its own telegrams.
+ */
+export function attachWakeupButton(rfd, options = {}) {
+    const air = airOf(rfd);
+    const device = air.add(
+        new BidcosDevice({
+            address: BUTTON_ADDRESS,
+            serial: BUTTON_SERIAL,
+            description: description('rf_pb-2-wm55_le_v1_3.xml'),
+            typeId: BUTTON_TYPE,
+            behaviour: new RemoteBehaviour(),
+            channelCount: 2,
+            peeringChannel: 0,
+            aes: true,
+            rxMode: 'wakeup',
+            ...options,
+        }),
+    );
+    return {air, device};
+}
+
+/**
+ * A wake-up device with a command rfd sends to it: the HM-Sec-MDIR motion detector (rf_sec_mdir_v1_5.xml, rx_modes
+ * CONFIG,WAKEUP; ENTER_BOOTLOADER on channel 0 is a to_device frame, so rfd queues it; channel 1 with aes_default).
+ * The PRESS_SHORT of a push button would not do: its KEY_SIM frames go to the key's link peers, not to the device.
+ */
+export function attachMotionDetector(rfd, options = {}) {
+    const air = airOf(rfd);
+    const device = air.add(
+        new BidcosDevice({
+            address: MOTION_ADDRESS,
+            serial: MOTION_SERIAL,
+            description: description('rf_sec_mdir_v1_5.xml'),
+            typeId: MOTION_TYPE,
+            channelCount: 1,
+            aes: true,
+            rxMode: 'wakeup',
+            ...options,
+        }),
+    );
+    return {air, device};
+}
+
+/** A lazy-config wake-up device: the HM-RC-4-2 (rf_rc-4-2.xml, rx_modes CONFIG,WAKEUP,LAZY_CONFIG). */
+export function attachLazyRemote(rfd, options = {}) {
+    const air = airOf(rfd);
+    const device = air.add(
+        new BidcosDevice({
+            address: LAZY_ADDRESS,
+            serial: LAZY_SERIAL,
+            description: description('rf_rc-4-2.xml'),
+            typeId: LAZY_TYPE,
+            behaviour: new RemoteBehaviour(),
+            channelCount: 4,
+            peeringChannel: 0,
+            aes: true,
+            rxMode: 'wakeup',
+            ...options,
+        }),
+    );
+    return {air, device};
+}
+
+/**
+ * A burst device: the HM-LC-Sw1-Ba-PCB battery switch (rf_s_ba.xml, rx_modes BURST): the switch behaviour, a
+ * receiver that a burst telegram wakes.
+ */
+export function attachBurstSwitch(rfd, options = {}) {
+    const air = airOf(rfd);
+    const device = air.add(
+        new BidcosDevice({
+            address: BURST_ADDRESS,
+            serial: BURST_SERIAL,
+            description: description('rf_s_ba.xml'),
+            typeId: BURST_TYPE,
+            rxMode: 'burst',
             ...options,
         }),
     );

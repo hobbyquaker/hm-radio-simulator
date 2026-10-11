@@ -72,6 +72,16 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   eines schlafenden Geräts (`CONFIG_PENDING`, geliefert beim nächsten Druck auf die Anlerntaste), eine
   Direktverknüpfung zwischen Fernbedienung und Aktor (`addLink`, Peer-Listen auf beiden Seiten, `getLinks`, das
   LINK-Paramset als Liste 3 im Aktor, `removeLink`).
+- **Geräte, die schlafen:** ein Wakeup-Gerät (HM-PB-2-WM55, `CONFIG,WAKEUP`), ein Gerät mit Lazy Config (HM-RC-4-2),
+  ein Bewegungsmelder (HM-Sec-MDIR) und ein Burst-Gerät (HM-LC-Sw1-Ba-PCB, `BURST`). Ein Paramset für ein schlafendes
+  Wakeup-Gerät versucht rfd einmal sofort, dann bleibt es offen (`CONFIG_PENDING`), und rfd bittet das Modul, das
+  Gerät zu wecken (`ADD_LINK_PEER` mit Wakeup-Byte, bei `LAZY_CONFIG` auch mit dem Lazy-Byte); das nächste Telegramm
+  des Geräts kommt mit dem `WOKEN_UP`-Flag des Moduls, und rfd liefert die Konfiguration nach und nimmt die Bitte
+  zurück. Befehle an ein schlafendes Gerät stellt rfd in eine Warteschlange von zehn (zwölf Befehle: die zwei ältesten
+  fallen mit einer Warnung heraus, zehn gehen nach dem Aufwachen raus). `deleteDevice` mit `DEFER` wartet auf das
+  Aufwachen, `abortDeleteDevice` bricht es ab. Ein Burst-Gerät bekommt sein erstes Telegramm als Burst, das nächste
+  innerhalb von 1,8 s ohne, und ein verpasster Versuch wird als Burst wiederholt; antwortet es gar nicht, folgt
+  `UNREACH`.
 - **hs485d am Wired-LAN-Gateway (HMW-LGW, `lib/hmwlgw.js`)** mit einem simulierten Schaltaktor (HMW-LC-Sw2-DR aus
   den `hs485types`-Beschreibungen des Images) am Bus (`lib/wired.js`): der Verbindungsaufbau mit demselben Vorspiel wie
   beim HM-LGW (auch verschlüsselt mit `-k`), das Keepalive `K` alle 20 s, die Gerätesuche (`D` → `d`/`c`, dann `h`/`v`/`n`
@@ -184,6 +194,10 @@ erst, wenn der Maintainer es entscheidet.
   eines Geräts aus der Schlüsseltabelle des Moduls und fordert ein Gerät selbst heraus, wenn rfd dessen Kanal unter
   Authentifizierung gestellt hat (`AUTHENTICATION_ON`); das Modul beantwortet `ADD_LINK_PEER` wie die Firmware mit
   der Zahl der Peers und der Authentifizierungsmaske des Geräts, gegen die rfd seine Richtlinie abgleicht.
+  Batteriegeräte schlafen: Ein Wakeup-Gerät hört nur kurz nach seinen eigenen Telegrammen zu, ein Burst-Gerät wacht
+  auf ein Burst-Telegramm auf. Hat rfd um das Wecken gebeten, antwortet das Modul auf das nächste Telegramm des Geräts
+  mit einem WAKEUP-Telegramm und meldet das Event mit `WOKEN_UP`. Die Fenster sind gewählt, nicht gemessen (300 ms
+  nach einem eigenen Telegramm, 1 s nach dem Wecken, 2 s nach einem Burst, 15 s Anlernmodus).
 - Das LAN-Gateway gibt es zweimal: hmlangw selbst (unten) für den Klartext und ein Gegenstück in JavaScript
   (`lib/lgw.js`) für `Encryption Key`, den `V`-Handshake und AES-128-CFB auf beiden Ports - mit Schaltern für die
   Reconnect-Szenarien (Port weg, Gateway weg und wieder da, stummes Keepalive, falsche Seriennummer).
