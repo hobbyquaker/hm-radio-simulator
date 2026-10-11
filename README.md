@@ -390,7 +390,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - 📥 **Trend im Testbericht:** oben ein Panel mit Verlaufslinien je Stand und Daemon für bestanden, todo, fehlgeschlagen
   und die Abdeckung, mit Pfeilen für die Veränderung
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
-- 🏗️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
+- 🕵️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - 📥 **Eine ThreadSanitizer-Variante** des Images
 - ✅ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
 - ✅ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
