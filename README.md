@@ -6,11 +6,6 @@
 [![Testbericht](https://img.shields.io/badge/Testbericht-GitHub%20Pages-2ea44f)](https://hobbyquaker.github.io/hm-radio-simulator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> [!CAUTION]
-> hm-radio-simulator ist in Entwicklung. Die Stufen 0 bis 4 stehen: Modul, LAN-Gateway (auch mit AES), ein simulierter
-> Schaltaktor und eine Fernbedienung für rfd, ein Wired-LAN-Gateway mit einem Wired-Aktor für hs485d. Was folgt, steht
-> unter _Roadmap_.
-
 hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
 **`rfd`** (BidCoS-RF) und **`hs485d`** (Homematic Wired), später möglicherweise auch **`multimacd`**. Die Daemons
 werden aus [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) gebaut, in einem Docker-Container gestartet und
