@@ -328,6 +328,26 @@ export const DESCRIPTIONS = Object.freeze({
         'a burst device: the first send is a burst, the next within 1.8 s is not, a missed one is retried as a burst':
             'A device that only listens to long wake-up transmissions gets one; the next command right after does not need it, and a missed one is retried with it.',
     },
+    'test/daemon/rfd-serial-errors.test.js': {
+        'a persistent ENODEV on the serial device: rfd lives, logs once, does not spin, reports CONNECTED false':
+            "The radio module's serial device keeps failing with ENODEV, as a stale /dev/mmd_bidcos does after a multimacd restart. A small test shim makes the read fail; rfd must survive, log it once, stay idle and report the interface as disconnected.",
+        'rfd survives the failing read()': 'rfd keeps running when reading from the serial device fails.',
+        'one error line for the whole streak, no busy loop':
+            'rfd logs the error once for the whole failure streak and does not use the CPU while it lasts.',
+        'listBidcosInterfaces reports CONNECTED false, RPC keeps answering':
+            'While reading keeps failing the interface is reported as disconnected, and rfd still answers RPC calls.',
+        'EIO for a while, then the module answers again: CONNECTED goes false and back to true, events arrive':
+            'The serial device fails with EIO for a while, as an unplugged USB adapter does, then works again: rfd reports the interface as disconnected, then as connected, and the next message from the module arrives.',
+        'rfd survives': 'rfd keeps running through the read errors.',
+        'CONNECTED false during the streak, true after the next good read':
+            'The connection state follows the device: disconnected while reads fail, connected again after the first successful read.',
+        'EINTR on read(): no error line, CONNECTED stays true':
+            'A read interrupted by a signal (EINTR) is not an error: rfd logs nothing and the interface stays connected.',
+        'EINTR is not an error': 'No error line, rfd alive and the interface connected after an interrupted read.',
+        'a failing select(): handled like a failing read() - alive, one line, no spin':
+            'Waiting for data on the serial device fails: rfd treats it like a failed read - alive, one log line, no busy loop.',
+        'alive, one select() line, no busy loop': 'rfd survives, logs the failure once and stays idle.',
+    },
     'test/daemon/udp-search.test.js': {
         'rfd: HMLGW2 by serial only - the UDP identify and runtime-IP requests, then the gateway on 2000/2001':
             'rfd finds a LAN gateway by its serial number on the network and connects to it.',

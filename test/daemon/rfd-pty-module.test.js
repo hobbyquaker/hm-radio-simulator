@@ -12,7 +12,7 @@ import {encodeFrame} from '../../lib/frame.js';
 import {SYSTEM_STATUS} from '../../lib/commands.js';
 import {mulberry32, seedFromEnvironment} from '../../lib/prng.js';
 import {startRfd, spawnRfd, withDaemon, skipWithoutDaemons, CENTRAL_ADDRESS} from '../helpers/daemon.js';
-import {regression, isKnownBroken} from '../helpers/known.js';
+import {regression} from '../helpers/known.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const options = (extra = {}) => ({...skipWithoutDaemons, timeout: 180000, ...extra});
@@ -84,9 +84,9 @@ test('a BUSY answer to GET_SERIALNR is retried by rfd (250 ms, twice) and the in
 // A pty slave whose master went away answers read() with 0 (end of file), not with -1: #115/#116 handle the error
 // case (a stale /dev/mmd_bidcos gives ENODEV, an unplugged USB adapter EIO) but not the end-of-file case, so rfd on
 // main still spins at 100 % CPU and keeps CONNECTED = true after the hangup - the `read-eof` finding (no upstream
-// issue yet).
+// issue yet). The error case itself, with a read() that really fails, is rfd-serial-errors.test.js (the fault shim).
 test(
-    'module lost: the pty hangs up - rfd stays alive without spinning (#115) and reports CONNECTED false (#116)',
+    'module lost: the pty hangs up (read() == 0) - rfd stays alive, without spinning, and reports CONNECTED false (the read-eof finding)',
     options(),
     async (t) => {
         const rfd = await startRfd();
@@ -95,7 +95,7 @@ test(
             await rfd.pty.lose();
             await sleep(3000);
 
-            await t.test('rfd survives the hangup', regression(115), async () => {
+            await t.test('rfd survives the hangup', async () => {
                 assert.ok(rfd.alive, `rfd exited: ${JSON.stringify(rfd.exit)}\n${rfd.tail(20)}`);
             });
             if (rfd.alive) {
@@ -104,19 +104,19 @@ test(
                 await sleep(2000);
                 const ticks = rfd.cpuTicks() - before;
                 t.diagnostic(`rfd used ${ticks} clock ticks in the 2 s after the hangup`);
-                await t.test('no busy loop after the hangup', regression(115, 'read-eof'), () => {
+                await t.test('no busy loop after the hangup', regression('read-eof'), () => {
                     assert.ok(ticks < 100, `rfd used ${ticks} clock ticks (of 200) in 2 s after the hangup`);
                 });
                 await t.test(
                     'listBidcosInterfaces reports the interface as not connected',
-                    regression(116, 'read-eof'),
+                    regression('read-eof'),
                     async () => {
                         const interfaces = await rfd.call('listBidcosInterfaces', [], {timeout: 5000});
                         assert.equal(interfaces[0].CONNECTED, false);
                     },
                 );
             } else {
-                t.diagnostic(`rfd exited after the hangup: ${JSON.stringify(rfd.exit)} (known: ${isKnownBroken(115)})`);
+                t.diagnostic(`rfd exited after the hangup: ${JSON.stringify(rfd.exit)}`);
             }
         } finally {
             await rfd.stop();

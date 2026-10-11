@@ -25,7 +25,13 @@ export const DAEMONS = process.env.HMRS_DAEMONS || '';
 export const RFTYPES = process.env.HMRS_RFTYPES || '/opt/openccu-base/rftypes';
 export const HS485TYPES = process.env.HMRS_HS485TYPES || '/opt/openccu-base/hs485types';
 export const HMLANGW = process.env.HMRS_HMLANGW || '';
+/** The fault shim (shim/hmrs-faults.c, built in the image): read()/select() on one device fail with a chosen errno. */
+export const FAULT_SHIM = process.env.HMRS_FAULT_SHIM || '';
 export const haveDaemons = DAEMONS !== '' && fs.existsSync(path.join(DAEMONS, 'bin', 'rfd'));
+export const haveFaultShim = haveDaemons && FAULT_SHIM !== '' && fs.existsSync(FAULT_SHIM);
+export const skipWithoutFaultShim = haveFaultShim
+    ? {}
+    : {skip: 'HMRS_FAULT_SHIM is not set: the fault-shim tests run in the docker image'};
 export const haveHmlangw = haveDaemons && HMLANGW !== '' && fs.existsSync(HMLANGW);
 export const skipWithoutDaemons = haveDaemons
     ? {}
@@ -111,6 +117,8 @@ export class Daemon {
         this.lgw = null;
         /** @type {Record<string, string>} environment additions for the process (merged last, see daemonEnv) */
         this.extraEnv = {};
+        /** @type {{ctl: string, log: string}|null} the fault shim's control and log files, when it is loaded */
+        this.faults = null;
     }
 
     start() {
@@ -156,6 +164,21 @@ export class Daemon {
 
     call(method, params, options) {
         return this.rpc.call(method, params, options);
+    }
+
+    /**
+     * Orders the fault shim (shim/hmrs-faults.c): 'clear', 'fail ENODEV', 'fail-once EIO', 'eintr-once',
+     * 'select-fail EBADF'.
+     */
+    setFault(order) {
+        fs.writeFileSync(this.faults.ctl, `${order}\n`);
+    }
+
+    /** The failures the shim injected so far, one "call ERRNO" string each. */
+    faultLog() {
+        return fs.existsSync(this.faults.log)
+            ? fs.readFileSync(this.faults.log, 'utf8').split('\n').filter(Boolean)
+            : [];
     }
 
     /** Waits until the daemon answers system.listMethods, or fails with its log when it exits first. */
@@ -285,8 +308,9 @@ export function tmpdir(prefix) {
  * With `dir`, an earlier daemon's directory is used again (a restart: its device files, address, keys and handlers
  * stay; only rfd.conf is written anew). `console: false` leaves out `-c`, so the configured `Log Destination` counts;
  * `args` replaces the command line after the binary (`{config}` is replaced by the config file's path).
+ * `faults` loads the fault shim (shim/hmrs-faults.c) on the first interface's device: `daemon.setFault()` orders it.
  * `env` adds to rfd's environment (merged last; LD_PRELOAD and the sanitizer options are joined, see combineEnv).
- * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>}} [options]
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>, faults?: boolean}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
@@ -306,6 +330,7 @@ export async function spawnRfd({
     improvedInit = true,
     quietAir = false,
     env = {},
+    faults = false,
 } = {}) {
     const fresh = !dir;
     dir = dir || tmpdir('hmrs-rfd');
@@ -395,7 +420,19 @@ export async function spawnRfd({
         ? args.map((a) => a.replace('{config}', config))
         : ['-f', config, ...(console ? ['-c'] : []), '-l', String(logLevel)];
     const daemon = new Daemon('rfd', path.join(DAEMONS, 'bin', 'rfd'), cmdline, dir, port);
-    daemon.extraEnv = combineEnv(env);
+    let faultEnv = {};
+    if (faults) {
+        // the fault shim on the module's device (the pty link): read()/select() fail when the test says so
+        daemon.faults = {ctl: path.join(dir, 'faults.ctl'), log: path.join(dir, 'faults.log')};
+        fs.writeFileSync(daemon.faults.ctl, 'clear\n');
+        faultEnv = {
+            LD_PRELOAD: FAULT_SHIM,
+            HMRS_FAULT_DEV: interfaces[0].dev,
+            HMRS_FAULT_CTL: daemon.faults.ctl,
+            HMRS_FAULT_LOG: daemon.faults.log,
+        };
+    }
+    daemon.extraEnv = combineEnv(faultEnv, env);
     daemon.module = module;
     daemon.air = air;
     daemon.pty = pty;

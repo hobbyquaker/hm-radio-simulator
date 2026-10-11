@@ -36,8 +36,14 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   verschwindet ([#27](https://github.com/OpenCCU/OpenCCU-Base/pull/27)), jeweils für rfd und hs485d.
 - **rfd mit simuliertem Funkmodul:** die Initialisierung bis `CONNECTED`, das Modul im Bootloader, `BUSY` mit
   Wiederholung, Modul weg und wieder da, Events, Fuzzing der Funk-Frames. Der Verlust des Moduls endet hier mit
-  `read()` = 0 (Dateiende); die Fixes [#115](https://github.com/OpenCCU/OpenCCU-Base/pull/115)/[#116](https://github.com/OpenCCU/OpenCCU-Base/pull/116)
-  behandeln `read()` = -1 und sind damit noch nicht abgedeckt (siehe Roadmap).
+  `read()` = 0 (Dateiende, der Fund `read-eof`).
+- **Lesefehler am seriellen Gerät** ([#115](https://github.com/OpenCCU/OpenCCU-Base/pull/115),
+  [#116](https://github.com/OpenCCU/OpenCCU-Base/pull/116)): ein kleiner `LD_PRELOAD`-Shim (`shim/hmrs-faults.c`, nur
+  Testgerüst, er ändert nichts an rfd) lässt `read()` und `select()` auf dem Gerät des Moduls mit einem gewählten
+  `errno` scheitern, wie es ein veraltetes `/dev/mmd_bidcos` (`ENODEV`) oder ein abgezogener Adapter (`EIO`) tut: rfd
+  bleibt am Leben, schreibt eine Fehlerzeile je Fehlerserie, dreht nicht durch, meldet `CONNECTED = false` und nach
+  dem nächsten gelungenen Lesen wieder `true`; `EINTR` ist kein Fehler; ein scheiterndes `select()` wird wie ein
+  scheiterndes `read()` behandelt. Vor #115 (3.89.11) stirbt rfd beim ersten gescheiterten `read()` (SIGSEGV).
 - **rfd am LAN-Gateway (HM-LGW):** [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw)
   vor dem simulierten Modul, rfd mit `Type = HMLGW2` - das ist auch der HM-LGW-Modus von openccu-lite. Die
   Initialisierung bis `CONNECTED`, das Keepalive auf Port 2001, eine Seriennummer in anderer Schreibweise

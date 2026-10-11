@@ -62,6 +62,9 @@ COPY scripts/build-daemons.sh /usr/local/bin/
 RUN build-daemons.sh /openccu-base release /opt/daemons/release
 RUN build-daemons.sh /openccu-base asan /opt/daemons/asan
 RUN build-daemons.sh /openccu-base coverage /opt/daemons/coverage
+# the fault shim (test scaffolding: read()/select() on one device fail with a chosen errno; shim/hmrs-faults.c)
+COPY shim/hmrs-faults.c /tmp/hmrs-faults.c
+RUN mkdir -p /opt/hmrs && gcc -shared -fPIC -O2 -Wall -o /opt/hmrs/libhmrs-faults.so /tmp/hmrs-faults.c -ldl
 COPY --from=hmlangw-src /hmlangw /hmlangw
 RUN make -C /hmlangw CXXFLAGS="-Wall -O2 -pipe" hmlangw \
  && install -D -m 0755 /hmlangw/hmlangw /opt/hmlangw/bin/hmlangw \
@@ -95,6 +98,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /opt/daemons /opt/daemons
 COPY --from=build /opt/hmlangw /opt/hmlangw
+COPY --from=build /opt/hmrs /opt/hmrs
 COPY --from=base-src /openccu-base/src/devicetypes/rftypes /opt/openccu-base/rftypes
 COPY --from=base-src /openccu-base/src/devicetypes/hs485types /opt/openccu-base/hs485types
 COPY --from=base-src /openccu-base/licenses /opt/openccu-base/licenses
@@ -106,6 +110,7 @@ COPY --from=base-src /openccu-base/src/hs485d/XmlRpcMethods.cpp /openccu-base/sr
 ENV HMRS_RFTYPES=/opt/openccu-base/rftypes \
     HMRS_HS485TYPES=/opt/openccu-base/hs485types \
     HMRS_HMLANGW=/opt/hmlangw/bin/hmlangw \
+    HMRS_FAULT_SHIM=/opt/hmrs/libhmrs-faults.so \
     HMRS_KNOWN_BROKEN=${KNOWN_BROKEN} \
     HMRS_METHODS=/opt/openccu-base/methods \
     TZ=Europe/Berlin
