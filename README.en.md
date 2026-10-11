@@ -44,7 +44,7 @@ for rfd; a wired LAN gateway with a wired actuator for hs485d). See _Stages_ for
 
 A regression test for a bug the chosen OpenCCU-Base ref does not have the fix for runs as `todo` (`HMRS_KNOWN_BROKEN`,
 set per ref by the Dockerfile), so the run shows what happens without going red. Against `3.89.11` that is #115,
-#116, #138 and #140, plus ten findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
+#116, #138 and #140, plus eleven findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
 The second finding without an issue yet is `read-eof`: a pty slave whose master went away
@@ -68,7 +68,7 @@ answers `false`, hs485d's history holds the new serial instead of the old. The m
 others, timers, the radio side) stands still until the connection closes. And `async-callback-threads` - every
 unanswered `newDevices`/`deleteDevices`/`replaceDevice` leaves a thread and a socket behind for good. Against `main`,
 `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`,
-`replace-callback`, `init-blocks`, `async-callback-threads` and `dutycycle-upper-bound` (when the module reports a 100 % duty cycle, rfd reads past its threshold map; found by the load test). Every finding has an issue draft in
+`replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (when the module reports a 100 % duty cycle, rfd reads past its threshold map; found by the load test) and `flush-drops-events` (rfd discards unread input from the module before every command; under load, events get lost). Every finding has an issue draft in
 [`upstream-reports/`](upstream-reports/) (German README, English drafts); nothing is reported upstream until the
 maintainer decides.
 
@@ -122,7 +122,7 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
 
 - **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
   that predates the fix it runs as **todo** (known broken, the run stays green);
-- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`), linking to the issue or,
+- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`), linking to the issue or,
   until there is one, to the findings above;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
 
@@ -267,7 +267,7 @@ interface's queue (1024 frames, the oldest dropped beyond) for the main loop. Af
 (also a duty-cycle refusal) rfd stops trying it until `FAIL_COUNTER_RESET_TIME` and answers further calls at once with
 the fault "Failure".
 
-One daemon behaviour worth knowing: rfd flushes its serial input before every command it sends, so an unsolicited
+One daemon behaviour worth knowing (now the finding `flush-drops-events`): rfd flushes its serial input before every command it sends, so an unsolicited
 event that arrives in that instant is dropped by rfd itself - with a real module too. Over the LAN gateway, measured on
 3.89.11: with a configured `IP Address` rfd does not query the module's serial (`GET_SERIALNR` is absent from the init),
 and `CONNECTED` turns true with the text preamble - the coprocessor re-initialisation after a reconnect follows it.

@@ -115,6 +115,11 @@ export const FINDINGS = Object.freeze({
         draft: '012-dutycycle-upper-bound.md',
         issue: null,
     },
+    'flush-drops-events': {
+        title: 'rfd discards unread events from the radio module before every command it sends (tcflush TCIFLUSH in SendData)',
+        draft: '013-flush-drops-events.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

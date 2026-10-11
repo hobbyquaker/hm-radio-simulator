@@ -30,8 +30,8 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -z "${KNOWN}" ]; then
   case "${REF}" in
-    3.89.11) KNOWN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound ;;
-    *) KNOWN=double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound ;;
+    3.89.11) KNOWN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events ;;
+    *) KNOWN=double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events ;;
   esac
 fi
 

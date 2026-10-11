@@ -223,7 +223,13 @@ test(
             assert.equal(levelSets, count, 'every call reached the air once: rfd does not collapse or drop commands');
             assert.deepEqual(states, wanted, 'each switch ends on the last value sent to it');
             assert.equal(putResult.r, 'ok', 'the MASTER write completes under load');
-            assert.equal(pressEvents, presses.length, 'every press reached the receiver');
+            // rfd discards unread serial input before every command it writes (tcflush TCIFLUSH): an event that is in the
+            // kernel buffer at that instant is lost - the flush-drops-events finding, more likely the busier rfd is
+            await t.test(
+                'every press reached the receiver (the flush-drops-events finding)',
+                regression('flush-drops-events'),
+                () => assert.equal(pressEvents, presses.length, `${pressEvents} of ${presses.length} presses arrived`),
+            );
             assert.deepEqual(rfd.sanitizerReports(), []);
         }).finally(async () => {
             clients.forEach((c) => c.client.close());
@@ -411,7 +417,17 @@ test(
                 numbers.probeLatencyMs.max < 10000,
                 `RPC answered within 10 s throughout (max ${numbers.probeLatencyMs.max} ms)`,
             );
-            assert.equal(pressEvents, pressesAt.length, 'events still arrive under overload');
+            assert.ok(pressEvents > 0, 'events still arrive under overload');
+            await t.test(
+                'every press reached the receiver (the flush-drops-events finding)',
+                regression('flush-drops-events'),
+                () =>
+                    assert.equal(
+                        pressEvents,
+                        pressesAt.length,
+                        `${pressEvents} of ${pressesAt.length} presses arrived`,
+                    ),
+            );
             assert.ok(recovered, 'commands go through again once the window has passed');
             assert.ok(numbers.rssKb[1] < numbers.rssKb[0] * 1.2 + 2048, `RSS ${numbers.rssKb.join(' -> ')} kB`);
             assert.deepEqual(rfd.sanitizerReports(), []);
