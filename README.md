@@ -431,6 +431,8 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ✅ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - ☑️ **Eine ThreadSanitizer-Variante** des Images
+- ☑️ **RSSI im ACK:** das Modul schickt den RSSI-Wert im Sendestatus vorzeichenbehaftet, rfd liest ihn ohne Vorzeichen (`RSSI=-236dB`); Simulator angleichen, Test, Entwurf für OpenCCU-Base
+- ☑️ **Fehler: ein hängender Test bricht nicht ab:** `hs485d-lgw.test.js` lief 20 Stunden; jeder Daemon-Test bekommt ein Timeout
 - ✅ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
 - ✅ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
 
