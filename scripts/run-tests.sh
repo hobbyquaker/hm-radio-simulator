@@ -33,6 +33,12 @@ if [ -z "${KNOWN}" ]; then
   KNOWN=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}") || { echo "cannot derive the known-broken list for ${REF} (pass --known-broken)" >&2; exit 2; }
 fi
 
+# one lock for every checkout of this repository: the worktrees share the docker daemon and the image tags, so the lock
+# lives next to the main checkout (git's common dir), not in the worktree (HMRS_DOCKER_LOCK overrides it)
+common=$(git -C "${HERE}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+LOCK=${HMRS_DOCKER_LOCK:-${common:+$(dirname "${common}")/.docker.lock}}
+LOCK=${LOCK:-${HERE}/.docker.lock}
+
 tag="hm-radio-simulator:${REF//\//-}"
 mkdir -p "${HERE}/results"
 log="${HERE}/results/run-$(date +%Y%m%dT%H%M%S).log"
@@ -70,4 +76,4 @@ echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; 
     --ref "$(git -C "${HERE}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)" "${HERE}/results" 2>&1 | tee -a "${log}" || true
   echo "=== done, status ${status}" | tee -a "${log}"
   exit "${status}"
-) 9>"${HERE}/.docker.lock"
+) 9>"${LOCK}"
