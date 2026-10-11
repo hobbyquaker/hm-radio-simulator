@@ -296,7 +296,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **Suite bei jedem neuen OpenCCU-Base-Commit:** alle 15 Minuten den Stand von `main` abfragen und bei einem neuen
   Commit die Suite genau dafür laufen lassen, mit Hinweis im Bericht
 - 📥 Kalibrierung des Modul-Timings an einem echten RPI-RF-MOD
-- 📥 Kalibrierung des HMW-LGW-Timings an einem echten Wired-LAN-Gateway (hs485d)
+- 🏗️ Kalibrierung des HMW-LGW-Timings an einem echten Wired-LAN-Gateway (hs485d)
 - ✅ **RPC-Methoden-Durchlauf,** Gerätetyp-Durchlauf über alle `rftypes`-Beschreibungen, der Vergleich 3.89.11 gegen main
 - ✅ **Der Empfänger-Vertrag:** mehrere Empfänger, `init`-Synchronisation, Event-Reihenfolge, die Unerreichbar-Regel,
   ein hängender Empfänger
