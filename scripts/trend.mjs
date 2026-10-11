@@ -90,7 +90,8 @@ export function series(history, ref, path) {
  */
 export function change(points) {
     const values = points.map((p) => p.value).filter((v) => v !== null);
-    if (values.length < 2) {
+    // no change to show when the latest run has no value (a gap is not a change)
+    if (values.length < 2 || !points.length || points[points.length - 1].value === null) {
         return {delta: null, sign: ''};
     }
     const delta = Math.round((values[values.length - 1] - values[values.length - 2]) * 10) / 10;
@@ -163,6 +164,16 @@ function tone(metric, sign) {
 }
 
 function cell(points, metric, {unit = '', ref = '', title = ''} = {}) {
+    // the line starts where the ref has its first value (a tag that entered the window later, coverage added later)
+    const first = points.findIndex((p) => p.value !== null);
+    if (first > 0) {
+        points = points.slice(first);
+    }
+    // a count is missing only when a run did not test the ref at all: the line goes on; a coverage value can be
+    // missing because the run had no coverage data, and that stays a visible gap
+    if (metric !== 'coverage') {
+        points = points.filter((p) => p.value !== null);
+    }
     const lastPoint = points[points.length - 1];
     const value = lastPoint ? lastPoint.value : null;
     const {delta, sign} = change(points);
@@ -212,14 +223,15 @@ export const TREND_CSS = `
   padding: .25rem 0; border-top: 1px solid var(--line); }
 .tr-row:nth-of-type(3) { grid-template-columns: 4.6rem repeat(3, minmax(0, 1fr)); }
 .tr-name { font-weight: 600; font-size: .85rem; color: var(--muted); }
-.tv { display: grid; grid-template-columns: max-content max-content; justify-content: start; column-gap: .35rem;
+
+.tv { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: .35rem; min-width: 0;
   align-items: baseline; }
 .tl { grid-column: 1 / 3; font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .tn { font-weight: 650; font-variant-numeric: tabular-nums; font-size: .95rem; }
 .tn.pass { color: var(--pass); } .tn.fail { color: var(--fail); } .tn.todo { color: var(--todo); } .tn.skip { color: var(--skip); }
 .td { font-size: .72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .td.good { color: var(--pass); } .td.bad { color: var(--fail); } .td.neutral, .td.same { color: var(--muted); }
-.spark { grid-column: 1 / 3; display: block; margin-top: 1px; overflow: visible; }
+.spark { grid-column: 1 / 3; display: block; margin-top: 1px; overflow: visible; width: 100%; max-width: 96px; height: auto; }
 .spark polyline { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
 .spark .dot { fill: var(--muted); } .spark .last { fill: var(--fg); } .spark .hit { fill: transparent; }
 .spark .hit:hover { fill: var(--link); fill-opacity: .35; }

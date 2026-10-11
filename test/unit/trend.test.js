@@ -83,3 +83,11 @@ test('the panel: a card per ref with arrows coloured by meaning, a ref new in th
     assert.equal((page.match(/<script/g) || []).length, 1);
     assert.match(page, /\.trend \{ display: grid;/);
 });
+
+test('a latest run without a value shows no change, even when older runs had values', () => {
+    const points = [{value: 30}, {value: 30.1}, {value: null}].map((p, i) => ({
+        entry: {generatedAt: `2026-10-0${i + 1}`},
+        ...p,
+    }));
+    assert.deepEqual(change(points), {delta: null, sign: ''});
+});
