@@ -404,6 +404,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
   wo sie sich unterscheiden; jede Zeile einzeilig, Details und eine kurze Erklärung des Tests zum Aufklappen
 - 🕵️ **Trend im Testbericht:** oben ein Panel mit Verlaufslinien je Stand und Daemon für bestanden, todo, fehlgeschlagen
   und die Abdeckung, mit Pfeilen für die Veränderung
+- 📥 **Testergebnisse filtern:** nach Ergebnis, Daemon, Art, Stand und Text, als Link teilbar
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ✅ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - 📥 **Eine ThreadSanitizer-Variante** des Images
