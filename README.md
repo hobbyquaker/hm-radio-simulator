@@ -411,7 +411,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - 🕵️ **AES-CBC-MAC-Telegramme (#4)** auf einem Kanal mit `aes_cbc` (eine Kopie der `rftypes`, OpenCCU-Base liefert keinen) und das korrigierte `LONG_ACT_TYPE`-Register des HM-OU-CFM-TW (#63)
 - 📥 **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
   an libXmlRpc, der 49-Tage-Überlauf der Uhr (libfaketime)
-- 🕵️ **Testbericht kompakter:** eine Ergebnisspalte je OpenCCU-Base-Stand; normal, ASan und Coverage nur dort einzeln,
+- ✅ **Testbericht kompakter:** eine Ergebnisspalte je OpenCCU-Base-Stand; normal, ASan und Coverage nur dort einzeln,
   wo sie sich unterscheiden; jede Zeile einzeilig, Details und eine kurze Erklärung des Tests zum Aufklappen
 - 🕵️ **Trend im Testbericht:** oben ein Panel mit Verlaufslinien je Stand und Daemon für bestanden, todo, fehlgeschlagen
   und die Abdeckung, mit Pfeilen für die Veränderung
