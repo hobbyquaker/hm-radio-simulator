@@ -102,11 +102,22 @@ test('the HTML report has a column per job, the links, the diagnostics and no sc
     );
     // every table shares the column scheme: a colgroup, fixed layout, the result columns right-aligned
     assert.match(html, /table-layout: fixed/);
-    const tables = html.match(/<table>[\s\S]*?<\/table>/g);
+    const tables = html.match(/<table[ >][\s\S]*?<\/table>/g);
+    // wide tables scroll in their own box and never squeeze below their columns (task 29: a big screen shows all)
+    assert.match(html, /\.scroll \{ overflow-x: auto;/);
+    assert.ok(
+        tables.every((t) => /^<table style="min-width: calc\(var\(--w-name\) \+ /.test(t)),
+        'every table has a min-width',
+    );
+    assert.equal(
+        (html.match(/<div class="scroll"><table /g) || []).length,
+        tables.length,
+        'every table in a scroll box',
+    );
     assert.ok(tables.length >= 4, `tables: ${tables.length}`);
     // the test tables have one result column per job (two in the fixture), the others four
     for (const t of tables) {
-        assert.match(t, /^<table><colgroup><col>/, 'the first column takes the rest');
+        assert.match(t, /^<table [^>]*><colgroup><col>/, 'the first column takes the rest');
         const expected = t.includes('<th class="">test</th>') ? report.jobs.length : 4;
         assert.equal((t.match(/<col class="r">/g) || []).length, expected, `result columns: ${t.slice(0, 200)}`);
         assert.equal((t.match(/<th class="r">/g) || []).length, expected, 'result headers');

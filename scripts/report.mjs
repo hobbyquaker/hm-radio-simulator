@@ -404,7 +404,10 @@ const CSS = `
   --card: #1f1f26; --pass: #66bb6a; --fail: #ef5350; --todo: #ffb74d; --skip: #90a4ae; --link: #8ab4f8; } }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 1.5rem; font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--bg); color: var(--fg); max-width: 1400px; margin: 0 auto; }
+  background: var(--bg); color: var(--fg); margin: 0 auto; }
+/* the page is as wide as the window: a table with every ref and variant side by side may need a big screen; on a
+   smaller one it scrolls sideways in its own box (every table has a min-width: the name column plus its fixed columns) */
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; } p, h1, h2, h3, .cards, ul.diff, footer { max-width: 1400px; }
 a { color: var(--link); text-decoration: none; } a:hover { text-decoration: underline; }
 h1 { font-size: 1.6rem; margin: 0 0 .25rem; } h2 { font-size: 1.2rem; margin: 2rem 0 .75rem; }
 h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; color: var(--muted); font-weight: 600; }
@@ -414,7 +417,7 @@ h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; color: var(--muted); font-weight: 
 .card .big { font-size: 1.5rem; font-weight: 600; } .card .label { color: var(--muted); font-size: .85rem; }
 /* every table: the name column takes the rest, the fixed columns share one width scheme, the four result columns at
    the right edge are --w-result wide and right-aligned in every table */
-:root { --w-result: 6.5rem; --w-commit: 5.5rem; --w-small: 6rem; --w-kind: 7.5rem; --w-links: 11rem; }
+:root { --w-result: 6.5rem; --w-commit: 5.5rem; --w-small: 6rem; --w-kind: 7.5rem; --w-links: 11rem; --w-name: 22rem; }
 .phone-only { display: none; }
 table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; table-layout: fixed; }
 col.r { width: var(--w-result); } col.c { width: var(--w-commit); } col.s { width: var(--w-small); }
@@ -437,7 +440,8 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
 /* phone: the commit, kind, links and duration columns shrink to a pixel (a zero width would count as auto) (their content moves under the name; the
    cells stay in the fixed layout so nothing shifts into the next <col>), the result columns keep one fixed width,
    the name wraps in the rest */
-@media (max-width: 760px) { :root { --w-result: 3rem; --w-small: 3.6rem; }
+@media (max-width: 760px) { :root { --w-result: 3rem; --w-small: 3.6rem; --w-commit: 1px; --w-kind: 1px; --w-links: 1px;
+    --w-name: 11rem; }
   body { padding: .75rem; font-size: 13px; }
   th, td { padding: .35rem .3rem; } th.r, td.r { padding-left: .3rem; }
   col.c, col.k, col.l, col.d { width: 1px; }
@@ -464,7 +468,14 @@ function table(head, rows) {
         (cells) =>
             `<tr>${cells.map((cell, i) => `<td class="${i === 0 ? 'name' : esc(head[i].cls || '')}">${cell}</td>`).join('')}</tr>`,
     );
-    return `<table><colgroup>${cols.join('')}</colgroup><thead><tr>${ths.join('')}</tr></thead><tbody>\n${trs.join('\n')}\n</tbody></table>`;
+    // the table never squeezes below its columns' widths; the .scroll box around it scrolls instead
+    const widths = {r: '--w-result', c: '--w-commit', s: '--w-small', k: '--w-kind', l: '--w-links', d: '--w-small'};
+    const fixed = head
+        .map((c) => (c.cls || '').split(' ').find((x) => x in widths))
+        .filter(Boolean)
+        .map((x) => `var(${widths[x]})`);
+    const min = `calc(var(--w-name) + ${fixed.length ? fixed.join(' + ') : '0px'})`;
+    return `<div class="scroll"><table style="min-width: ${min}"><colgroup>${cols.join('')}</colgroup><thead><tr>${ths.join('')}</tr></thead><tbody>\n${trs.join('\n')}\n</tbody></table></div>`;
 }
 
 export function renderHtml(report, history = []) {
