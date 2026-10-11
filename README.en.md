@@ -9,8 +9,7 @@
 A simulated Homematic **radio module** and a **test suite for the CCU's radio daemons** - `rfd` and `hs485d` of
 [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base), later `multimacd`.
 
-[hm-simulator](https://github.com/hobbyquaker/hm-simulator) plays the CCU's interface processes towards their
-clients. This project points the other way: it plays the **hardware** towards the real daemons - the RPI-RF-MOD /
+It plays the **hardware** towards the real daemons - the RPI-RF-MOD /
 HM-MOD-RPI-PCB on a serial line, the HM-LGW over TCP, the HMW-LGW over TCP - so that the daemons can be started,
 exercised and broken in a container, in CI, without a radio module in the room. The daemons are built from
 OpenCCU-Base at a chosen ref inside the docker image; nothing of theirs is copied here.

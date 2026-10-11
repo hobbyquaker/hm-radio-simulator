@@ -12,11 +12,6 @@ werden aus [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) gebaut, in ei
 über ihre XML-RPC- und BIN-RPC-Schnittstellen getestet, ohne dass ein Funkmodul im Raum sein muss. Die Tests laufen
 bei jedem Push auf GitHub Actions.
 
-[hm-simulator](https://github.com/hobbyquaker/hm-simulator) spielt die Schnittstellenprozesse der CCU gegenüber
-ihren Clients. hm-radio-simulator spielt in die andere Richtung: die **Hardware** gegenüber den echten Daemons. Das
-ist ein RPI-RF-MOD bzw. HM-MOD-RPI-PCB an einer seriellen Schnittstelle, ein LAN-Gateway (HM-LGW) über TCP oder ein
-Wired-LAN-Gateway (HMW-LGW) über TCP.
-
 ## Warum
 
 rfd, hs485d und multimacd haben in OpenCCU-Base bisher keine Tests: Die CI dort baut die Daemons, prüft aber nicht,
