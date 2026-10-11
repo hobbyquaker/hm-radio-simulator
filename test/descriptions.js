@@ -195,6 +195,62 @@ export const DESCRIPTIONS = Object.freeze({
         'AES: the module power-cycled behind the gateway - rfd republishes the paired devices and keys (restoreConfigToCoprocessor), but not the AES policy':
             'The radio module behind the gateway loses power and comes back: rfd hands it the paired devices and keys again, but not the per-channel security settings.',
     },
+    'test/daemon/rfd-lgw-recovery.test.js': {
+        'AES: the restore after a reconnect fails twice (SET_CLOCK answered with an error) - rfd drops the connection, retries after 5 s and is back only with a complete restore (#13)':
+            'After the gateway connection drops, the radio module rejects the clock setting twice while rfd restores its configuration. rfd must not treat the half-restored module as ready: it disconnects, waits 5 seconds, reconnects and comes back only once the restore has gone through.',
+        'a failed restore is not taken as recovered':
+            'Each failed restore ends in a new TCP connection after a 5-second pause, not in a working interface.',
+        'the last restore is complete: key, device, clock':
+            'The restore that finally succeeds sends the AES key, the paired device and the clock to the module again.',
+        'AES: the coprocessor does not answer after the TCP reconnect (IDENTIFY dropped twice) - rfd sends no telegram meanwhile and retries until it answers (#13)':
+            'The gateway is back, but the radio module behind it does not answer at first. rfd must not count the TCP connection alone as recovered, must not send radio telegrams while the module is being set up, and retries until the module answers.',
+        'a TCP connection without a coprocessor is not taken as recovered':
+            'rfd reconnects again after each unanswered greeting instead of declaring the interface ready.',
+        'no SEND_TELEGRAM before the restore has finished':
+            'Switch commands issued during the re-initialisation are not sent to the module before its configuration is restored.',
+        'AES: the module restarts behind the gateway and the restore fails 3 times - rfd retries 1 s apart, then schedules a gateway reconnect (#13)':
+            'The radio module restarts while the gateway stays connected, and restoring its configuration fails three times. rfd retries twice, one second apart, and then starts a fresh gateway connection, after which everything works again.',
+        '3 restore attempts, then a new gateway connection':
+            'Two retry messages, one scheduled reconnect, and a new connection to the gateway.',
+        'AES: three reconnects leave no bidcos-channel keepalive thread behind - the thread count is back where it was (#13)':
+            'Before fix #13 every gateway reconnect left one background keepalive thread running. After three reconnects rfd must have no more threads than before.',
+        'no leaked thread': "The number of rfd's threads after three reconnects is not higher than before them.",
+        'AES: SET_CLOCK fails during the start - the interface does not come up as connected (#13)':
+            'The radio module rejects the clock setting while rfd starts: the gateway interface must not be reported as connected (rfd gives the interface up).',
+        'no connected interface after a failed SET_CLOCK':
+            'No interface is reported as connected after the failed clock setting.',
+        'a hello without a serial is rejected - rfd.conf names the serial (#17)':
+            "The gateway greets without a serial number while rfd's configuration names one: rfd must refuse the gateway instead of talking to an unknown device.",
+        'rejected with a configured serial': 'rfd logs the rejection and never completes the connection.',
+        'the status file is named after the configured serial, not the spelling the gateway reports (#17)':
+            "rfd writes the gateway's connection status into a file the web interface reads. The file must be named after the serial as configured, even when the gateway spells it in other letter case, and be rewritten on a reconnect.",
+        'one file, under the configured serial, rewritten on the reconnect':
+            'Only the file with the configured spelling exists, and a reconnect updates it.',
+        'AES: port 2001 names another gateway than port 2000 - rfd rejects the keepalive connection until it matches (#17)':
+            "The gateway's second (keepalive) channel claims to be a different gateway. rfd must refuse that channel until it names the configured serial again.",
+        'the keepalive port checks the serial':
+            'The keepalive connection to the wrong gateway is refused and never completed.',
+        'search by serial: after a drop rfd looks for the configured serial, not the reported spelling (#17)':
+            'rfd finds its gateway on the network by serial number. After a connection drop it must search for the serial as configured, not as the gateway last spelled it.',
+        'the reconnect searches for the configured serial':
+            'The network search after the drop asks for the configured spelling.',
+        "AES: the gateway's messages split across TCP segments and gathered into one - the init, the keepalives and a switch work (6c757603)":
+            'The gateway sends its messages cut into pieces and several messages in one piece, as a slow network does. rfd must put them together correctly: the setup, the keepalives and switching a device all work, with encryption.',
+        "plaintext: the gateway's messages split across TCP segments and gathered into one - the init, the keepalives and a switch work (6c757603)":
+            'The same cut and merged gateway messages without encryption: rfd must still assemble them correctly.',
+        'AES: rfd started with 900 descriptors open - its sockets get numbers below 1024; the gateway path (e097a3c1) and the RPC server work':
+            'A control run: rfd starts with 900 files already open, so its network connections get high numbers that are still below 1024. The gateway connection and the RPC server both work.',
+        'AES: rfd started with 1100 descriptors open - its sockets get numbers above 1024; the gateway path (e097a3c1) and the RPC server work':
+            'rfd starts with 1100 files already open, so its network connections get numbers above 1024. The gateway connection works since fix e097a3c1; the RPC server should work too (it does not: finding xmlrpc-select-fd).',
+        'the gateway path':
+            'rfd stays alive, its sockets have the expected numbers, both gateway channels connect and the radio module is set up.',
+        'the RPC server answers': 'rfd answers an RPC call.',
+        'no sanitizer report': 'The sanitizer build reports no memory error.',
+        'two coprocessor system commands at once: each gets its own answer (a duty-cycle query while the module restarts)':
+            'Two parts of rfd send a command to the radio module at the same moment: an RPC call asks for the duty cycle while the module restarts. Each command must get its own answer (it does not: finding system-command-slot).',
+        'both commands get their own answers':
+            'The duty cycle is reported correctly and rfd logs no error for either command.',
+    },
     'test/daemon/rfd-lgw-hmlangw.test.js': {
         'rfd with Type = HMLGW2 reaches CONNECTED through hmlangw; the keepalive on 2001 is answered':
             'rfd connects through hmlangw, the LAN-gateway program openccu-lite uses, and brings the radio module online.',

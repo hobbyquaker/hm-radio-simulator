@@ -222,6 +222,26 @@ export class Daemon {
         return Number(fields[11]) + Number(fields[12]);
     }
 
+    /** The daemon's threads right now (/proc/<pid>/task). */
+    threads() {
+        return fs.readdirSync(`/proc/${this.pid}/task`).length;
+    }
+
+    /** The daemon's open descriptors that are sockets, by number (/proc/<pid>/fd). */
+    socketFds() {
+        const fds = [];
+        for (const fd of fs.readdirSync(`/proc/${this.pid}/fd`)) {
+            try {
+                if (fs.readlinkSync(`/proc/${this.pid}/fd/${fd}`).startsWith('socket:')) {
+                    fds.push(Number(fd));
+                }
+            } catch {
+                // closed meanwhile
+            }
+        }
+        return fds.sort((a, b) => a - b);
+    }
+
     /**
      * Stops rfd the clean way, through its `exit` RPC method (rfd.cpp: the main loop ends, exit(0) runs the atexit
      * handlers - a coverage build writes its data), and waits for the process to end.
@@ -310,7 +330,10 @@ export function tmpdir(prefix) {
  * `args` replaces the command line after the binary (`{config}` is replaced by the config file's path).
  * `faults` loads the fault shim (shim/hmrs-faults.c) on the first interface's device: `daemon.setFault()` orders it.
  * `env` adds to rfd's environment (merged last; LD_PRELOAD and the sanitizer options are joined, see combineEnv).
- * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>, faults?: boolean}} [options]
+ * `fdFloor` starts rfd with descriptors 3 .. fdFloor-1 already open (on /dev/null) and the limit raised, so every
+ * descriptor rfd opens itself - sockets included - gets a number of at least fdFloor (a busy process, or one started
+ * by a supervisor that leaks descriptors).
+ * @param {{interfaces?: InterfaceConfig[], module?: object, lgw?: object, lgwFront?: object, noInterface?: boolean, logLevel?: number, address?: number, extra?: string, dir?: string|null, console?: boolean, args?: string[]|null, logDestination?: string, port?: number|null, improvedInit?: boolean, quietAir?: boolean, env?: Record<string, string>, faults?: boolean, fdFloor?: number}} [options]
  * @returns {Promise<Daemon>} the spawned daemon, not yet ready
  */
 export async function spawnRfd({
@@ -331,6 +354,7 @@ export async function spawnRfd({
     quietAir = false,
     env = {},
     faults = false,
+    fdFloor = 0,
 } = {}) {
     const fresh = !dir;
     dir = dir || tmpdir('hmrs-rfd');
@@ -419,7 +443,21 @@ export async function spawnRfd({
     const cmdline = args
         ? args.map((a) => a.replace('{config}', config))
         : ['-f', config, ...(console ? ['-c'] : []), '-l', String(logLevel)];
-    const daemon = new Daemon('rfd', path.join(DAEMONS, 'bin', 'rfd'), cmdline, dir, port);
+    const rfdBin = path.join(DAEMONS, 'bin', 'rfd');
+    const daemon = fdFloor
+        ? new Daemon(
+              'rfd',
+              '/bin/bash',
+              [
+                  '-c',
+                  `ulimit -n ${fdFloor + 1024} || exit 97; for ((i = 3; i < ${fdFloor}; i++)); do eval "exec $i</dev/null"; done; exec "$0" "$@"`,
+                  rfdBin,
+                  ...cmdline,
+              ],
+              dir,
+              port,
+          )
+        : new Daemon('rfd', rfdBin, cmdline, dir, port);
     let faultEnv = {};
     if (faults) {
         // the fault shim on the module's device (the pty link): read()/select() fail when the test says so

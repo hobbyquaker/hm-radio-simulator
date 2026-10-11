@@ -70,3 +70,24 @@ test('the LAN device answers identify and the runtime IP configuration in the eQ
         await device.close();
     }
 });
+
+test('a serial in another letter case is answered only with serialIgnoringCase', async () => {
+    for (const serialIgnoringCase of [false, true]) {
+        const device = new Eq3LanDevice({
+            type: 'eQ3-HM-LGW',
+            serial: 'SIM0000002',
+            ip: '127.0.0.1',
+            port: 0,
+            bind: '127.0.0.1',
+            serialIgnoringCase,
+        });
+        await device.start();
+        try {
+            const answer = await ask(device, request('eQ3-HM-LGW*', 'sim0000002', 'I'));
+            assert.equal(answer !== null, serialIgnoringCase);
+            assert.equal(device.requests[0].serial, 'sim0000002');
+        } finally {
+            await device.close();
+        }
+    }
+});

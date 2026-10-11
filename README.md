@@ -63,6 +63,16 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   [#17](https://github.com/OpenCCU/OpenCCU-Base/pull/17)), Port 2000 weg, während ein Telegramm unterwegs ist, und
   das Modul stromlos hinter dem Gateway: rfd meldet Geräte und Schlüssel neu an (`restoreConfigToCoprocessor`), die
   AES-Richtlinie je Kanal aber nicht (`aes-republish`).
+- **Die Wiederherstellung am LAN-Gateway** ([#13](https://github.com/OpenCCU/OpenCCU-Base/pull/13),
+  [#17](https://github.com/OpenCCU/OpenCCU-Base/pull/17)): eine Wiederherstellung des Coprozessors, die nach dem
+  Reconnect scheitert (rfd trennt, wartet 5 s und verbindet neu, statt das halb eingerichtete Modul zu benutzen), ein
+  Modul, das nach dem TCP-Reconnect nicht antwortet (währenddessen geht kein Telegramm hinaus), ein Neustart des Moduls
+  hinter dem Gateway mit drei gescheiterten Versuchen und neuer Verbindung, kein Keepalive-Thread bleibt nach drei
+  Reconnects übrig, `SET_CLOCK` scheitert beim Start; ein Hello ohne Seriennummer, die Statusdatei unter der
+  konfigurierten Seriennummer, Port 2001 mit fremder Seriennummer, die Suche nach der konfigurierten Seriennummer;
+  Nachrichten des Gateways auf mehrere TCP-Segmente verteilt und zusammengefasst (6c757603), Sockets über Deskriptor 1024
+  (e097a3c1) - dabei fiel `xmlrpc-select-fd` auf - und zwei Systembefehle aus zwei Threads gleichzeitig
+  (`system-command-slot`).
 - **AES-gesicherte Geräte und eine Fernbedienung (HM-RC-4 aus `rf_rc.xml`):** der Schlüsseltausch beim Anlernen,
   `AES_ACTIVE` setzt die Kanal-Authentifizierung im Modul (`AUTHENTICATION_ON`), ein Schaltbefehl läuft durch
   Challenge-Response (die Luftstrecke rechnet, was sonst die Modul-Firmware tut: `ACK_W_AES_CHALLENGE`,
@@ -193,7 +203,7 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
-`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data` und `propertymap-long-line` (siehe Fuzzing). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-017 sind als
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data`, `propertymap-long-line` (siehe Fuzzing), `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s) und `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-017 sind als
 OpenCCU-Base #161-#177 gemeldet (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)).
 
 ## Wie es funktioniert
@@ -321,7 +331,7 @@ man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 

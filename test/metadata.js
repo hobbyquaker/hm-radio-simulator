@@ -144,6 +144,16 @@ export const FINDINGS = Object.freeze({
         issue: null,
         fuzzHarness: 'fuzz_propertymap',
     },
+    'xmlrpc-select-fd': {
+        title: 'libXmlRpc: the RPC server stops answering once its sockets have descriptors of 1024 or more (select() with fd_set)',
+        draft: '018-xmlrpc-select-fd.md',
+        issue: null,
+    },
+    'system-command-slot': {
+        title: "rfd: two coprocessor system commands from two threads share one request slot; one takes the other's answer",
+        draft: '019-system-command-slot.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

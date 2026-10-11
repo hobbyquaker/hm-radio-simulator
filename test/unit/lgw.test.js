@@ -207,3 +207,68 @@ test('a second client on a port is refused; the hello can carry another serial o
         module.close();
     }
 });
+
+test('the hello per port: another serial on the keepalive port, no serial field at all', async () => {
+    const {module, f} = await front('');
+    try {
+        f.serialByPort = {keepalive: 'OTHER00001', bidcos: false};
+        const b = new Client(f.ports.bidcos, '');
+        await b.connected();
+        assert.equal(await b.line(), 'H01,01,eQ3-HM-LGW,1.1.5');
+        const k = new Client(f.ports.keepalive, '');
+        await k.connected();
+        assert.ok((await k.line()).endsWith(',OTHER00001'));
+        b.close();
+        k.close();
+    } finally {
+        await f.close();
+        module.close();
+    }
+});
+
+for (const key of ['', 'MySecretLanKey']) {
+    test(`${key ? 'AES' : 'plaintext'}: segmentation - messages gathered, then cut into pieces 20 ms apart`, async () => {
+        const module = new RadioModule({responseDelayMs: 0});
+        const f = await createLgwFront({
+            module,
+            serial: 'SIM0000002',
+            key,
+            bidcosPort: 0,
+            keepalivePort: 0,
+            segmentation: {pieces: 3, gapMs: 20, coalesce: true},
+        });
+        try {
+            const c = new Client(f.ports.bidcos, key);
+            let arrivals = 0;
+            c.socket.on('data', () => arrivals++);
+            await c.connected();
+            const {hello} = await c.preamble();
+            assert.ok(hello.endsWith(',SIM0000002'), hello);
+            // H (and V) went out gathered in one unit, cut into 3 pieces that arrive one by one
+            assert.ok(arrivals >= 3, `arrivals: ${arrivals}`);
+            assert.ok(f.segments >= 3);
+            c.send(encodeFrame(Buffer.from([TYPE.SYSTEM, 0x11, SYSTEM.IDENTIFY])));
+            const parser = new FrameParser();
+            let frame = null;
+            const until = Date.now() + 2000;
+            while (!frame && Date.now() < until) {
+                const got = await c.bytes(1, 100).catch(() => null);
+                for (const r of got ? parser.push(got) : []) {
+                    frame = r.payload ? Buffer.from(r.payload) : frame;
+                }
+            }
+            assert.ok(frame, 'the cut frame is whole again at the client');
+            assert.equal(frame.subarray(4).toString('ascii'), IDENTIFY_APP);
+            c.close();
+        } finally {
+            await f.close();
+            module.close();
+        }
+    });
+}
+
+test('module faults from the options are in place before the first command', () => {
+    const module = new RadioModule({faults: {SET_CLOCK: {status: SYSTEM_STATUS.ERROR, times: 2}}});
+    assert.equal(module.faults.get('SET_CLOCK').length, 2);
+    module.close();
+});
