@@ -40,8 +40,9 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   ([#140](https://github.com/OpenCCU/OpenCCU-Base/pull/140)), feindliches XML-RPC, ein Event-Empfänger, der
   verschwindet ([#27](https://github.com/OpenCCU/OpenCCU-Base/pull/27)), jeweils für rfd und hs485d.
 - **rfd mit simuliertem Funkmodul:** die Initialisierung bis `CONNECTED`, das Modul im Bootloader, `BUSY` mit
-  Wiederholung, Modul weg ([#115](https://github.com/OpenCCU/OpenCCU-Base/pull/115),
-  [#116](https://github.com/OpenCCU/OpenCCU-Base/pull/116)) und wieder da, Events, Fuzzing der Funk-Frames.
+  Wiederholung, Modul weg und wieder da, Events, Fuzzing der Funk-Frames. Der Verlust des Moduls endet hier mit
+  `read()` = 0 (Dateiende); die Fixes [#115](https://github.com/OpenCCU/OpenCCU-Base/pull/115)/[#116](https://github.com/OpenCCU/OpenCCU-Base/pull/116)
+  behandeln `read()` = -1 und sind damit noch nicht abgedeckt (siehe Roadmap).
 - **rfd am LAN-Gateway (HM-LGW):** [hmlangw](https://github.com/OpenCCU/OpenCCU/tree/master/buildroot-external/package/hmlangw)
   vor dem simulierten Modul, rfd mit `Type = HMLGW2` - das ist auch der HM-LGW-Modus von openccu-lite. Die
   Initialisierung bis `CONNECTED`, das Keepalive auf Port 2001, eine Seriennummer in anderer Schreibweise
@@ -138,7 +139,7 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer; dazu
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
-Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #115, #116, #138 und #140
+Der Lauf zeigt dann, was passiert, ohne rot zu werden. Gegen `3.89.11` betrifft das #138 und #140
 sowie elf Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
@@ -341,6 +342,17 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - 📥 **Labormessungen, die Handgriffe brauchen** (Vorbereitung): ein stummes Wired-Gerät, ein Senden an ein abwesendes BidCoS-Gerät,
   ein Anlernen, ein Duty-Cycle-Event
 - 📥 **Drei OpenCCU-Base-Stände nebeneinander:** die zwei neuesten Tags und der Stand von `main`, automatisch gewählt
+- 📥 **Regressionstests beweisen:** jeder Test einmal gegen den Commit vor dem Fix (dort rot) und gegen den Fix (grün), im
+  Bericht als „bewiesen“ markiert
+- 📥 **Lesefehler am seriellen Gerät (#115/#116):** ein `read()`, das wirklich mit ENODEV/EIO scheitert, damit die Tests
+  den reparierten Code erreichen
+- 📥 **LAN-Gateway, was noch fehlt (#13/#17):** gescheiterte Wiederherstellung nach dem Reconnect, keine Telegramme
+  währenddessen, der Keepalive-Thread, Hello ohne Seriennummer, die Statusdatei, auf TCP-Segmente verteilte Frames,
+  Sockets über 1024
+- 📥 **AES-CBC-MAC-Telegramme (#4)** eines Rauchmelders HM-Sec-SD-2 und das korrigierte `LONG_ACT_TYPE`-Register des
+  HM-OU-CFM-TW (#63)
+- 📥 **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
+  an libXmlRpc, der 49-Tage-Überlauf der Uhr (libfaketime)
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - 📥 **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - ☑️ **Eine ThreadSanitizer-Variante** des Images
