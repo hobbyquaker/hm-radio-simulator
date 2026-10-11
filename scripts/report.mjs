@@ -477,6 +477,8 @@ p.what { margin: .3rem 0 .4rem; }
 ul.plain { list-style: none; padding: 0; margin: .3rem 0; } td.v { white-space: nowrap; }
 /* the kind and links cells stay on one line too (the full links are in the row's collapsible on a phone) */
 td.k, td.l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.proof { font-size: .75em; font-weight: 600; white-space: nowrap; } .proof.proven { color: var(--pass); }
+.proof.not-proven { color: var(--fail); } .proof.inconclusive { color: var(--todo); } .proof.no-build { color: var(--muted); }
 th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top;
   overflow-wrap: anywhere; }
 th { color: var(--muted); font-weight: 600; font-size: .85rem; }
@@ -540,6 +542,40 @@ function table(head, rows) {
         .map((x) => `var(${widths[x]})`);
     const min = `calc(var(--w-name) + ${fixed.length ? fixed.join(' + ') : '0px'})`;
     return `<div class="scroll"><table style="min-width: ${min}"><colgroup>${cols.join('')}</colgroup><thead><tr>${ths.join('')}</tr></thead><tbody>\n${trs.join('\n')}\n</tbody></table></div>`;
+}
+
+const PROOF = {
+    proven: {mark: '✓', label: 'proven', title: "fails on the fix's parent commit, passes on its merge commit"},
+    'not-proven': {
+        mark: '✗',
+        label: 'not proven',
+        title: 'did not fail on the parent commit, or did not pass on the merge',
+    },
+    inconclusive: {mark: '?', label: 'inconclusive', title: 'the proof runs disagreed'},
+    'no-build': {mark: '–', label: 'no build', title: 'the parent or the merge commit did not build'},
+};
+
+/** A regression test's proof (task 30): a small mark for the kind cell. */
+export function proofMark(proof) {
+    const p = PROOF[proof.status] || {mark: '?', label: proof.status, title: ''};
+    return `<span class="proof ${esc(proof.status)}" title="${esc(`${p.label}${proof.fix ? ` for #${proof.fix}` : ''}: ${p.title}`)}">${esc(p.mark)} ${esc(p.label)}</span>`;
+}
+
+/** The proof in words, with the fix and both commits linked, for the row's collapsible. */
+export function proofText(proof) {
+    const p = PROOF[proof.status] || {label: proof.status, title: ''};
+    const commit = (sha) => (sha ? `<a class="mono" href="${BASE}/commit/${esc(sha)}">${esc(short(sha))}</a>` : '?');
+    const fix = proof.fix ? `<a href="${BASE}/pull/${esc(proof.fix)}">#${esc(proof.fix)}</a>` : 'the fix';
+    return `Proof: <span class="proof ${esc(proof.status)}">${esc(p.label)}</span> - ${p.title}: ${fix}, parent ${commit(proof.parent)}, merge ${commit(proof.merge)}${proof.date ? ` (${esc(String(proof.date).slice(0, 10))})` : ''}.`;
+}
+
+/** The proof summary of a report (report.proof, task 30): counts per status over the fixes. */
+export function proofCounts(proof) {
+    const counts = {};
+    for (const f of Object.values((proof && proof.fixes) || {})) {
+        counts[f.status] = (counts[f.status] || 0) + 1;
+    }
+    return counts;
 }
 
 /** The test rows of a run: one per file, nesting and name, with the result of every job that ran it. */
@@ -616,6 +652,16 @@ export function renderHtml(report, history = []) {
         ),
     );
     h.push(`<div class="cards">`);
+    if (report.proof && report.proof.fixes) {
+        // task 30: each fixed upstream bug's regression tests run on the fix's parent and merge commits
+        const pc = proofCounts(report.proof);
+        const parts = Object.keys(PROOF)
+            .filter((k) => pc[k])
+            .map((k) => `<span class="proof ${k}">${pc[k]} ${esc(PROOF[k].label)}</span>`);
+        h.push(
+            `<div class="card"><div class="big ${pc['not-proven'] ? 'fail' : 'pass'}">${pc.proven || 0}/${Object.keys(report.proof.fixes).length}</div><div class="label">fixes proven (fail on parent, pass on merge)${parts.length ? `<br>${parts.join(' · ')}` : ''}</div></div>`,
+        );
+    }
     h.push(
         `<div class="card"><div class="big overall-${report.status}">${report.status === 'pass' ? 'green' : 'red'}</div><div class="label">overall</div></div>`,
     );
@@ -707,6 +753,10 @@ export function renderHtml(report, history = []) {
             }
         }
         let body = `<p class="what">${esc(first.description || 'No description yet.')}</p>`;
+        const proof = [...row.results.values()].map((r) => r.proof).find(Boolean);
+        if (proof) {
+            body += `<div class="diag">${proofText(proof)}</div>`;
+        }
         body += `<div class="phone-only">${kindBadge}${links.length ? ' ' + links.join(' · ') : ''}</div>`;
         for (const e of errors) {
             body += `<div class="err">${esc(e)}</div>`;
@@ -720,7 +770,7 @@ export function renderHtml(report, history = []) {
             }
         });
         const name = `<details class="row"><summary>${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}</summary>${body}</details>`;
-        const cells = [name, kindBadge, links.join(' · ')];
+        const cells = [name, kindBadge + (proof ? ' ' + proofMark(proof) : ''), links.join(' · ')];
         combined.forEach((c) => {
             if (!c) {
                 cells.push(`<span class="muted">-</span>`);

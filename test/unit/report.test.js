@@ -11,6 +11,8 @@ import {
     renderHtml,
     writeSite,
     missingDescriptions,
+    proofMark,
+    proofText,
 } from '../../scripts/report.mjs';
 import {combine, groupByRef} from '../../scripts/combine.mjs';
 import {describe} from '../descriptions.js';
@@ -299,4 +301,30 @@ test('coverage: the lcov summary per component, the section, the links and the h
     } finally {
         fs.rmSync(out, {recursive: true, force: true});
     }
+});
+
+test('the regression proof (task 30): a mark in the kind cell, the commits behind the collapsible, a card with the counts', () => {
+    const results = collectResults([FIXTURE]);
+    const t = results.jobs[1].tests.find((x) => x.name.startsWith('#138'));
+    t.proof = {status: 'proven', fix: 138, parent: 'a'.repeat(40), merge: 'b'.repeat(40), date: '2026-10-11T12:00:00Z'};
+    const report = buildReport(results, {generatedAt: '2026-10-11T13:00:00.000Z'});
+    report.proof = {
+        generatedAt: '2026-10-11T12:00:00Z',
+        fixes: {
+            138: {status: 'proven'},
+            140: {status: 'proven'},
+            115: {status: 'not-proven'},
+            116: {status: 'inconclusive'},
+        },
+    };
+    const html = renderHtml(report, []);
+    assert.match(html, /<span class="proof proven" title="proven for #138: [^"]+">✓ proven<\/span>/);
+    assert.ok(html.includes('Proof: <span class="proof proven">proven</span>'));
+    assert.ok(
+        html.includes(`href="https://github.com/OpenCCU/OpenCCU-Base/commit/${'a'.repeat(40)}"`),
+        'the parent linked',
+    );
+    assert.match(html, /<div class="big fail">2\/4<\/div><div class="label">fixes proven/);
+    assert.match(proofMark({status: 'not-proven', fix: 115}), /class="proof not-proven"[^>]*>✗ not proven/);
+    assert.match(proofText({status: 'inconclusive', fix: 116}), /inconclusive/);
 });
