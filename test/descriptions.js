@@ -339,6 +339,8 @@ export const DESCRIPTIONS = Object.freeze({
         'EIO for a while, then the module answers again: CONNECTED goes false and back to true, events arrive':
             'The serial device fails with EIO for a while, as an unplugged USB adapter does, then works again: rfd reports the interface as disconnected, then as connected, and the next message from the module arrives.',
         'rfd survives': 'rfd keeps running through the read errors.',
+        'the module is heard again after the error':
+            'A message the module sends after the read errors reaches rfd, so its receive path still works.',
         'CONNECTED false during the streak, true after the next good read':
             'The connection state follows the device: disconnected while reads fail, connected again after the first successful read.',
         'EINTR on read(): no error line, CONNECTED stays true':

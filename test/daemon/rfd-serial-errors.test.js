@@ -105,7 +105,10 @@ test(
             // the adapter is back and the module speaks: the next successful read() ends the streak
             rfd.setFault('clear');
             await sleep(1500);
+            // wait for the event before the next RPC: rfd flushes unread module input before every command it sends
+            // (the flush-drops-events finding), and listBidcosInterfaces sends GETDUTYCYCLE
             rfd.module.sendDutyCycleEvent(7);
+            const event = await waitFor(async () => rfd.grep(/Duty cycle event/i).length >= 1, 5000);
             const after = await waitFor(async () => (await connected(rfd)) === true, 6000);
             t.diagnostic(
                 `CONNECTED false during the EIO streak: ${during}, true after the module spoke: ${after}; ${rfd.faultLog().length} failures injected`,
@@ -114,8 +117,11 @@ test(
                 assert.ok(during, 'CONNECTED stayed true during the EIO streak');
                 assert.ok(after, 'CONNECTED did not come back after a successful read');
             });
-            const event = await waitFor(async () => rfd.grep(/Duty cycle event/i).length >= 1, 5000);
-            assert.ok(event, 'the module event after the error reached rfd');
+            // before #115 rfd may outlive the failed read with its receive thread wrecked (seen on GitHub's runners):
+            // then nothing the module sends arrives any more
+            await t.test('the module is heard again after the error', regression(115), () => {
+                assert.ok(event, 'the module event after the error reached rfd');
+            });
         } finally {
             await rfd.stop();
         }
