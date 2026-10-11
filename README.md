@@ -379,7 +379,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - 📥 **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
   an libXmlRpc, der 49-Tage-Überlauf der Uhr (libfaketime)
 - 📥 **Testbericht kompakter:** eine Ergebnisspalte je OpenCCU-Base-Stand; normal, ASan und Coverage nur dort einzeln,
-  wo sie sich unterscheiden
+  wo sie sich unterscheiden; jede Zeile einzeilig, Details und eine kurze Erklärung des Tests zum Aufklappen
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - 🏗️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - 📥 **Eine ThreadSanitizer-Variante** des Images
