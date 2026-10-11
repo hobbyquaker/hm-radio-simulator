@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/175
 component: rfd
 refs: [3.89.9 (5b47e37), 3.89.11 (3ed652a), main (570566e)]
 suite: json-substr

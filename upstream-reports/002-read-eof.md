@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/162
 component: rfd (CCU2SerialPortWrapperLinux, CCU2CommController)
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: read-eof

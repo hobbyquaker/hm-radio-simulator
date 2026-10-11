@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/170
 component: libhsscomm, libXmlRpc (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: init-blocks

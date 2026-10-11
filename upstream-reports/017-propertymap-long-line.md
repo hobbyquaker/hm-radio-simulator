@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/177
 component: libelvutils, rfd, hs485d
 refs: [3.89.9 (5b47e37), 3.89.11 (3ed652a), main (570566e)]
 suite: propertymap-long-line

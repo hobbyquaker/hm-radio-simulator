@@ -73,8 +73,8 @@ others, timers, the radio side) stands still until the connection closes. And `a
 unanswered `newDevices`/`deleteDevices`/`replaceDevice` leaves a thread and a socket behind for good. Against `main`,
 `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`,
 `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (when the module reports a 100 % duty cycle, rfd reads past its threshold map; found by the load test) `flush-drops-events` (rfd discards unread input from the module before every command; under load, events get lost), `unknown-interface` (`setBidcosInterface` with an interface that does not exist reports success and stores it; the device then sits on the default interface), `json-substr` (a `setValue` with malformed JSON for a parameter with write dependencies ends rfd), `hexfile-no-data` (a wired firmware file without a data record crashes hs485d) and `propertymap-long-line` (a configuration line over 255 characters: the daemon never starts). Every finding has an issue draft in
-[`upstream-reports/`](upstream-reports/) (German README, English drafts); nothing is reported upstream until the
-maintainer decides.
+[`upstream-reports/`](upstream-reports/) (German README, English drafts); 001-017 are reported as
+OpenCCU-Base #161-#177 (linked from the [list](upstream-reports/README.md#die-entwürfe)).
 
 ## Running it
 
@@ -341,7 +341,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | calibration of the HMW-LGW timing against a real wired LAN gateway (hs485d)                                                                                                                                                 | done                 |
 | -     | the test report: the four result columns right-aligned and the same width in every table                                                                                                                                    | done                 |
 | -     | the test report: code coverage of rfd and hs485d from the suite                                                                                                                                                             | done                 |
-| -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding, nothing reported yet                                                                                                                         | done                 |
+| -     | upstream reports: `upstream-reports/` with one issue draft per daemon finding; 001-017 reported as OpenCCU-Base #161-#177                                                                                                   | done                 |
 | -     | run the suite whenever OpenCCU-Base main moves: a 15-minute poll, the suite for that exact commit, noted on the report                                                                                                      | done                 |
 | -     | more daemon tests (the collection, split into the items below)                                                                                                                                                              | not as such          |
 | -     | an RPC method sweep, a device-type sweep over all rftypes descriptions, the 3.89.11/main differential                                                                                                                       | done                 |
