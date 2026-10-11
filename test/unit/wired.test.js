@@ -164,7 +164,7 @@ async function connectClient(front) {
 test('the HMW-LGW front: keepalive, discovery, a send answered by the device, a silent address, an event', async () => {
     const bus = new WiredBus({ackDelayMs: 1});
     const dev = bus.add(device({infoDelayMs: 5}));
-    const front = new HmwLgwFront({bus, port: 0, discoveryGapMs: 1});
+    const front = new HmwLgwFront({bus, port: 0, discoveryGapMs: 1, silentDeviceMs: 20});
     await front.start();
     try {
         const client = await connectClient(front);
@@ -182,7 +182,7 @@ test('the HMW-LGW front: keepalive, discovery, a send answered by the device, a 
         assert.equal(frames[3][0], 0x03);
         assert.equal(frames[3][1], 0x72, 'r');
         assert.deepEqual([...frames[3].subarray(3)], [0x11, 0x00]);
-        // an address nobody has: a 01 after the frame's timeout
+        // an address nobody has: a 01 after the gateway's wait (silentDeviceMs)
         client.send([0x04, 0x53, 0x32, 0x00, 0x00, 0x00, 0x99, WCTRL.IFRAME, 0x00, 0x00, 0x00, 0x01, 0x68]);
         frames = await client.waitFrames(5);
         assert.deepEqual([...frames[4]], [0x04, 0x61, 0x01]);
@@ -205,6 +205,46 @@ test('the HMW-LGW front: keepalive, discovery, a send answered by the device, a 
             'tx a',
             'tx e',
         ]);
+        client.socket.destroy();
+    } finally {
+        await front.close();
+    }
+});
+
+test('the HMW-LGW front: a device that does not answer gets a 01 after the measured ~620 ms, each try', async () => {
+    // measured 2026-10-11 on a real HMW-LGW 1.0.5 with the device off the bus: hs485d logged LGW_RPL_ANSWER ERROR 636 ms
+    // after the RPC and 619 ms later for its second try; hs485d's own HS485_RESPONSE_TIMEOUT is 700 ms
+    const bus = new WiredBus({ackDelayMs: 1});
+    const dev = bus.add(device());
+    dev.answering = false;
+    const front = new HmwLgwFront({bus, port: 0});
+    assert.equal(front.silentDeviceMs, 620, 'the default is the measured wait');
+    await front.start();
+    try {
+        const client = await connectClient(front);
+        const frame = (counter) => [
+            counter,
+            0x53,
+            0x0a,
+            0x00,
+            0x00,
+            0x12,
+            0x34,
+            WCTRL.IFRAME,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            0x68,
+        ];
+        for (const [i, counter] of [0x05, 0x06].entries()) {
+            const started = Date.now();
+            client.send(frame(counter));
+            const frames = await client.waitFrames(i + 1);
+            const took = Date.now() - started;
+            assert.deepEqual([...frames[i]], [counter, 0x61, 0x01], "a 01 with the request's counter");
+            assert.ok(took >= 560 && took < 700, `a 01 after ${took} ms (expected ~620, below hs485d's 700)`);
+        }
         client.socket.destroy();
     } finally {
         await front.close();

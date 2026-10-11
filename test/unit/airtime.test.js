@@ -77,3 +77,16 @@ test('the air with airtime: no refusal while the module duty-cycle check is off 
     assert.equal((await air.send(request)).status, BIDCOS_STATUS.TELEGRAM_SENT);
     assert.ok(air.meter.percent() > 150, 'the budget is overspent');
 });
+
+test('the meter against a real module: 200 switch commands cost ~11.5 % of the 1 % budget (measured 2026-10-11)', () => {
+    // measured on an RPI-RF-MOD: 200 acknowledged switch commands raised its duty cycle from 14.0 to 25.5 %, reported in
+    // half-percent steps (so 11.5 +- 0.5); the devices' ACKs do not count against the central's budget
+    let now = 0;
+    const meter = new DutyCycleMeter({now: () => now});
+    for (let i = 0; i < 200; i++) {
+        meter.add(telegramAirtimeMs(14));
+        now += 1000;
+    }
+    const percent = meter.percent();
+    assert.ok(percent >= 10.5 && percent <= 12.5, `200 commands = ${percent.toFixed(2)} % (measured 11.5 +- 0.5)`);
+});

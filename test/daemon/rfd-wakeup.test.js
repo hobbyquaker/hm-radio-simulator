@@ -14,7 +14,7 @@
  *
  * Timing assumptions (rfd 3.89.11): a sent telegram's status within defaultResponseTimeout = 4000 ms (12000 ms for a
  * triple burst); the simulated module answers after ackDelayMs = 155 ms (measured), plus the computed 360 ms burst
- * preamble, and reports a device that does not hear the telegram as SEND_FAILED after failDelayMs = 3000 ms (chosen);
+ * preamble, and reports a device that does not hear the telegram as SEND_FAILED after failDelayMs = 1106 ms (measured);
  * after a failed send rfd refuses the next one for FAIL_COUNTER_RESET_TIME = 5000 ms. The sleeping device's windows
  * (300 ms after its own telegram, 1000 ms after a wake-up, 2000 ms after a burst, 15 s config mode) are chosen
  * (lib/device.js). Waits have margins of seconds.

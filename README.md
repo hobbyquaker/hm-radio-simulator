@@ -255,14 +255,26 @@ OpenCCU-Base #161-#177 gemeldet (die Links stehen in der [Liste](upstream-report
   hs485d 3.89.11 auf Log-Level 0: Die Verbindung mit dem verschlüsselten Vorspiel dauert rund 5 ms, der `K`-Keepalive
   kommt alle 20,0 s und wird in wenigen ms beantwortet, ein `setValue` dauert an hs485ds RPC 57-65 ms, der Aktor meldet
   seinen neuen Zustand von sich aus (INFO_LEVEL) 2,9-3,0 s nach dem Schalten, eine Suche mit einem Gerät endet 1,79 s
-  nach dem `D`. Die Vorgaben der Simulation folgen dem: der Bus antwortet in 45 ms, die Statusmeldung kommt 2950 ms
-  nach dem Schalten, das Gateway schließt die Suche nach 1750 ms und meldet Firmware 1.0.5. Nicht gemessen: was das
-  Gateway für ein stummes Gerät antwortet (dafür müsste das Gerät vom Bus) - `a 01` bleibt gewählt. Das RPI-RF-MOD
-  (über multimacd) mit einem HM-LC-Sw1-Pl-2, rfd auf Log-Level 0: Der Coprozessor antwortet in 0,2-0,6 ms, ein
-  Schaltbefehl ist **155 ms** nach dem Schreiben als "gesendet, ACK erhalten" gemeldet; rfd fragt den Duty Cycle etwa
-  alle 26 s ab. Die Vorgaben folgen (`responseDelayMs` 1, `ackDelayMs` 155). Ein echtes Modul schafft so etwa **6,5
-  Schaltbefehle pro Sekunde**, weit unter den 16,7, die die reine Sendezeit erlaubte. Noch nicht gemessen: eine Sendung
-  an ein abwesendes Gerät, ein Anlernen, ein Duty-Cycle-Event.
+  nach dem `D`. Die Vorgaben der Simulation folgen dem: der Bus antwortet in 45 ms, die Statusmeldung kommt 2950 ms nach
+  dem Schalten, das Gateway schließt die Suche nach 1750 ms und meldet Firmware 1.0.5. Ein Gerät, das nicht am Bus
+  hängt: Das Gateway meldet hs485d nach rund 620 ms einen Fehler (636 ms nach dem RPC, der zweite Versuch 619 ms
+  später), obwohl hs485d 200 ms in den Frame schreibt; hs485d versucht es zweimal und setzt dann UNREACH. Die Simulation
+  antwortet `a 01` nach 620 ms (`silentDeviceMs`). Das RPI-RF-MOD (über multimacd) mit einem HM-LC-Sw1-Pl-2, rfd auf
+  Log-Level 0: Der Coprozessor antwortet in 0,2-0,6 ms, ein Schaltbefehl ist **155 ms** nach dem Schreiben als
+  "gesendet, ACK erhalten" gemeldet; rfd fragt den Duty Cycle alle 60 s ab und zusätzlich bei jedem
+  `listBidcosInterfaces`. Die Vorgaben folgen (`responseDelayMs` 1, `ackDelayMs` 155). Ein echtes Modul schafft so etwa
+  **6,5 Schaltbefehle pro Sekunde**, weit unter den 16,7, die die reine Sendezeit erlaubte. Ein ausgestecktes Gerät:
+  "Senden fehlgeschlagen" nach **1106 ms** (1105,5 und 1106,0 ms; `failDelayMs` 1106). Ein Anlernen (ein AES-Gerät): das
+  SYSINFO-Telegramm mit Firmware, Typcode, Seriennummer und vier Bytes dahinter, wie es die Simulation baut; rfd
+  schreibt Liste 0 (CONFIG_START, CONFIG_WRITE_INDEX, CONFIG_END, je ein ACK nach 149-150 ms), tauscht den Schlüssel
+  (zweimal AES_CONTAINER) und liest Parameter und Peers; was das Gerät mit seiner AES-Signatur bestätigt, meldet das
+  Modul als "Authentifizierung erfolgreich" nach **405-428 ms** (`authDelayMs` 415), nach dem Schlüsseltausch auch beim
+  Ablernen jeden Konfigurationsframe. Der Duty Cycle: 200 bestätigte Schaltbefehle hoben den Wert des Moduls von 14,0
+  auf 25,5 % - 0,0575 % (20,7 ms der 36 s) pro Befehl, berechnet sind 20,0 ms; die ACKs der Geräte und rund 150
+  Telegramme fremder Geräte in 30 Minuten zählen nicht mit, nach etwa einer Stunde fällt der Wert wieder. Das Modul
+  meldet in halben Prozent und schickte zwischen 1,5 und 25,5 % kein Duty-Cycle-Event. Das Modell der Simulation (eigene
+  Sendezeit über eine gleitende Stunde, 100 % = 36 s) ist damit bestätigt; die Grenze selbst bleibt ungemessen
+  (`refuseAt` 100, gewählt), ebenso das Event bei jedem vollen Prozent.
 - **Sendezeit und Duty Cycle (berechnet, nicht gemessen):** Für die Lasttests kann die Luftstrecke den Kanal selbst
   nachbilden (`lib/airtime.js`). Aus dem Rahmenformat der öffentlichen BidCoS-Implementierungen (die CC1101-Einstellung
   von culfw und Homegear, als Dokumentation gelesen): 2-FSK mit 9992,6 Baud, 4 Byte Präambel, zweimal das Sync-Wort,

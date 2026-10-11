@@ -270,27 +270,37 @@ to meet the **host-side** windows, which in OpenCCU-Base 3.89.11 are:
 A pty has no baud rate (115200 baud would be ~87 µs per byte), so the simulator is a faster module, never a slower one.
 Node's event-loop latency is well under a millisecond for a heap this size - two to three orders of magnitude below
 every window. Assertions on time use margins, never exact values. The delays the simulator itself uses (`DEFAULTS` in
-`module.js`: 30 ms until "sent", 80 ms until an acknowledgement, 3 s until "failed") are **chosen**, not measured; a
-calibration against a real module is planned.
+`module.js`) are measured where the next section says so (155 ms until an acknowledgement, 415 ms for an AES-confirmed
+send, 1106 ms until "failed"); 30 ms until "sent" is chosen.
 
 ### Measured against real hardware (2026-10-11)
 
 **The HMW-LGW** (firmware 1.0.5) with an HMW-LC-Sw2-DR (firmware 3.06), hs485d 3.89.11 at log level 0: the connection
 with the encrypted preamble takes ~5 ms; the `K` keepalive goes out every 20.0 s (19.98-20.00 s apart, the first ~20 s
-after the connection) and is answered within a few ms; a `setValue` round trip at hs485d's RPC is 57-65 ms; the
-switch reports its new state on its own (INFO_LEVEL) 2.9-3.0 s after a set; a discovery with one device ends 1.79 s
-after the `D` (the whole `searchDevices` call 2.2 s: 0.2 s sleep-mode broadcast before and after). The simulator's
-defaults follow: the bus answers in 45 ms, the device's status report comes 2950 ms after a set, the gateway closes a
-discovery after 1750 ms and reports firmware 1.0.5. Not measured: what the gateway answers for a silent device (that
-needs the device off the bus) - `a 01` stays chosen.
+after the connection) and is answered within a few ms; a `setValue` round trip at hs485d's RPC is 57-65 ms; the switch
+reports its new state on its own (INFO_LEVEL) 2.9-3.0 s after a set; a discovery with one device ends 1.79 s after the
+`D` (the whole `searchDevices` call 2.2 s: 0.2 s sleep-mode broadcast before and after). The simulator's defaults
+follow: the bus answers in 45 ms, the device's status report comes 2950 ms after a set, the gateway closes a discovery
+after 1750 ms and reports firmware 1.0.5. A device off the bus: the gateway reports an error to hs485d after ~620 ms
+(636 ms after the RPC, the second try's error 619 ms later), although hs485d puts 200 ms into the frame; hs485d tries
+twice, then sets UNREACH. The simulator answers `a 01` after 620 ms (`silentDeviceMs`).
 
 **The RPI-RF-MOD** (through multimacd, `/dev/mmd_bidcos`) with an HM-LC-Sw1-Pl-2, rfd 3.89.11 at log level 0: the
 coprocessor answers a command in 0.2-0.6 ms; a switch command (CENTRAL_RAMP_START) is reported "Telegram sent, received
-ACK" **155 ms** after rfd wrote it (155.1 and 155.2 ms); rfd polls `GETDUTYCYCLE` about every 26 s. The simulator's
-defaults follow (`responseDelayMs` 1, `ackDelayMs` 155). So a real module manages about **6.5 switch commands per
-second**, well below the 16.7 the airtime alone would allow (the module's listen-before-talk, its turnaround and the
-multimacd hop). Not measured yet: a send to an absent device (`SEND_FAILED` timing - the device has to be unplugged),
-a pairing, a duty-cycle event.
+ACK" **155 ms** after rfd wrote it (155.1 and 155.2 ms); rfd polls `GETDUTYCYCLE` every 60 s and once more for each
+`listBidcosInterfaces`. The simulator's defaults follow (`responseDelayMs` 1, `ackDelayMs` 155). So a real module
+manages about **6.5 switch commands per second**, well below the 16.7 the airtime alone would allow (the module's
+listen-before-talk, its turnaround and the multimacd hop). A send to an unplugged device: "Telegram send failed" after
+**1106 ms** (1105.5 and 1106.0 ms; `failDelayMs` 1106). A pairing (an AES device): the SYSINFO telegram carries
+firmware, type code, serial and four bytes after it, as the simulator builds it; rfd writes list 0 (CONFIG_START,
+CONFIG_WRITE_INDEX, CONFIG_END, each ACK after 149-150 ms), exchanges the key (AES_CONTAINER twice) and reads the
+parameters and peers; what the device confirms with its AES signature the module reports as AUTHENTICATION_SUCCESS after
+**405-428 ms** (`authDelayMs` 415) - after the key exchange every configuration frame, the unpairing's too. The duty
+cycle: 200 acknowledged switch commands raised the module's value from 14.0 to 25.5 % - 0.0575 % (20.7 ms of the 36 s)
+per command against the computed 20.0 ms; the devices' ACKs and ~150 telegrams of other devices heard in 30 minutes do
+not count, and the value falls again about an hour later. The module reports in half-percent steps and sent no
+duty-cycle event between 1.5 and 25.5 %. That confirms the simulator's model (its own transmit time over a sliding hour,
+100 % = 36 s); the limit itself is not measured (`refuseAt` 100, chosen), nor is the event at every full percent.
 
 ### Airtime and the duty cycle (computed, not measured)
 

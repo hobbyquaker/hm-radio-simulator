@@ -15,7 +15,7 @@
  *
  * Timing assumptions (rfd 3.89.11): a sent telegram's status within defaultResponseTimeout = 4000 ms; the simulated
  * module acknowledges after ackDelayMs = 155 ms (measured) and reports a device out of its range as SEND_FAILED after
- * failDelayMs = 3000 ms (chosen); after a failed send rfd refuses the next one for FAIL_COUNTER_RESET_TIME = 5000 ms;
+ * failDelayMs = 1106 ms (measured); after a failed send rfd refuses the next one for FAIL_COUNTER_RESET_TIME = 5000 ms;
  * the HM-LGW reconnect attempt comes every 5 s. Waits have margins of a second or more over the 150/300 ms windows.
  */
 import {test} from 'node:test';
