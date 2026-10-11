@@ -350,7 +350,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                                                                                         | in progress          |
 | -     | a ThreadSanitizer image variant                                                                                                                                                                                     | enqueued             |
 | -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                                                           | done                 |
-| -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                                                           | testing              |
+| -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                                                           | done                 |
 
 ## Credits and licences
 
