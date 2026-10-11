@@ -295,7 +295,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
   ein hängender Empfänger
 - ✅ **Neustart, Gerätedateien und Konfiguration:** Persistenz, kaputte Dateien, Adressvergabe, die Start-Matrix
 - 🏗️ **`listMethods` stimmt:** jede gelistete Methode ist aufrufbar, und keine aufrufbare fehlt in der Liste
-- 🕵️ **Ein Event-Empfänger, der sich danebenbenimmt, blockiert nichts:** Server weg mitten im Callback, keine oder
+- ✅ **Ein Event-Empfänger, der sich danebenbenimmt, blockiert nichts:** Server weg mitten im Callback, keine oder
   falsche Antworten
 - 📥 **Last:** schnelle `setValue`-/`putParamset`-Salven, Funk-Events währenddessen, die Warteschlange von rfd, Grenzen
   aus Sendezeit und Duty Cycle
