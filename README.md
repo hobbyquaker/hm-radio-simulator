@@ -305,7 +305,11 @@ steht dort ihr gemeinsames Ergebnis; weichen sie ab, das schlechteste mit einem 
 ASan, `C` coverage, `R` normal), Tooltip und Aufklappbereich zeigen jede Variante. Die coverage-Variante zählt nur, wo
 sie von der normalen abweicht. Jede Testzeile ist beim Laden eine Zeile; aufgeklappt zeigt sie zuerst in ein, zwei
 Sätzen, was der Test prüft (`test/descriptions.js` - ein Test ohne Beschreibung lässt den CI-Job "every test has a
-description" scheitern), dann die Diagnosen. Ein Link führt zu den Zeilen, in denen die Varianten abweichen. So liest
+description" scheitern), dann die Diagnosen. Ein Link führt zu den Zeilen, in denen die Varianten abweichen. Ganz oben steht
+ein **Trend** je Version: bestanden, todo, fehlgeschlagen und übersprungen für rfd und hs485d und die Zeilenabdeckung
+(je Daemon und insgesamt), jeweils mit der Änderung gegenüber dem vorigen Lauf (▲/▼, = unverändert; grün besser, rot
+schlechter) und einer kleinen Verlaufslinie über die aufbewahrten Läufe. Eine Version, die erst neu im Fenster ist,
+zeigt, seit wann sie dabei ist. So liest
 man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den

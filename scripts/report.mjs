@@ -28,6 +28,7 @@ import {fileURLToPath} from 'node:url';
 import {describeTest} from '../test/metadata.js';
 import {describe} from '../test/descriptions.js';
 import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
+import {trendOf, renderTrendPanel, TREND_CSS} from './trend.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
 import {compareRefs} from './refs.mjs';
 
@@ -433,7 +434,7 @@ function seconds(ms) {
 // ---------------------------------------------------------------------------------------------------------------
 // HTML
 
-const CSS = `
+const CSS_BASE = `
 :root { color-scheme: light dark; --bg: #fff; --fg: #1d1d1f; --muted: #6e6e73; --line: #d9d9de; --card: #f5f5f7;
   --pass: #2e7d32; --fail: #c62828; --todo: #b26a00; --skip: #607d8b; --link: #0b57d0; }
 @media (prefers-color-scheme: dark) { :root { --bg: #16161a; --fg: #e7e7ea; --muted: #9a9aa3; --line: #34343c;
@@ -504,6 +505,7 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
   td.r { white-space: nowrap; } .word { display: none; }
   .phone-only { display: block; margin-top: .2rem; } summary .phone-only { display: inline; } }
 `;
+const CSS = CSS_BASE + TREND_CSS;
 
 /**
  * A table with a <colgroup>: the first column takes the remaining width, the others are fixed by their class
@@ -605,6 +607,13 @@ export function renderHtml(report, history = []) {
     h.push(`<h1>hm-radio-simulator <span class="muted">test report</span></h1>`);
     h.push(
         `<p class="muted">${esc(report.generatedAt)}${report.repoSha ? ` · <a href="${esc(report.repoUrl)}" class="mono">${esc(report.repoSha.slice(0, 7))}</a>` : ''}${report.ref ? ` · ${esc(report.ref)}` : ''}${report.runUrl ? ` · <a href="${esc(report.runUrl)}">CI run ${esc(report.runId)}</a>` : ''}${report.trigger ? ` · triggered by ${triggerHtml(report.trigger)}` : ''} · <a href="${REPO}">repository</a> · <a href="report.json">report.json</a></p>`,
+    );
+    // the trend needs the current run first (writeSite passes it so; a bare call gets it added)
+    h.push(
+        renderTrendPanel(
+            report,
+            history[0] && history[0].id === report.id ? history : [historyEntry(report), ...history],
+        ),
     );
     h.push(`<div class="cards">`);
     h.push(
@@ -1014,6 +1023,7 @@ export function historyEntry(report) {
         status: report.status,
         ...totals,
         fuzzFindings: unexpectedFuzzFindings(report.fuzz),
+        trend: trendOf(report),
         coverage: Object.fromEntries(
             report.jobs
                 .filter((j) => j.coverage)
@@ -1043,6 +1053,17 @@ export function writeSite(report, {out, previous, keep = 20}) {
     }
     history.unshift(historyEntry(report));
     history = history.slice(0, keep);
+    // entries from before the trend panel get their trend from the kept run's report.json
+    for (const entry of history.slice(1)) {
+        const file = previous ? path.join(previous, 'runs', entry.id, 'report.json') : null;
+        if (!entry.trend && file && fs.existsSync(file)) {
+            try {
+                entry.trend = trendOf(readJson(file));
+            } catch {
+                // a report the trend cannot read is a gap
+            }
+        }
+    }
 
     fs.mkdirSync(out, {recursive: true});
     for (const entry of history.slice(1)) {
