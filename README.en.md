@@ -342,7 +342,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                                                                                                   | ready                  |
 | -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                                                                                         | enqueued               |
 | -     | a ThreadSanitizer image variant                                                                                                                                                                                     | ready                  |
-| -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                                                           | in progress            |
+| -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                                                           | testing                |
 | -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                                                           | in progress            |
 
 ## Credits and licences
