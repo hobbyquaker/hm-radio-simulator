@@ -5,6 +5,7 @@
  * oom-, leak- files) with the sanitizer's error type from the log.
  *
  * Usage: fuzz-summary.mjs <results dir> <ref> <base commit> <seconds> <expected: 0|1> <harness>...
+ * FUZZ_KNOWN_HARNESSES (harness=finding,...) marks harnesses whose findings are a known finding of this suite.
  */
 
 import fs from 'node:fs';
@@ -36,6 +37,13 @@ function errorType(log) {
     return null;
 }
 
+const known = Object.fromEntries(
+    (process.env.FUZZ_KNOWN_HARNESSES || '')
+        .split(',')
+        .filter((s) => s.includes('='))
+        .map((s) => s.split('=')),
+);
+
 const summary = {
     ref,
     baseCommit,
@@ -66,8 +74,9 @@ for (const name of harnesses) {
         execs: stat(log, 'number_of_executed_units'),
         execPerSec: stat(log, 'average_exec_per_sec'),
         findings,
+        known: known[name] || null,
     });
-    if (findings.length || (status !== null && status !== 0)) {
+    if (!known[name] && (findings.length || (status !== null && status !== 0))) {
         summary.status = 'findings';
     }
 }

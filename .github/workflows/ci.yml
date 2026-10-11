@@ -117,7 +117,7 @@ jobs:
       - name: run the harnesses (60 s each)
         run: |
           mkdir -p results/fuzz
-          docker run --rm -e FUZZ_SECONDS=60 -e FUZZ_EXPECT_FINDINGS=${{ matrix.expect_findings }} -v "$PWD/results/fuzz:/results" hm-radio-simulator:fuzz
+          docker run --rm -e FUZZ_SECONDS=60 -e FUZZ_EXPECT_FINDINGS=${{ matrix.expect_findings }} -e FUZZ_KNOWN_HARNESSES=${{ matrix.known_harnesses }} -v "$PWD/results/fuzz:/results" hm-radio-simulator:fuzz
       - name: job summary
         if: always()
         run: node scripts/report.mjs summary results >> "$GITHUB_STEP_SUMMARY"

@@ -149,7 +149,14 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
   das Modul zählt, der Speicher bleibt gleich. Eine Überlast mit 200 % und überschrittenem Duty Cycle: RPC antwortet
   weiter, Events kommen an, rfd fängt sich danach. Die Zahlen stehen im Testbericht.
 - **Fuzzing der Parser** mit libFuzzer: die BIN-RPC- und XML-RPC-Deserialisierung, der Request-Dispatcher mit
-  `system.multicall` und `xmlParser`.
+  `system.multicall`, `xmlParser` (auch beim Bearbeiten und Serialisieren geparster Knoten, dazu feste Fälle für die
+  Clear-Tags), die seriellen Frames des Funkmoduls und die Coprozessor-Befehle, die das daraus macht, die Frames des
+  Wired-LAN-Gateways, die Konfigurationsdateien (`PropertyMap`), Wired-Firmware-Dateien (`Hexfile`),
+  Update-Dateien und das JSON von rfd. In der Suite: Telegramme mit verändertem Inhalt von der Adresse eines angelernten
+  Geräts (sie erreichen das Gerätemodell), ein Verzeichnis namens `X.dev` und eine leere `.dev` bei rfd und hs485d.
+  Drei Funde daraus: `json-substr` (ein `setValue` mit kaputtem JSON beendet rfd), `hexfile-no-data` (eine
+  Firmware-Datei ohne Datensatz lässt hs485d abstürzen) und `propertymap-long-line` (eine Konfigurationszeile über 255
+  Zeichen: der Daemon startet nie).
 
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer; dazu
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
@@ -182,7 +189,7 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
-`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren) und `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data` und `propertymap-long-line` (siehe Fuzzing). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); gemeldet wird er
 erst, wenn der Maintainer es entscheidet.
 
 ## Wie es funktioniert
@@ -297,7 +304,7 @@ ein Verlauf der letzten 20 Läufe (`runs/<id>/`). So liest man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
   Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 

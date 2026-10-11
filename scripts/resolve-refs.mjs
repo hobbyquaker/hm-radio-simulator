@@ -16,8 +16,8 @@
  *   node scripts/resolve-refs.mjs [--repo <url>] [--main <sha>] [--tags <n>] [--github-output]
  *     prints {refs, daemons, fuzz} as JSON; with --github-output also writes refs=, daemons=, fuzz= to $GITHUB_OUTPUT
  *     (the matrices of the CI's daemon and fuzz jobs). --main tests that commit as main (the upstream watch).
- *   node scripts/resolve-refs.mjs --known <ref> [--repo <url>]
- *     prints the known-broken list of one ref (scripts/run-tests.sh)
+ *   node scripts/resolve-refs.mjs --known <ref> [--harnesses] [--repo <url>]
+ *     prints the known-broken list of one ref, or with --harnesses its FUZZ_KNOWN_HARNESSES (scripts/run-tests.sh)
  */
 
 import {execFileSync} from 'node:child_process';
@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {VARIANTS, newestReleaseTags, knownBroken} from './refs.mjs';
+import {VARIANTS, newestReleaseTags, knownBroken, knownHarnesses} from './refs.mjs';
 
 function git(dir, ...args) {
     return execFileSync('git', ['-C', dir, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -56,7 +56,12 @@ export function resolve({repo, main = '', tags = 2}) {
             {ref: 'main', build: mainSha, sha: mainSha},
         ].map((r) => {
             const known = knownBroken((commit) => isAncestor(dir, commit, r.sha));
-            return {...r, knownBroken: known.join(','), expectFuzzFindings: known.includes('140') ? '1' : '0'};
+            return {
+                ...r,
+                knownBroken: known.join(','),
+                expectFuzzFindings: known.includes('140') ? '1' : '0',
+                knownHarnesses: knownHarnesses(known),
+            };
         });
         const daemons = refs.flatMap((r) =>
             VARIANTS.map((variant) => ({
@@ -66,7 +71,12 @@ export function resolve({repo, main = '', tags = 2}) {
                 known_broken: r.knownBroken,
             })),
         );
-        const fuzz = refs.map((r) => ({base_ref: r.ref, build_ref: r.build, expect_findings: r.expectFuzzFindings}));
+        const fuzz = refs.map((r) => ({
+            base_ref: r.ref,
+            build_ref: r.build,
+            expect_findings: r.expectFuzzFindings,
+            known_harnesses: r.knownHarnesses,
+        }));
         return {refs, daemons, fuzz};
     } finally {
         fs.rmSync(dir, {recursive: true, force: true});
@@ -85,7 +95,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         const dir = clone(repo);
         try {
             const sha = git(dir, 'rev-parse', `${one}^{commit}`);
-            console.log(knownBroken((commit) => isAncestor(dir, commit, sha)).join(','));
+            const known = knownBroken((commit) => isAncestor(dir, commit, sha));
+            console.log(process.argv.includes('--harnesses') ? knownHarnesses(known) : known.join(','));
         } finally {
             fs.rmSync(dir, {recursive: true, force: true});
         }

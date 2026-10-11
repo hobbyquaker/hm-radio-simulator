@@ -61,7 +61,8 @@ echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; 
     echo "=== fuzz, ${FUZZ}s per harness" | tee -a "${log}"
     expect=0
     case ",${KNOWN}," in *,140,*) expect=1 ;; esac
-    docker run --rm -e "FUZZ_SECONDS=${FUZZ}" -e "FUZZ_EXPECT_FINDINGS=${expect}" -v "${HERE}/results/fuzz:/results" "${tag}-fuzz" 2>&1 | tee -a "${log}"
+    harnesses=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}" --harnesses || true)
+    docker run --rm -e "FUZZ_SECONDS=${FUZZ}" -e "FUZZ_EXPECT_FINDINGS=${expect}" -e "FUZZ_KNOWN_HARNESSES=${harnesses}" -v "${HERE}/results/fuzz:/results" "${tag}-fuzz" 2>&1 | tee -a "${log}"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
   fi
   echo "=== report" | tee -a "${log}"

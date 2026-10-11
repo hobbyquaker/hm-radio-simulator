@@ -62,7 +62,8 @@ export const UPSTREAM_FIXES = Object.freeze({
 /**
  * Findings of this suite, each with its issue draft in upstream-reports/ (not reported yet; the maintainer decides).
  * When an issue exists, put its URL into `issue` and the draft's status line.
- * @type {Record<string, {title: string, draft: string, issue: string|null}>}
+ * `fuzzHarness`: the libFuzzer harness that finds it (its findings are then known, not new, on refs without the fix).
+ * @type {Record<string, {title: string, draft: string, issue: string|null, fuzzHarness?: string, fixedBy?: string}>}
  */
 export const FINDINGS = Object.freeze({
     'double-join': {
@@ -124,6 +125,24 @@ export const FINDINGS = Object.freeze({
         title: 'rfd: setBidcosInterface accepts an interface that does not exist, reports success and stores it',
         draft: '014-unknown-interface.md',
         issue: null,
+    },
+    'json-substr': {
+        title: 'rfd terminates on setValue with a malformed JSON value for a parameter with write dependencies (JSONObject throws std::out_of_range)',
+        draft: '015-json-substr.md',
+        issue: null,
+        fuzzHarness: 'fuzz_json',
+    },
+    'hexfile-no-data': {
+        title: 'libelvutils Hexfile::Read erases from begin() to begin() - 1 for a hex file without a data record (hs485d firmware files)',
+        draft: '016-hexfile-no-data.md',
+        issue: null,
+        fuzzHarness: 'fuzz_hexfile',
+    },
+    'propertymap-long-line': {
+        title: 'libelvutils PropertyMap::ReadFromFile loops for ever on a line longer than 255 characters (rfd and hs485d hang at start-up)',
+        draft: '017-propertymap-long-line.md',
+        issue: null,
+        fuzzHarness: 'fuzz_propertymap',
     },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',

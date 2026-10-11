@@ -71,7 +71,7 @@ RUN make -C /hmlangw CXXFLAGS="-Wall -O2 -pipe" hmlangw \
 # the libFuzzer harnesses (a separate target)
 FROM ${NODE_IMAGE} AS fuzz
 RUN apt-get update \
- && apt-get install -y --no-install-recommends clang libclang-rt-dev \
+ && apt-get install -y --no-install-recommends clang libclang-rt-dev llvm \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=base-src /openccu-base /openccu-base
 WORKDIR /opt/hm-radio-simulator
@@ -89,7 +89,7 @@ CMD ["fuzz/run.sh"]
 
 # the test environment
 FROM ${NODE_IMAGE} AS test
-ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events,unknown-interface
+ARG KNOWN_BROKEN=115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events,unknown-interface,json-substr,hexfile-no-data,propertymap-long-line
 RUN apt-get update \
  && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata llvm \
  && rm -rf /var/lib/apt/lists/*

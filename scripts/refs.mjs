@@ -27,6 +27,17 @@ export function compareRefs(a, b) {
     return a.localeCompare(b);
 }
 
+/**
+ * The harnesses with a known finding of this suite on a ref: "harness=finding,..." for FUZZ_KNOWN_HARNESSES.
+ * @param {string[]} known the ref's known-broken list
+ */
+export function knownHarnesses(known, findings = FINDINGS) {
+    return Object.entries(findings)
+        .filter(([name, f]) => f.fuzzHarness && known.includes(name))
+        .map(([name, f]) => `${f.fuzzHarness}=${name}`)
+        .join(',');
+}
+
 /** The newest `count` release tags of a tag list, oldest first. */
 export function newestReleaseTags(tags, count = 2) {
     return tags

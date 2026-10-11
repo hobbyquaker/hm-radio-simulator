@@ -230,7 +230,7 @@ export function loadRows(jobs) {
 export function unexpectedFuzzFindings(fuzz) {
     return fuzz
         .filter((f) => !f.expected)
-        .reduce((n, f) => n + f.harnesses.reduce((m, h) => m + h.findings.length, 0), 0);
+        .reduce((n, f) => n + f.harnesses.filter((h) => !h.known).reduce((m, h) => m + h.findings.length, 0), 0);
 }
 
 function overallStatus(results) {
@@ -362,7 +362,7 @@ export function renderSummaryMarkdown(report) {
         for (const run of report.fuzz) {
             for (const h of run.harnesses) {
                 lines.push(
-                    `| ${run.ref} ([${short(run.baseCommit)}](${BASE}/commit/${run.baseCommit})) | ${h.name} | ${h.seconds} s | ${h.execs ?? '?'} | ${h.findings.length ? h.findings.map((f) => f.type).join(', ') + (run.expected ? ' (expected on this ref)' : '') : 'none'} |`,
+                    `| ${run.ref} ([${short(run.baseCommit)}](${BASE}/commit/${run.baseCommit})) | ${h.name} | ${h.seconds} s | ${h.execs ?? '?'} | ${h.findings.length ? h.findings.map((f) => f.type).join(', ') + (h.known ? ` (known finding ${h.known})` : run.expected ? ' (expected on this ref)' : '') : 'none'} |`,
                 );
             }
         }
@@ -804,7 +804,7 @@ export function renderHtml(report, history = []) {
                         esc(String(hz.execs ?? '?')),
                         esc(String(hz.execPerSec ?? '?')),
                         hz.findings.length
-                            ? `<span class="${run.expected ? 'todo' : 'fail'}" title="${esc(hz.findings.map((f) => f.type).join(', '))}">${hz.findings.length}${run.expected ? ' <span class="muted">(expected)</span>' : ''}</span>`
+                            ? `<span class="${run.expected || hz.known ? 'todo' : 'fail'}" title="${esc(hz.findings.map((f) => f.type).join(', '))}">${hz.findings.length}${hz.known ? ` <span class="muted">(known: ${esc(hz.known)})</span>` : run.expected ? ' <span class="muted">(expected)</span>' : ''}</span>`
                             : `<span class="pass">0</span>`,
                     ]),
                 ),

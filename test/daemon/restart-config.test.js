@@ -117,7 +117,7 @@ test(
 );
 
 test(
-    'rfd restart: a truncated file, a garbage file, leftover .bak/.new copies and a file missing a channel - rfd starts and keeps the good devices',
+    'rfd restart: a truncated file, a garbage file, an empty file, a directory named X.dev, leftover .bak/.new copies and a file missing a channel - rfd starts and keeps the good devices',
     options(),
     async (t) => {
         const first = await startQuietRfd();
@@ -135,6 +135,9 @@ test(
         fs.writeFileSync(path.join(devices, 'SWPBAD0001.dev'), truncated.slice(0, Math.floor(truncated.length / 2)));
         fs.writeFileSync(path.join(devices, 'JUNK000001.dev'), Buffer.from([0x00, 0xff, 0x3c, 0x3f, 0x13, 0x37, 0x0a]));
         fs.writeFileSync(path.join(devices, 'EMPTY00001.dev'), '');
+        // a directory named like a device file (OpenCCU-Base #29: parseFile() did not check seek, size and read; on a
+        // directory ftell can report a huge size)
+        fs.mkdirSync(path.join(devices, 'DIRDEV0001.dev'));
         for (const suffix of ['.bak', '.new', '~']) {
             fs.copyFileSync(path.join(devices, 'SWPBAK0001.dev'), path.join(devices, `SWPBAK0001.dev${suffix}`));
         }
@@ -152,7 +155,7 @@ test(
                 assert.ok(list.includes(good), `${good} is back`);
             }
             assert.equal(list.filter((a) => a === 'SWPBAK0001').length, 1, 'the leftover copies add nothing');
-            assert.ok(!list.includes('JUNK000001') && !list.includes('EMPTY00001'));
+            assert.ok(!list.includes('JUNK000001') && !list.includes('EMPTY00001') && !list.includes('DIRDEV0001'));
             const channels = (await second.call('getDeviceDescription', ['SWPCHN0001'])).CHILDREN;
             t.diagnostic(`SWPCHN0001 children after the restart: ${channels.join(' ')}`);
             t.diagnostic(`the truncated SWPBAD0001: ${list.includes('SWPBAD0001') ? 'loaded' : 'dropped'}`);
