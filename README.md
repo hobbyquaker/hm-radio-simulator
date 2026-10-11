@@ -391,7 +391,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - 🕵️ **LAN-Gateway, was noch fehlt (#13/#17):** gescheiterte Wiederherstellung nach dem Reconnect, keine Telegramme
   währenddessen, der Keepalive-Thread, Hello ohne Seriennummer, die Statusdatei, auf TCP-Segmente verteilte Frames,
   Sockets über 1024
-- 📥 **AES-CBC-MAC-Telegramme (#4)** eines Rauchmelders HM-Sec-SD-2 und das korrigierte `LONG_ACT_TYPE`-Register des
+- 🏗️ **AES-CBC-MAC-Telegramme (#4)** eines Rauchmelders HM-Sec-SD-2 und das korrigierte `LONG_ACT_TYPE`-Register des
   HM-OU-CFM-TW (#63)
 - 📥 **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
   an libXmlRpc, der 49-Tage-Überlauf der Uhr (libfaketime)
