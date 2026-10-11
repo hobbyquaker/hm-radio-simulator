@@ -304,7 +304,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | restart, device files and config: persistence, broken files, address donation, the start-up matrix                                                                                    | done          |
 | -     | `listMethods` tells the truth: every listed method is callable, and no callable method is missing                                                                                     | done          |
 | -     | a misbehaving event receiver blocks nothing: server gone mid-callback, no answer, wrong answers                                                                                       | done          |
-| -     | load: fast setValue/putParamset bursts, events meanwhile, rfd's queue, airtime and duty-cycle limits                                                                                  | in testing    |
+| -     | load: fast setValue/putParamset bursts, events meanwhile, rfd's queue, airtime and duty-cycle limits                                                                                  | done          |
 | -     | firmware update flows with a simulated device (rfd) and the Hexfile path (hs485d)                                                                                                     | ready         |
 | -     | more fuzz targets: frames from a paired device, the frame, LGW, XML and device-file parsers                                                                                           | ready         |
 | -     | a ThreadSanitizer image variant                                                                                                                                                       | ready         |

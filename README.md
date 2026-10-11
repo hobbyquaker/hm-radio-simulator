@@ -324,7 +324,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ✅ **`listMethods` stimmt:** jede gelistete Methode ist aufrufbar, und keine aufrufbare fehlt in der Liste
 - ✅ **Ein Event-Empfänger, der sich danebenbenimmt, blockiert nichts:** Server weg mitten im Callback, keine oder
   falsche Antworten
-- 🕵️ **Last:** schnelle `setValue`-/`putParamset`-Salven, Funk-Events währenddessen, die Warteschlange von rfd, Grenzen
+- ✅ **Last:** schnelle `setValue`-/`putParamset`-Salven, Funk-Events währenddessen, die Warteschlange von rfd, Grenzen
   aus Sendezeit und Duty Cycle
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ☑️ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
