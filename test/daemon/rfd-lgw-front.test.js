@@ -197,6 +197,7 @@ test(
             await receiver.waitFor('newDevices', 15000);
             await pairSwitch(rfd, receiver, air, device);
             // the device takes long to acknowledge; the port goes away in the middle of the wait
+            const ackDelayMs = rfd.module.options.ackDelayMs;
             rfd.module.options.ackDelayMs = 1500;
             const started = Date.now();
             const pending = rfd.call('setValue', [`${device.serial}:1`, 'STATE', true], {timeout: 60000}).then(
@@ -208,7 +209,7 @@ test(
             const outcome = await pending;
             t.diagnostic(`the set returned after ${Date.now() - started} ms: ${JSON.stringify(outcome).slice(0, 100)}`);
             assert.ok(rfd.alive, `rfd died: ${JSON.stringify(rfd.exit)}`);
-            rfd.module.options.ackDelayMs = 80;
+            rfd.module.options.ackDelayMs = ackDelayMs;
             await waitUntil(() => connected(rfd), 40000, 'CONNECTED after the reconnect');
             await waitUntil(() => rfd.grep(/Reconnected/).length >= 1, 15000, 'the Reconnected log line');
             // and the device is reachable again

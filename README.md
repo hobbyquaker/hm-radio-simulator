@@ -212,7 +212,12 @@ erst, wenn der Maintainer es entscheidet.
   seinen neuen Zustand von sich aus (INFO_LEVEL) 2,9-3,0 s nach dem Schalten, eine Suche mit einem Gerät endet 1,79 s
   nach dem `D`. Die Vorgaben der Simulation folgen dem: der Bus antwortet in 45 ms, die Statusmeldung kommt 2950 ms
   nach dem Schalten, das Gateway schließt die Suche nach 1750 ms und meldet Firmware 1.0.5. Nicht gemessen: was das
-  Gateway für ein stummes Gerät antwortet (dafür müsste das Gerät vom Bus) - `a 01` bleibt gewählt.
+  Gateway für ein stummes Gerät antwortet (dafür müsste das Gerät vom Bus) - `a 01` bleibt gewählt. Das RPI-RF-MOD
+  (über multimacd) mit einem HM-LC-Sw1-Pl-2, rfd auf Log-Level 0: Der Coprozessor antwortet in 0,2-0,6 ms, ein
+  Schaltbefehl ist **155 ms** nach dem Schreiben als "gesendet, ACK erhalten" gemeldet; rfd fragt den Duty Cycle etwa
+  alle 26 s ab. Die Vorgaben folgen (`responseDelayMs` 1, `ackDelayMs` 155). Ein echtes Modul schafft so etwa **6,5
+  Schaltbefehle pro Sekunde**, weit unter den 16,7, die die reine Sendezeit erlaubte. Noch nicht gemessen: eine Sendung
+  an ein abwesendes Gerät, ein Anlernen, ein Duty-Cycle-Event.
 - **Sendezeit und Duty Cycle (berechnet, nicht gemessen):** Für die Lasttests kann die Luftstrecke den Kanal selbst
   nachbilden (`lib/airtime.js`). Aus dem Rahmenformat der öffentlichen BidCoS-Implementierungen (die CC1101-Einstellung
   von culfw und Homegear, als Dokumentation gelesen): 2-FSK mit 9992,6 Baud, 4 Byte Präambel, zweimal das Sync-Wort,

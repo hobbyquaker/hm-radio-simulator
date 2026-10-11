@@ -4,7 +4,7 @@
  * cases 17 and the remote of §5.
  *
  * Timing assumptions (rfd 3.89.11): a sent telegram's status within defaultResponseTimeout = 4000 ms (the simulated
- * air answers the handshake within ackDelayMs = 80 ms each way); after a failed send rfd refuses the next one for
+ * air answers the handshake within ackDelayMs = 155 ms (measured) each way); after a failed send rfd refuses the next one for
  * FAIL_COUNTER_RESET_TIME = 5000 ms. Margins of seconds everywhere.
  */
 import {test} from 'node:test';

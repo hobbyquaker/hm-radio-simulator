@@ -4,7 +4,7 @@
  * CONFIG_PENDING, the duty cycle, and the events on a BIN-RPC and an XML-RPC receiver.
  *
  * Timing assumptions (rfd 3.89.11): a sent telegram's status comes within defaultResponseTimeout = 4000 ms (the
- * simulated air answers after ackDelayMs = 80 ms and reports a silent device as SEND_FAILED after failDelayMs =
+ * simulated air answers after ackDelayMs = 155 ms (measured) and reports a silent device as SEND_FAILED after failDelayMs =
  * 3000 ms - both chosen, not measured); after a send rfd waits WAIT_TIME_DEFAULT = 1500 ms for further responses;
  * after a failed send it refuses the next one for FAIL_COUNTER_RESET_TIME = 5000 ms; a pending configuration is
  * retried after 5 and 10 s (RFDevice::ScheduleConfigRetry). The install mode lasts 60 s. Every wait here has a margin

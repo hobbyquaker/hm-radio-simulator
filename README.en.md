@@ -257,6 +257,14 @@ defaults follow: the bus answers in 45 ms, the device's status report comes 2950
 discovery after 1750 ms and reports firmware 1.0.5. Not measured: what the gateway answers for a silent device (that
 needs the device off the bus) - `a 01` stays chosen.
 
+**The RPI-RF-MOD** (through multimacd, `/dev/mmd_bidcos`) with an HM-LC-Sw1-Pl-2, rfd 3.89.11 at log level 0: the
+coprocessor answers a command in 0.2-0.6 ms; a switch command (CENTRAL_RAMP_START) is reported "Telegram sent, received
+ACK" **155 ms** after rfd wrote it (155.1 and 155.2 ms); rfd polls `GETDUTYCYCLE` about every 26 s. The simulator's
+defaults follow (`responseDelayMs` 1, `ackDelayMs` 155). So a real module manages about **6.5 switch commands per
+second**, well below the 16.7 the airtime alone would allow (the module's listen-before-talk, its turnaround and the
+multimacd hop). Not measured yet: a send to an absent device (`SEND_FAILED` timing - the device has to be unplugged),
+a pairing, a duty-cycle event.
+
 ### Airtime and the duty cycle (computed, not measured)
 
 For the load tests the air can model the channel itself (`new Air({module, airtime: {...}})`, `lib/airtime.js`). The
