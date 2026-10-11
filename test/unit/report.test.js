@@ -130,7 +130,7 @@ test('descriptions: every test needs one, a variant suffix finds the plain name'
     assert.deepEqual(missing, [{file: 'test/daemon/rfd-pty-module.test.js', name: 'a test nobody explained yet'}]);
 });
 
-test('the HTML report: one column per ref, one line per row with the explanation behind it, chips where variants differ, no script', () => {
+test('the HTML report: one column per ref, one line per row with the explanation behind it, chips where variants differ', () => {
     const report = buildReport(collectResults([FIXTURE]), {
         repoSha: 'abcdef0123456789',
         generatedAt: '2026-10-10T18:05:00.000Z',
@@ -148,7 +148,7 @@ test('the HTML report: one column per ref, one line per row with the explanation
         },
     ]);
     assert.ok(html.startsWith('<!doctype html>'));
-    assert.doesNotMatch(html, /<script/);
+    assert.equal((html.match(/<script/g) || []).length, 1, 'one script: the filter (task 37)');
     assert.match(html, /prefers-color-scheme: dark/);
     assert.ok(html.includes('href="https://github.com/OpenCCU/OpenCCU-Base/pull/138"'));
     assert.ok(
@@ -327,4 +327,33 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
     assert.match(html, /<div class="big fail">2\/4<\/div><div class="label">fixes proven/);
     assert.match(proofMark({status: 'not-proven', fix: 115}), /class="proof not-proven"[^>]*>✗ not proven/);
     assert.match(proofText({status: 'inconclusive', fix: 116}), /inconclusive/);
+});
+
+test('the filter bar (task 37): hidden without JavaScript, chips with counts, rows carry what the filter matches', () => {
+    const report = buildReport(collectResults([FIXTURE]), {generatedAt: '2026-10-11T13:00:00.000Z'});
+    const html = renderHtml(report, []);
+    // without JavaScript the bar stays hidden and no row is hidden
+    assert.match(html, /<form class="filter" id="filter" hidden role="search"/);
+    assert.doesNotMatch(html, /<tr data-row[^>]* hidden/);
+    // the counts over the unique rows of the file tables (6 tests in the fixture)
+    const count = (token) => {
+        const m = new RegExp(`value="${token}" data-group="[^"]+"> [^<]+ <span class="fcount">(\\d+)</span>`).exec(
+            html,
+        );
+        return m ? Number(m[1]) : 0;
+    };
+    assert.equal(count('fail'), 2, 'two rows fail somewhere');
+    assert.equal(count('differs'), 2);
+    assert.equal(count('hs485d'), 1);
+    assert.equal(count('rfd'), 5);
+    assert.equal(count('regression'), 2, '#138 and the #115/#116 module-lost test');
+    assert.equal(count('r1-fail'), 2, 'fails on main (column 1)');
+    assert.equal(count('r0-fail'), 0, 'nothing fails on 3.89.11: no chip');
+    assert.match(html, /<span id="fshown" aria-live="polite">6 of 6 tests shown<\/span>/);
+    // a row carries its results per ref, daemon, kind and the searchable text
+    assert.match(
+        html,
+        /<tr data-row="" data-result="todo pass" data-daemon="hs485d" data-kind="regression" data-differs="no" data-proof="" data-text="#138 on hs485d[^"]*" data-r0="todo" data-r1="pass">/,
+    );
+    assert.match(html, /<section class="test-file"><h3 class="mono">test\/daemon\/rfd-pty-module\.test\.js<\/h3>/);
 });

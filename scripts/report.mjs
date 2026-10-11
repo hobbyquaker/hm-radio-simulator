@@ -28,7 +28,8 @@ import {fileURLToPath} from 'node:url';
 import {describeTest} from '../test/metadata.js';
 import {describe} from '../test/descriptions.js';
 import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
-import {trendOf, renderTrendPanel, TREND_CSS} from './trend.mjs';
+import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
+import {renderFilterBar, FILTER_SCRIPT, FILTER_CSS} from './filter.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
 import {compareRefs} from './refs.mjs';
 
@@ -507,7 +508,7 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
   td.r { white-space: nowrap; } .word { display: none; }
   .phone-only { display: block; margin-top: .2rem; } summary .phone-only { display: inline; } }
 `;
-const CSS = CSS_BASE + TREND_CSS;
+const CSS = CSS_BASE + TREND_CSS + FILTER_CSS;
 
 /**
  * A table with a <colgroup>: the first column takes the remaining width, the others are fixed by their class
@@ -522,10 +523,16 @@ function table(head, rows) {
         return cls ? `<col class="${cls}">` : '<col>';
     });
     const ths = head.map((c) => `<th class="${esc(c.cls || '')}">${c.raw ? c.label : esc(c.label)}</th>`);
-    const trs = rows.map(
-        (cells) =>
-            `<tr>${cells.map((cell, i) => `<td class="${i === 0 ? 'name' : esc(head[i].cls || '')}">${cell}</td>`).join('')}</tr>`,
-    );
+    // a row is its cells, or {cells, attrs} with attributes for the <tr> (the filter's data-*)
+    const trs = rows.map((row) => {
+        const cells = Array.isArray(row) ? row : row.cells;
+        const attrs = Array.isArray(row)
+            ? ''
+            : Object.entries(row.attrs || {})
+                  .map(([k, v]) => ` ${k}="${esc(v)}"`)
+                  .join('');
+        return `<tr${attrs}>${cells.map((cell, i) => `<td class="${i === 0 ? 'name' : esc(head[i].cls || '')}">${cell}</td>`).join('')}</tr>`;
+    });
     // the table never squeezes below its columns' widths; the .scroll box around it scrolls instead
     const widths = {
         r: '--w-result',
@@ -788,12 +795,36 @@ export function renderHtml(report, history = []) {
                 `<span class="${c.status}${c.differs ? ' differs' : ''}" title="${esc(title)}">${esc(STATUS_MARK[c.status] || c.status)} <span class="word">${esc(c.status)}</span>${chips ? ' ' + chips : ''}</span>`,
             );
         });
-        return cells;
+        // what the filter (task 37) matches on
+        const results = combined.filter(Boolean);
+        const attrs = {
+            'data-row': '',
+            'data-result': [...new Set(results.map((c) => c.status))].join(' '),
+            'data-daemon': daemonOf(row),
+            'data-kind': row.kind,
+            'data-differs': results.some((c) => c.differs) ? 'yes' : 'no',
+            'data-proof': proof ? proof.status : '',
+            'data-text': `${row.name} ${row.file} ${first.description || ''}`.toLowerCase(),
+        };
+        combined.forEach((c, i) => {
+            attrs[`data-r${i}`] = c ? c.status : '';
+        });
+        return {cells, attrs};
     };
+    // the filter bar (task 37): hidden until its script runs, so without JavaScript every row stays visible
+    h.push(
+        renderFilterBar(
+            rows.map(testRow).map((r) => r.attrs),
+            refs.map((r) => r.ref),
+        ),
+    );
+    h.push(`<div id="test-tables">`);
     for (const [file, fileRows] of files) {
-        h.push(`<h3 class="mono">${esc(file || '?')}</h3>`);
+        h.push(`<section class="test-file"><h3 class="mono">${esc(file || '?')}</h3>`);
         h.push(table(testHead, fileRows.map(testRow)));
+        h.push(`</section>`);
     }
+    h.push(`</div>`);
     // the rows where the variants differ, on their own (no JavaScript needed: a plain anchor)
     h.push(
         `<h2 id="differing">Rows where the variants differ</h2><p class="muted">${differingRows.length ? `${differingRows.length} row(s). ${legend}.` : 'None: release, ASan and coverage agree in every row.'} <a href="#tests">All tests</a>.</p>`,
@@ -1012,6 +1043,7 @@ export function renderHtml(report, history = []) {
     h.push(
         `<footer>hm-radio-simulator - a simulated Homematic radio module and a test suite for the CCU's radio daemons of <a href="${BASE}">OpenCCU-Base</a>. MIT. The daemons under test are built from the OpenCCU-Base commits linked above.</footer>`,
     );
+    h.push(`<script>${FILTER_SCRIPT}</script>`);
     h.push(`</body></html>`);
     return h.join('\n') + '\n';
 }

@@ -77,9 +77,9 @@ test('the panel: a card per ref with arrows coloured by meaning, a ref new in th
     assert.match(html, /<span class="tn fail">2<\/span><span class="td bad"[^>]*>▲ 2<\/span>/);
     assert.match(html, /<span class="tn coverage">36\.7 %<\/span><span class="td good"[^>]*>▲ 6\.7<\/span>/);
     assert.match(html, /<span class="td same"[^>]*>=<\/span>/, 'an unchanged value');
-    // the full page carries the panel at the top, before the cards, and stays without script
+    // the full page carries the panel at the top, before the cards; its only script is the filter's
     const page = renderHtml(report, history);
     assert.ok(page.indexOf('class="trend"') < page.indexOf('class="cards"'));
-    assert.doesNotMatch(page, /<script/);
+    assert.equal((page.match(/<script/g) || []).length, 1);
     assert.match(page, /\.trend \{ display: grid;/);
 });

@@ -130,7 +130,10 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
   variant (`A` ASan, `C` coverage, `R` release) - the tooltip and the row's collapsible show each variant; the coverage
   variant counts only where it differs from release. Every test row is one line at load; opened, it first says in one
   or two sentences what the test does (`test/descriptions.js` - a test without a description fails the CI job "every
-  test has a description"), then the diagnostics. A link leads to the rows where the variants differ. At the top, a **trend** card per ref: pass, todo, fail and
+  test has a description"), then the diagnostics. A link leads to the rows where the variants differ. Above the tests, a **filter bar** (result, variants differ,
+  daemon, kind, proof, the result on one ref, a text search over name, file and description, each with its count);
+  the filter is part of the link (`#f=fail,rfd&q=lgw`), so a view can be shared. Without JavaScript the bar stays
+  hidden and every row visible. At the top, a **trend** card per ref: pass, todo, fail and
   skip for rfd and hs485d and the line coverage (per daemon and in total), each with its change against the previous
   run (▲/▼, = unchanged; green better, red worse) and a sparkline over the kept runs; a ref new in the window says
   since when it is there. How to read it:
