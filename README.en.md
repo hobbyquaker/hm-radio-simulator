@@ -123,9 +123,13 @@ except on a ref without #140's fixes, where they are expected and only reported)
 Every CI run writes a Markdown overview into its summary on GitHub (per job, and for the whole run in the "test report"
 job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://hobbyquaker.github.io/hm-radio-simulator/>**
 
-- the three OpenCCU-Base refs side by side (older tag, newer tag, `main`, each with its commit linked; release, ASan
-  and coverage each), every test's outcome, duration and
-  diagnostics, the fuzz runs, and the history of the last 20 runs (`runs/<id>/`). How to read it:
+- the three OpenCCU-Base refs side by side (older tag, newer tag, `main`, each with its commit linked), the fuzz runs
+  and the history of the last 20 runs (`runs/<id>/`). There is **one** result column per ref: where the variants
+  (release, ASan, coverage) agree it shows their result, where they differ the worst one with a small chip naming the
+  variant (`A` ASan, `C` coverage, `R` release) - the tooltip and the row's collapsible show each variant; the coverage
+  variant counts only where it differs from release. Every test row is one line at load; opened, it first says in one
+  or two sentences what the test does (`test/descriptions.js` - a test without a description fails the CI job "every
+  test has a description"), then the diagnostics. A link leads to the rows where the variants differ. How to read it:
 
 - **regression** - the test pins a fixed OpenCCU-Base bug and links to the pull request and its merge commit; on a ref
   that predates the fix it runs as **todo** (known broken, the run stays green);

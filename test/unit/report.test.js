@@ -4,7 +4,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {collectResults, buildReport, renderSummaryMarkdown, renderHtml, writeSite} from '../../scripts/report.mjs';
+import {
+    collectResults,
+    buildReport,
+    renderSummaryMarkdown,
+    renderHtml,
+    writeSite,
+    missingDescriptions,
+} from '../../scripts/report.mjs';
+import {combine, groupByRef} from '../../scripts/combine.mjs';
+import {describe} from '../descriptions.js';
 import {describeTest} from '../metadata.js';
 
 const FIXTURE = new URL('../fixtures/report/', import.meta.url).pathname;
@@ -36,7 +45,7 @@ test('collectResults finds the jobs and fuzz runs below the fixture; buildReport
     const results = collectResults([FIXTURE]);
     assert.deepEqual(
         results.jobs.map((j) => j.id),
-        ['3.89.11-release', 'main-release', 'main-coverage'],
+        ['3.89.11-release', 'main-release', 'main-asan', 'main-coverage'],
     );
     assert.equal(results.fuzz.length, 1);
     assert.deepEqual(results.jobs[0].counts, {pass: 3, fail: 0, todo: 2, skip: 0});
@@ -57,19 +66,69 @@ test('the Markdown summary lists the jobs, the failure and the known-broken test
         generatedAt: '2026-10-10T18:05:00.000Z',
     });
     const md = renderSummaryMarkdown(report);
+    // one row per ref, the variants with their durations, the combined counts
     assert.match(
         md,
-        /\| 3\.89\.11 \(\[3ed652a\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/commit\/3ed652a4[0-9a-f]+\)\) \| release \| \d+ s \| 3 \| 0 \| 2 \| 0 \|/,
+        /\| 3\.89\.11 \(\[3ed652a\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/commit\/3ed652a4[0-9a-f]+\)\) \| release \d+ s \| 3 \| 0 \| 2 \| 0 \|/,
     );
     assert.match(
         md,
-        /### Failures\n\n- ❌ \*\*rfd initialises the simulated module and reports the interface CONNECTED\*\* \(main, release\): rfd did not answer/,
+        /\| main \(\[030dba7\]\([^)]+\)\) \| release \d+ s · asan \d+ s · coverage \d+ s \| 3 \| 2 \| 1 \| 0 \|/,
     );
+    assert.match(
+        md,
+        /### Failures\n\n- ❌ \*\*rfd initialises the simulated module and reports the interface CONNECTED\*\* \(main: release, asan\): rfd did not answer/,
+    );
+    assert.match(md, /### Where the variants differ\n\n[^]*frame fuzzing[^\n]* - main: release ✅ asan ❌/);
     assert.match(md, /\[OpenCCU-Base \\#138\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/pull\/138\)/);
     assert.match(md, /fuzz_xmlparser \| 60 s \| 3456789 \| none/);
 });
 
-test('the HTML report has a column per job, the links, the diagnostics and no script', () => {
+test('combine: one result per ref - agreeing variants give one result, differing ones the worst plus chips', () => {
+    const results = collectResults([FIXTURE]);
+    const refs = groupByRef(results.jobs);
+    assert.deepEqual(
+        refs.map((r) => `${r.ref}:${r.jobs.map((j) => j.variant).join('+')}`),
+        ['3.89.11:release', 'main:release+asan+coverage'],
+    );
+    const main = refs[1];
+    const row = (name) => {
+        const m = new Map();
+        for (const j of results.jobs) {
+            const t = j.tests.find((x) => x.name === name);
+            if (t) {
+                m.set(j.id, t);
+            }
+        }
+        return m;
+    };
+    const agree = combine(row('#138 on hs485d: a nested system.multicall is refused, hs485d stays up'), main);
+    assert.deepEqual([agree.status, agree.differs, agree.chips], ['pass', false, []]);
+    const asanOnly = combine(
+        row('frame fuzzing: random frames and garbage on the pty do not crash rfd (seeded)'),
+        main,
+    );
+    assert.deepEqual([asanOnly.status, asanOnly.differs, asanOnly.chips], ['fail', true, ['A']]);
+    // the coverage variant counts where it differs from release: release and ASan fail, coverage passes
+    const cov = combine(row('rfd initialises the simulated module and reports the interface CONNECTED'), main);
+    assert.deepEqual([cov.status, cov.differs, cov.chips], ['fail', true, ['R', 'A']]);
+    assert.equal(combine(row('a test nobody explained yet'), refs[0]), null, 'not run on 3.89.11');
+});
+
+test('descriptions: every test needs one, a variant suffix finds the plain name', () => {
+    assert.ok(
+        describe(
+            'test/daemon/rfd-rpc.test.js',
+            'init with an empty id deregisters the receiver and rfd stays up (the double-join finding under ASan)',
+        ),
+    );
+    assert.ok(describe('/opt/x/test/daemon/rfd-rpc.test.js', 'a getValue on an unknown address faults, rfd stays up'));
+    assert.equal(describe('test/daemon/rfd-rpc.test.js', 'no such test'), null);
+    const missing = missingDescriptions(collectResults([FIXTURE]));
+    assert.deepEqual(missing, [{file: 'test/daemon/rfd-pty-module.test.js', name: 'a test nobody explained yet'}]);
+});
+
+test('the HTML report: one column per ref, one line per row with the explanation behind it, chips where variants differ, no script', () => {
     const report = buildReport(collectResults([FIXTURE]), {
         repoSha: 'abcdef0123456789',
         generatedAt: '2026-10-10T18:05:00.000Z',
@@ -95,15 +154,45 @@ test('the HTML report has a column per job, the links, the diagnostics and no sc
     );
     assert.ok(html.includes('rfd used 200 clock ticks in the 2 s after the hangup'));
     assert.ok(html.includes('runs/x/'), 'the history links to the kept run');
-    assert.equal(
-        (html.match(/<th class="r">3\.89\.11 <a class="mono muted" href="[^"]+\/commit\/[0-9a-f]+">/g) || []).length,
-        2,
-        'a column per job in both file tables',
+    // one result column per ref (two refs in the fixture), not per job
+    const refRe = /<th class="r">(3\.89\.11|main) <a class="mono muted" href="[^"]+\/commit\/[0-9a-f]+">/g;
+    const refHeads = html.match(refRe) || [];
+    assert.ok(refHeads.length >= 4 && refHeads.length % 2 === 0, `ref columns: ${refHeads.length}`);
+    assert.doesNotMatch(html, /<span class="muted">asan<\/span><\/th>/, 'no per-variant columns');
+    // every test row is one line at load: the name is the summary of a closed <details>, cut with an ellipsis
+    assert.match(
+        html,
+        /details\.row > summary \{ display: block; cursor: pointer; white-space: nowrap; overflow: hidden;/,
     );
-    // every table shares the column scheme: a colgroup, fixed layout, the result columns right-aligned
+    const rowDetails = html.match(/<td class="name"><details class="row"><summary>/g) || [];
+    assert.ok(rowDetails.length >= 6, `rows with a collapsible: ${rowDetails.length}`);
+    assert.doesNotMatch(html, /<details class="row" open/, 'all collapsed at load');
+    for (const t of html.match(/<table[ >][\s\S]*?<\/table>/g).filter((x) => x.includes('<th class="">test</th>'))) {
+        const names = t.match(/<td class="name">.{0,30}/g) || [];
+        assert.ok(
+            names.every((n) => n.startsWith('<td class="name"><details class="row"><summary>')),
+            `every test row starts collapsed: ${names.find((n) => !n.includes('<details'))}`,
+        );
+    }
+    // behind it, first the description of what the test does
+    assert.ok(
+        html.includes(
+            `<p class="what">${describe('test/daemon/hs485d-rpc.test.js', '#138 on hs485d: a nested system.multicall is refused, hs485d stays up').replace(/'/g, '&#39;')}</p>`,
+        ),
+        'the description is rendered',
+    );
+    // where the variants differ: the worst result plus a chip naming the variant, a tooltip with each variant
+    assert.match(
+        html,
+        /<span class="fail differs" title="release: pass [^"]*\nasan: fail [^"]*">❌ <span class="word">fail<\/span> <span class="chip fail">A<\/span><\/span>/,
+    );
+    assert.match(html, /<h2 id="differing">Rows where the variants differ<\/h2>/);
+    assert.match(html, /<a href="#differing">Only the 2 row\(s\) where the variants differ<\/a>/);
+    // the jobs table: one row per ref with the variants and their durations
+    assert.match(html, /<span class="vd" title="asan: \d+ s">A \d+ s<\/span>/);
+    // every table shares the column scheme: a colgroup, fixed layout, the result columns right-aligned and equal
     assert.match(html, /table-layout: fixed/);
     const tables = html.match(/<table[ >][\s\S]*?<\/table>/g);
-    // wide tables scroll in their own box and never squeeze below their columns (task 29: a big screen shows all)
     assert.match(html, /\.scroll \{ overflow-x: auto;/);
     assert.ok(
         tables.every((t) => /^<table style="min-width: calc\(var\(--w-name\) \+ /.test(t)),
@@ -114,15 +203,13 @@ test('the HTML report has a column per job, the links, the diagnostics and no sc
         tables.length,
         'every table in a scroll box',
     );
-    assert.ok(tables.length >= 4, `tables: ${tables.length}`);
-    // the test tables have one result column per job (two in the fixture), the others four
     for (const t of tables) {
         assert.match(t, /^<table [^>]*><colgroup><col>/, 'the first column takes the rest');
-        const expected = t.includes('<th class="">test</th>') ? report.jobs.length : 4;
+        const expected = t.includes('<th class="">test</th>') ? 2 : 4;
         assert.equal((t.match(/<col class="r">/g) || []).length, expected, `result columns: ${t.slice(0, 200)}`);
         assert.equal((t.match(/<th class="r">/g) || []).length, expected, 'result headers');
     }
-    assert.match(html, /col\.d \{ width: 1px; \}/, 'secondary columns shrink away at phone width');
+    assert.match(html, /col\.d, col\.v \{ width: 1px; \}/, 'secondary columns shrink away at phone width');
 });
 
 test('writeSite keeps the previous runs and caps the history', () => {

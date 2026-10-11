@@ -130,6 +130,23 @@ jobs:
             !results/fuzz/corpus
           if-no-files-found: ignore
 
+  # every test needs a short explanation for the report (test/descriptions.js); a test without one fails this job
+  descriptions:
+    name: every test has a description
+    runs-on: ubuntu-latest
+    needs: daemons
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: 'daemon-results-*'
+      - run: node scripts/report.mjs check artifacts
+
   # the test report: the Markdown overview of the whole run and the static site for GitHub Pages (scripts/report.mjs)
   report:
     name: test report

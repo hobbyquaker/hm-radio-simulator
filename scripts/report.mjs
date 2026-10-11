@@ -15,6 +15,7 @@
  *                      [--run-id <id>] [--run-url <url>] [--ref <git ref>] [--trigger <text>] [--keep 20]
  *                      <results dir>...
  *   report.mjs summary <results dir>...        print the Markdown overview of these results only
+ *   report.mjs check <results dir>...          fail when a test has no description (test/descriptions.js)
  *
  * The test names carry their upstream references (see test/metadata.js), so a regression test links to the pull
  * request and commit that fixed the bug, a known finding to its issue or, until one exists, to the README.
@@ -25,6 +26,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import {describeTest} from '../test/metadata.js';
+import {describe} from '../test/descriptions.js';
+import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
 import {compareRefs} from './refs.mjs';
 
@@ -97,7 +100,7 @@ export function collectResults(roots) {
 function makeJob(meta, results) {
     const tests = (results.tests || []).map((t) => {
         const {kind, refs} = describeTest(t.name, t);
-        return {...t, kind, refs};
+        return {...t, kind, refs, description: describe(t.file, t.name)};
     });
     const counts = {pass: 0, fail: 0, todo: 0, skip: 0};
     for (const t of tests) {
@@ -226,6 +229,19 @@ export function loadRows(jobs) {
     return rows;
 }
 
+/** The tests (file and name, once each) without a description in test/descriptions.js. */
+export function missingDescriptions(results) {
+    const seen = new Map();
+    for (const job of results.jobs) {
+        for (const t of job.tests) {
+            if (!t.description) {
+                seen.set(`${t.file}\u0000${t.name}`, {file: t.file, name: t.name});
+            }
+        }
+    }
+    return [...seen.values()];
+}
+
 /** Fuzz findings that are not expected on that ref (an old tag has known ones). */
 export function unexpectedFuzzFindings(fuzz) {
     return fuzz
@@ -252,42 +268,62 @@ export function renderSummaryMarkdown(report) {
     );
     lines.push('');
     if (report.jobs.length) {
-        lines.push('| OpenCCU-Base | daemons | duration | pass | fail | todo (known) | skip |');
-        lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: |');
-        for (const job of report.jobs) {
+        // one row per ref: the variants with their durations, the combined counts (a test counts with its worst result)
+        const refs = groupByRef(report.jobs);
+        const rows = testRows(report.jobs);
+        lines.push('| OpenCCU-Base | variants | pass | fail | todo (known) | skip |');
+        lines.push('| --- | --- | ---: | ---: | ---: | ---: |');
+        for (const {ref, counts: c} of refCounts(rows, refs)) {
             lines.push(
-                `| ${job.ref} ([${short(job.baseCommit)}](${BASE}/commit/${job.baseCommit})) | ${job.variant} | ${seconds(job.durationMs)} | ${job.counts.pass} | ${job.counts.fail} | ${job.counts.todo} | ${job.counts.skip} |`,
+                `| ${ref.ref} ([${short(ref.baseCommit)}](${BASE}/commit/${ref.baseCommit})) | ${ref.jobs.map((j) => `${j.variant} ${seconds(j.durationMs)}`).join(' · ')} | ${c.pass} | ${c.fail} | ${c.todo} | ${c.skip} |`,
             );
         }
         lines.push('');
-        const failing = report.jobs.flatMap((j) =>
-            j.tests.filter((t) => t.status === 'fail').map((t) => ({job: j, test: t})),
-        );
+        const where = (row, status) =>
+            refs
+                .map((ref) => {
+                    const c = combine(row.results, ref);
+                    const variants = c ? c.variants.filter((v) => v.status === status).map((v) => v.variant) : [];
+                    return variants.length ? `${ref.ref}: ${variants.join(', ')}` : null;
+                })
+                .filter(Boolean)
+                .join('; ');
+        const failing = rows.filter((row) => [...row.results.values()].some((t) => t.status === 'fail'));
         if (failing.length) {
             lines.push('### Failures');
             lines.push('');
-            for (const {job, test} of failing) {
+            for (const row of failing) {
+                const error = [...row.results.values()].find((t) => t.status === 'fail' && t.error);
                 lines.push(
-                    `- ❌ **${escapeMd(test.name)}** (${job.ref}, ${job.variant})${test.error ? `: ${escapeMd(test.error)}` : ''}`,
+                    `- ❌ **${escapeMd(row.name)}** (${where(row, 'fail')})${error ? `: ${escapeMd(error.error)}` : ''}`,
                 );
             }
             lines.push('');
         }
-        const todo = new Map();
-        for (const job of report.jobs) {
-            for (const t of job.tests.filter((t) => t.status === 'todo')) {
-                const key = t.name;
-                if (!todo.has(key)) {
-                    todo.set(key, {test: t, jobs: []});
-                }
-                todo.get(key).jobs.push(`${job.ref} ${job.variant}`);
-            }
-        }
-        if (todo.size) {
+        const todo = rows.filter((row) => [...row.results.values()].some((t) => t.status === 'todo'));
+        if (todo.length) {
             lines.push('### Known broken on these refs (run as todo)');
             lines.push('');
-            for (const {test, jobs} of todo.values()) {
-                lines.push(`- ⚠️ ${escapeMd(test.name)} - ${jobs.join(', ')}${linksMd(test.refs)}`);
+            for (const row of todo) {
+                const first = [...row.results.values()][0];
+                lines.push(`- ⚠️ ${escapeMd(row.name)} - ${where(row, 'todo')}${linksMd(first.refs)}`);
+            }
+            lines.push('');
+        }
+        const differing = rows.filter((row) => refs.some((ref) => (combine(row.results, ref) || {}).differs));
+        if (differing.length) {
+            lines.push('### Where the variants differ');
+            lines.push('');
+            for (const row of differing) {
+                const parts = refs
+                    .map((ref) => combine(row.results, ref))
+                    .map((c, i) =>
+                        c && c.differs
+                            ? `${refs[i].ref}: ${c.variants.map((v) => `${v.variant} ${STATUS_MARK[v.status] || v.status}`).join(' ')}`
+                            : null,
+                    )
+                    .filter(Boolean);
+                lines.push(`- ${escapeMd(row.name)} - ${parts.join('; ')}`);
             }
             lines.push('');
         }
@@ -417,11 +453,29 @@ h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; color: var(--muted); font-weight: 
 .card .big { font-size: 1.5rem; font-weight: 600; } .card .label { color: var(--muted); font-size: .85rem; }
 /* every table: the name column takes the rest, the fixed columns share one width scheme, the four result columns at
    the right edge are --w-result wide and right-aligned in every table */
-:root { --w-result: 6.5rem; --w-commit: 5.5rem; --w-small: 6rem; --w-kind: 7.5rem; --w-links: 11rem; --w-name: 22rem; }
+:root { --w-result: 6.5rem; --w-commit: 5.5rem; --w-small: 6rem; --w-kind: 7.5rem; --w-links: 11rem; --w-name: 22rem;
+  --w-variants: 15rem; }
 .phone-only { display: none; }
 table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; table-layout: fixed; }
 col.r { width: var(--w-result); } col.c { width: var(--w-commit); } col.s { width: var(--w-small); }
 col.k { width: var(--w-kind); } col.l { width: var(--w-links); } col.d { width: var(--w-small); }
+col.v { width: var(--w-variants); }
+/* one line per row at load: the name is the summary of a collapsible, cut with an ellipsis; open it for the rest */
+details.row > summary { display: block; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  list-style: none; }
+details.row > summary::-webkit-details-marker { display: none; }
+details.row > summary::before { content: '\\25B8'; display: inline-block; width: 1em; color: var(--muted); }
+details.row[open] > summary::before { content: '\\25BE'; }
+details.row[open] > summary { white-space: normal; }
+details.row > :not(summary) { margin-left: 1em; }
+p.what { margin: .3rem 0 .4rem; }
+.chip { display: inline-block; min-width: 1.3em; padding: 0 .35em; border-radius: 4px; border: 1px solid currentColor;
+  font-size: .72em; font-weight: 700; line-height: 1.5; text-align: center; vertical-align: 1px; color: var(--muted); }
+.chip.fail { color: var(--fail); } .chip.todo { color: var(--todo); } .chip.skip { color: var(--skip); }
+.variants { font-size: .85em; color: var(--muted); white-space: nowrap; } .vd { margin-right: .5em; }
+ul.plain { list-style: none; padding: 0; margin: .3rem 0; } td.v { white-space: nowrap; }
+/* the kind and links cells stay on one line too (the full links are in the row's collapsible on a phone) */
+td.k, td.l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top;
   overflow-wrap: anywhere; }
 th { color: var(--muted); font-weight: 600; font-size: .85rem; }
@@ -441,14 +495,14 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
    cells stay in the fixed layout so nothing shifts into the next <col>), the result columns keep one fixed width,
    the name wraps in the rest */
 @media (max-width: 760px) { :root { --w-result: 3rem; --w-small: 3.6rem; --w-commit: 1px; --w-kind: 1px; --w-links: 1px;
-    --w-name: 11rem; }
+    --w-variants: 1px; --w-name: 11rem; }
   body { padding: .75rem; font-size: 13px; }
   th, td { padding: .35rem .3rem; } th.r, td.r { padding-left: .3rem; }
-  col.c, col.k, col.l, col.d { width: 1px; }
-  th.c, th.k, th.l, th.d, td.c, td.k, td.l, td.d { padding: 0; border: 0; overflow: hidden; visibility: hidden;
+  col.c, col.k, col.l, col.d, col.v { width: 1px; }
+  th.c, th.k, th.l, th.d, th.v, td.c, td.k, td.l, td.d, td.v { padding: 0; border: 0; overflow: hidden; visibility: hidden;
     font-size: 0; line-height: 0; }
-  td.r { white-space: normal; }
-  .phone-only { display: block; margin-top: .2rem; } }
+  td.r { white-space: nowrap; } .word { display: none; }
+  .phone-only { display: block; margin-top: .2rem; } summary .phone-only { display: inline; } }
 `;
 
 /**
@@ -460,7 +514,7 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
  */
 function table(head, rows) {
     const cols = head.map((c) => {
-        const cls = (c.cls || '').split(' ').find((x) => ['r', 'c', 's', 'k', 'l', 'd'].includes(x));
+        const cls = (c.cls || '').split(' ').find((x) => ['r', 'c', 's', 'k', 'l', 'd', 'v'].includes(x));
         return cls ? `<col class="${cls}">` : '<col>';
     });
     const ths = head.map((c) => `<th class="${esc(c.cls || '')}">${c.raw ? c.label : esc(c.label)}</th>`);
@@ -469,13 +523,43 @@ function table(head, rows) {
             `<tr>${cells.map((cell, i) => `<td class="${i === 0 ? 'name' : esc(head[i].cls || '')}">${cell}</td>`).join('')}</tr>`,
     );
     // the table never squeezes below its columns' widths; the .scroll box around it scrolls instead
-    const widths = {r: '--w-result', c: '--w-commit', s: '--w-small', k: '--w-kind', l: '--w-links', d: '--w-small'};
+    const widths = {
+        r: '--w-result',
+        c: '--w-commit',
+        s: '--w-small',
+        k: '--w-kind',
+        l: '--w-links',
+        d: '--w-small',
+        v: '--w-variants',
+    };
     const fixed = head
         .map((c) => (c.cls || '').split(' ').find((x) => x in widths))
         .filter(Boolean)
         .map((x) => `var(${widths[x]})`);
     const min = `calc(var(--w-name) + ${fixed.length ? fixed.join(' + ') : '0px'})`;
     return `<div class="scroll"><table style="min-width: ${min}"><colgroup>${cols.join('')}</colgroup><thead><tr>${ths.join('')}</tr></thead><tbody>\n${trs.join('\n')}\n</tbody></table></div>`;
+}
+
+/** The test rows of a run: one per file, nesting and name, with the result of every job that ran it. */
+export function testRows(jobs) {
+    const byName = new Map();
+    for (const job of jobs) {
+        for (const t of job.tests) {
+            const key = `${t.file}\u0000${t.nesting}\u0000${t.name}`;
+            if (!byName.has(key)) {
+                byName.set(key, {
+                    file: t.file,
+                    nesting: t.nesting,
+                    name: t.name,
+                    kind: t.kind,
+                    refs: t.refs,
+                    results: new Map(),
+                });
+            }
+            byName.get(key).results.set(job.id, t);
+        }
+    }
+    return [...byName.values()];
 }
 
 export function renderHtml(report, history = []) {
@@ -538,97 +622,125 @@ export function renderHtml(report, history = []) {
     );
     h.push(`</div>`);
 
-    // Jobs: name | commit | daemons | duration | pass | fail | todo | skip
+    // one result column per OpenCCU-Base ref (scripts/combine.mjs): the variants show only where they differ
+    const refs = groupByRef(jobs);
+    const rows = [...byName.values()];
+    const counts = refCounts(rows, refs);
+    const legend = `<span class="chip">A</span> ASan, <span class="chip">C</span> coverage, <span class="chip">R</span> release: the variant(s) with the shown result where the variants of a ref differ (the coverage variant counts only where it differs from release)`;
+
+    // Jobs: one row per ref - commit, the variants with their durations, the combined counts
     h.push(
-        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side, oldest first: the two newest release tags and the head of main, chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix's merge commit.</p>`,
+        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side, oldest first: the two newest release tags and the head of main, chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix's merge commit. The counts combine the variants: a test counts with its worst result.</p>`,
     );
     h.push(
         table(
             [
                 {label: 'OpenCCU-Base'},
                 {label: 'commit', cls: 'c'},
-                {label: 'daemons', cls: 's'},
-                {label: 'duration', cls: 'd r'},
+                {label: 'variants', cls: 'v'},
                 {label: 'pass', cls: 'r'},
                 {label: 'fail', cls: 'r'},
                 {label: 'todo', cls: 'r'},
                 {label: 'skip', cls: 'r'},
             ],
-            jobs.map((job) => [
-                `${esc(job.ref)}<span class="phone-only mono">${esc(short(job.baseCommit))}</span>${job.knownBroken.length ? `<div class="diag">known broken: ${esc(job.knownBroken.join(', '))}</div>` : ''}`,
-                `<a class="mono" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a>`,
-                esc(job.variant),
-                esc(seconds(job.durationMs)),
-                `<span class="pass">${job.counts.pass}</span>`,
-                `<span class="fail">${job.counts.fail}</span>`,
-                `<span class="todo">${job.counts.todo}</span>`,
-                `<span class="skip">${job.counts.skip}</span>`,
-            ]),
+            counts.map(({ref, counts: c, differing}) => {
+                const known = ref.jobs[0] && ref.jobs[0].knownBroken.length ? ref.jobs[0].knownBroken : [];
+                const perVariant = ref.jobs
+                    .map(
+                        (j) =>
+                            `<li><span class="mono">${esc(j.variant)}</span>: ${esc(seconds(j.durationMs))} · <span class="pass">${j.counts.pass}</span> / <span class="fail">${j.counts.fail}</span> / <span class="todo">${j.counts.todo}</span> / <span class="skip">${j.counts.skip}</span></li>`,
+                    )
+                    .join('');
+                const summary = `${esc(ref.ref)}${differing ? ` <span class="chip" title="rows where the variants differ">${differing} differ</span>` : ''}`;
+                const body = `<ul class="plain">${perVariant}</ul>${known.length ? `<div class="diag">known broken: ${esc(known.join(', '))}</div>` : ''}`;
+                return [
+                    `<details class="row"><summary>${summary}<span class="phone-only mono"> ${esc(short(ref.baseCommit))}</span></summary>${body}</details>`,
+                    `<a class="mono" href="${BASE}/commit/${esc(ref.baseCommit)}">${esc(short(ref.baseCommit))}</a>`,
+                    `<span class="variants">${ref.jobs.map((j) => `<span class="vd" title="${esc(j.variant)}: ${esc(seconds(j.durationMs))}">${esc(VARIANT_CHIP[j.variant] || j.variant)} ${esc(seconds(j.durationMs))}</span>`).join(' ')}</span>`,
+                    `<span class="pass">${c.pass}</span>`,
+                    `<span class="fail">${c.fail}</span>`,
+                    `<span class="todo">${c.todo}</span>`,
+                    `<span class="skip">${c.skip}</span>`,
+                ];
+            }),
         ),
     );
 
-    // Tests: name | kind | links | one result column per job
+    // Tests: one line per test at load; the explanation, diagnostics and per-variant results behind a collapsible
+    const differingRows = rows.filter((row) => refs.some((ref) => (combine(row.results, ref) || {}).differs));
     h.push(
-        `<h2>Tests</h2><p class="muted">One column per job. <span class="badge kind-regression">regression</span> pins an upstream fix and links to its pull request and commit; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (todo everywhere); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A <span class="todo">todo</span> is a regression test on a ref that predates the fix.</p>`,
+        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (todo everywhere); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A <span class="todo">todo</span> is a test on a ref that predates the fix. ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
     );
     const testHead = [
         {label: 'test'},
         {label: 'kind', cls: 'k'},
         {label: 'links', cls: 'l'},
-        ...jobs.map((job) => ({
-            label: `${esc(job.ref)} <a class="mono muted" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a><br><span class="muted">${esc(job.variant)}</span>`,
+        ...refs.map((ref) => ({
+            label: `${esc(ref.ref)} <a class="mono muted" href="${BASE}/commit/${esc(ref.baseCommit)}">${esc(short(ref.baseCommit))}</a>`,
             cls: 'r',
             raw: true,
         })),
     ];
-    for (const [file, rows] of files) {
+    const testRow = (row) => {
+        const first = [...row.results.values()][0];
+        const kindBadge = `<span class="badge kind-${esc(row.kind)}">${esc(row.kind.replace('-', ' '))}</span>`;
+        const links = (first.refs || []).map((ref) => `<a href="${esc(ref.url)}">${esc(ref.label)}</a>`);
+        const combined = refs.map((ref) => combine(row.results, ref));
+        // behind the collapsible: the explanation, the errors and diagnostics, the per-variant results where they differ
+        const diags = new Set();
+        const errors = new Set();
+        for (const r of row.results.values()) {
+            for (const d of r.diagnostics || []) {
+                diags.add(d);
+            }
+            if (r.status === 'fail' && r.error) {
+                errors.add(r.error);
+            }
+        }
+        let body = `<p class="what">${esc(first.description || 'No description yet.')}</p>`;
+        body += `<div class="phone-only">${kindBadge}${links.length ? ' ' + links.join(' · ') : ''}</div>`;
+        for (const e of errors) {
+            body += `<div class="err">${esc(e)}</div>`;
+        }
+        for (const d of diags) {
+            body += `<div class="diag">${esc(d)}</div>`;
+        }
+        combined.forEach((c, i) => {
+            if (c && c.differs) {
+                body += `<div class="diag">${esc(refs[i].ref)}: ${c.variants.map((v) => `${esc(v.variant)} <span class="${v.status}">${esc(STATUS_MARK[v.status] || v.status)} ${esc(v.status)}</span> ${esc(duration(v.durationMs))}`).join(' · ')}</div>`;
+            }
+        });
+        const name = `<details class="row"><summary>${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}</summary>${body}</details>`;
+        const cells = [name, kindBadge, links.join(' · ')];
+        combined.forEach((c) => {
+            if (!c) {
+                cells.push(`<span class="muted">-</span>`);
+                return;
+            }
+            const title = c.variants
+                .map((v) => {
+                    const note =
+                        typeof v.todo === 'string' ? `: ${v.todo}` : typeof v.skip === 'string' ? `: ${v.skip}` : '';
+                    return `${v.variant}: ${v.status} ${duration(v.durationMs)}${note}`;
+                })
+                .join('\n');
+            const chips = c.chips.map((x) => `<span class="chip ${c.status}">${esc(x)}</span>`).join('');
+            cells.push(
+                `<span class="${c.status}${c.differs ? ' differs' : ''}" title="${esc(title)}">${esc(STATUS_MARK[c.status] || c.status)} <span class="word">${esc(c.status)}</span>${chips ? ' ' + chips : ''}</span>`,
+            );
+        });
+        return cells;
+    };
+    for (const [file, fileRows] of files) {
         h.push(`<h3 class="mono">${esc(file || '?')}</h3>`);
-        h.push(
-            table(
-                testHead,
-                rows.map((row) => {
-                    const first = [...row.results.values()][0];
-                    const diags = new Set();
-                    const errors = new Set();
-                    for (const r of row.results.values()) {
-                        for (const d of r.diagnostics || []) {
-                            diags.add(d);
-                        }
-                        if (r.status === 'fail' && r.error) {
-                            errors.add(r.error);
-                        }
-                    }
-                    const kindBadge = `<span class="badge kind-${esc(row.kind)}">${esc(row.kind.replace('-', ' '))}</span>`;
-                    const links = (first.refs || []).map((ref) => `<a href="${esc(ref.url)}">${esc(ref.label)}</a>`);
-                    let name = `${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}`;
-                    name += `<div class="phone-only">${kindBadge}${links.length ? ' ' + links.join(' · ') : ''}</div>`;
-                    for (const e of errors) {
-                        name += `<div class="err">${esc(e)}</div>`;
-                    }
-                    for (const d of diags) {
-                        name += `<div class="diag">${esc(d)}</div>`;
-                    }
-                    const cells = [name, kindBadge, links.join('<br>')];
-                    for (const job of jobs) {
-                        const r = row.results.get(job.id);
-                        if (!r) {
-                            cells.push(`<span class="muted">-</span>`);
-                        } else {
-                            const title =
-                                r.todo && typeof r.todo === 'string'
-                                    ? r.todo
-                                    : r.skip && typeof r.skip === 'string'
-                                      ? r.skip
-                                      : '';
-                            cells.push(
-                                `<span class="${r.status}" title="${esc(title)}">${esc(STATUS_MARK[r.status] || r.status)} ${esc(r.status)}</span><br><span class="muted">${esc(duration(r.durationMs))}</span>`,
-                            );
-                        }
-                    }
-                    return cells;
-                }),
-            ),
-        );
+        h.push(table(testHead, fileRows.map(testRow)));
+    }
+    // the rows where the variants differ, on their own (no JavaScript needed: a plain anchor)
+    h.push(
+        `<h2 id="differing">Rows where the variants differ</h2><p class="muted">${differingRows.length ? `${differingRows.length} row(s). ${legend}.` : 'None: release, ASan and coverage agree in every row.'} <a href="#tests">All tests</a>.</p>`,
+    );
+    if (differingRows.length) {
+        h.push(table(testHead, differingRows.map(testRow)));
     }
 
     // Coverage: component | kind | files | lines | functions | branches (per ref, the coverage variant's job)
@@ -1020,6 +1132,18 @@ function main(argv) {
         });
         process.stdout.write(renderSummaryMarkdown(report) + '\n');
         return 0;
+    }
+    if (command === 'check') {
+        const missing = missingDescriptions(collectResults(options.roots));
+        for (const m of missing) {
+            console.error(`no description: ${m.file}: ${m.name}`);
+        }
+        console.log(
+            missing.length
+                ? `${missing.length} test(s) without a description - add them to test/descriptions.js`
+                : 'every test has a description',
+        );
+        return missing.length ? 1 : 0;
     }
     if (command === 'collect') {
         if (!options.out) {

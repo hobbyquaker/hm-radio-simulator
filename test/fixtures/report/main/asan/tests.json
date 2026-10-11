@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-10-10T18:02:00Z",
+  "counts": {"pass": 3, "fail": 2, "todo": 1, "skip": 0},
+  "tests": [
+    {
+      "name": "#138 on hs485d: a nested system.multicall is refused, hs485d stays up",
+      "file": "test/daemon/hs485d-rpc.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 1900,
+      "diagnostics": []
+    },
+    {
+      "name": "rfd initialises the simulated module and reports the interface CONNECTED",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "fail",
+      "durationMs": 90000,
+      "error": "rfd did not answer within 90000 ms",
+      "diagnostics": []
+    },
+    {
+      "name": "module lost: the pty hangs up - rfd stays alive without spinning (#115) and reports CONNECTED false (#116)",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 9000,
+      "diagnostics": []
+    },
+    {
+      "name": "no busy loop after the hangup",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 1,
+      "status": "todo",
+      "todo": "the read-eof finding is not fixed in this BASE_REF (HMRS_KNOWN_BROKEN)",
+      "durationMs": 0.5,
+      "diagnostics": []
+    },
+    {
+      "name": "frame fuzzing: random frames and garbage on the pty do not crash rfd (seeded)",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "fail",
+      "durationMs": 7000,
+      "error": "sanitizer reports (seed 1): heap-use-after-free",
+      "diagnostics": ["HMRS_SEED=1"]
+    },
+    {
+      "name": "a test nobody explained yet",
+      "file": "test/daemon/rfd-pty-module.test.js",
+      "nesting": 0,
+      "status": "pass",
+      "durationMs": 10,
+      "diagnostics": []
+    }
+  ]
+}
