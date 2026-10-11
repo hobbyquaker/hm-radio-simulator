@@ -48,7 +48,7 @@ async function ticksIn(rfd, ms) {
 const errorLines = (rfd, call) => rfd.grep(new RegExp(`${call}\\(\\) failed`));
 
 test(
-    'a persistent ENODEV on the serial device: rfd lives, logs once, does not spin, reports CONNECTED false',
+    'a persistent ENODEV on the serial device: rfd lives, logs once, does not spin, reports CONNECTED false (#115/#116)',
     options(),
     async (t) => {
         const rfd = await startRfd({faults: true});
@@ -86,7 +86,7 @@ test(
 );
 
 test(
-    'EIO for a while, then the module answers again: CONNECTED goes false and back to true, events arrive',
+    'EIO for a while, then the module answers again: CONNECTED goes false and back to true, events arrive (#115/#116)',
     options(),
     async (t) => {
         const rfd = await startRfd({faults: true});
@@ -128,7 +128,7 @@ test(
     },
 );
 
-test('EINTR on read(): no error line, CONNECTED stays true', options(), async (t) => {
+test('EINTR on read(): no error line, CONNECTED stays true (#115)', options(), async (t) => {
     const rfd = await startRfd({faults: true});
     try {
         rfd.setFault('eintr-once');
@@ -145,7 +145,7 @@ test('EINTR on read(): no error line, CONNECTED stays true', options(), async (t
     }
 });
 
-test('a failing select(): handled like a failing read() - alive, one line, no spin', options(), async (t) => {
+test('a failing select(): handled like a failing read() - alive, one line, no spin (#115)', options(), async (t) => {
     const rfd = await startRfd({faults: true});
     try {
         rfd.setFault('select-fail EBADF');
