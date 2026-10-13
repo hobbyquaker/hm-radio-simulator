@@ -1,7 +1,7 @@
 # Upstream-Berichte
 
 Funde in den Daemons von [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base), die diese Suite gemacht hat, als
-Entwürfe für Issues dort. 001-019 sind am 2026-10-11 als OpenCCU-Base #161-#179 gemeldet; ob und wann ein neuer
+Entwürfe für Issues dort. 001-019 sind am 2026-10-11 als OpenCCU-Base #161-#179 gemeldet, 020 am 2026-10-13 als #185; ob und wann ein neuer
 Entwurf als Issue aufgemacht wird, entscheidet der Maintainer. Der [Testbericht](https://hobbyquaker.github.io/hm-radio-simulator/) und das README verlinken
 die Entwürfe hier, wo sie früher auf den Abschnitt mit den Funden im README zeigten.
 
@@ -45,7 +45,7 @@ nichts aus nicht-öffentlichen Quellen.
 | [017-propertymap-long-line.md](017-propertymap-long-line.md) ([#177](https://github.com/OpenCCU/OpenCCU-Base/issues/177))                     | libelvutils, rfd, hs485d | eine Konfigurationszeile über 255 Zeichen: `PropertyMap::ReadFromFile` liest endlos, der Daemon startet nie                                                                                                                              | `propertymap-long-line`  |
 | [018-xmlrpc-select-fd.md](018-xmlrpc-select-fd.md) ([#178](https://github.com/OpenCCU/OpenCCU-Base/issues/178))                               | libXmlRpc, rfd, hs485d   | ein Socket mit Deskriptor ab 1024: `XmlRpcDispatch::work` wartet mit `select()` auf `fd_set`s, der RPC-Server antwortet nicht mehr                                                                                                       | `xmlrpc-select-fd`       |
 | [019-system-command-slot.md](019-system-command-slot.md) ([#179](https://github.com/OpenCCU/OpenCCU-Base/issues/179))                         | rfd                      | zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Anfrage-Platz; einer nimmt die Antwort des anderen                                                                                                              | `system-command-slot`    |
-| [020-ack-rssi-signed.md](020-ack-rssi-signed.md) (Entwurf)                                                                                    | rfd                      | das Modul schickt den RSSI der Quittung im Sendestatus als vorzeichenbehaftetes Byte, rfd negiert ihn wie den Betrag im Event: -216 statt -40 dBm auf dem CCU3, +40 auf x86_64, in `RSSI_PEER` und `rssiInfo`                            | `ack-rssi-sign`          |
+| [020-ack-rssi-signed.md](020-ack-rssi-signed.md) ([#185](https://github.com/OpenCCU/OpenCCU-Base/issues/185)) (Entwurf)                       | rfd                      | das Modul schickt den RSSI der Quittung im Sendestatus als vorzeichenbehaftetes Byte, rfd negiert ihn wie den Betrag im Event: -216 statt -40 dBm auf dem CCU3, +40 auf x86_64, in `RSSI_PEER` und `rssiInfo`                            | `ack-rssi-sign`          |
 
 Neue Funde späterer Stufen kommen auf dieselbe Weise dazu.
 
