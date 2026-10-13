@@ -157,6 +157,17 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
   Daemons sind danach wie vorher. Dazu riesige und ungültige `listDevices`-Antworten beim `init`, 100 Anmeldungen in
   Folge, zwei Empfänger mit einer ID, eine URL ohne Gegenstelle. Zwei Funde: `init-blocks` und
   `async-callback-threads` (siehe unten).
+- **Ältere Fixes, die jeder Stand schon hat** (älter als der CMake-Build von OpenCCU-Base, also nie als todo und
+  nicht gegen den Stand vor dem Fix beweisbar), festgehalten, damit sie nicht zurückkommen; jeder Test nennt seinen
+  Commit: hs485d nennt ein Wired-Gerät ohne Seriennummer `ELV` plus Adresse in Hex (c57eb49f) und einen
+  Verknüpfungspartner, den kein Gerät hat, `@` plus Hex, und überspringt Dateien ohne Punkt in seinem
+  Geräteverzeichnis (bf7851d1); rfd und hs485d sind mit einem Event an einen trägen XML-RPC-Empfänger
+  (`Content-Length: 0`, der Header endet genau am Ende eines Lesevorgangs, eine `<methodResponse>` ohne `<params>`)
+  sofort fertig, höchstens ein Wiederholungsversuch, kein Warten auf den Timeout, und jede Anfrage trägt `<params>`
+  (fc83bfd4); mit libfaketime an der Uhr des Daemons gibt ein Aufruf an einen Empfänger, der nie antwortet, nach den
+  üblichen 10 s auf - über den 2^32-ms-Überlauf der alten 32-Bit-Millisekundenuhr hinweg wie über Sprünge der Uhr um
+  +1 h und -1 h (90c666c0). Gemessen: der Timeout folgt der Uhrzeit nicht, der `CLOCK_REALTIME`-Kandidat ist kein
+  Fund.
 - **`listMethods` stimmt** (rfd und hs485d, BIN-RPC und XML-RPC): jeder gelistete Name ist dem Dispatcher bekannt
   (gefragt über `system.methodHelp`, die harmlosen auch aufgerufen), und kein anderer: alle Namen aus dem Quelltext
   der Daemons (auch nicht registrierte), die des anderen Daemons, Namen anderer Homematic-Schnittstellen,
@@ -351,7 +362,7 @@ zeigt, seit wann sie dabei ist. So liest
 man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
-  Merge-Commit; auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
+  Merge-Commit (oder, bei einem älteren Fix ohne Pull Request, den Commit); auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
 - **proven** / **not proven** - ob ein Regressionstest ohne seinen Fix nachweislich scheitert: `scripts/prove.mjs` baut
   die Daemons am Commit vor dem Fix und am Merge-Commit und lässt dort nur die Tests mit der Nummer des Fixes laufen,
   normal und mit ASan (Races und Lebensdauerfehler am Commit davor bis zu fünfmal unter ASan). **proven**: Der Test

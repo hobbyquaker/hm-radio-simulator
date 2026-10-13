@@ -72,6 +72,31 @@ export const UPSTREAM_FIXES = Object.freeze({
 });
 
 /**
+ * OpenCCU-Base fixes without a pull request, older than every ref the suite builds (and mostly than its CMake build):
+ * their tests (test/daemon/older-fixes.test.js) carry the short commit in the name ("(c57eb49f)"), never run as todo
+ * and cannot be proven on the parent (scripts/prove.mjs needs a CMake build).
+ * @type {Record<string, {title: string, commit: string}>}
+ */
+export const UPSTREAM_COMMITS = Object.freeze({
+    c57eb49f: {
+        title: 'hs485d: hex instead of decimal device addresses and serials (PRIX32)',
+        commit: 'c57eb49f8a429106a5b9203d7287342b31c9fd37',
+    },
+    bf7851d1: {
+        title: 'hs485d: string search results in std::string::size_type instead of unsigned int',
+        commit: 'bf7851d1325a6bbbea03aa5affcda9d333f9d1a3',
+    },
+    fc83bfd4: {
+        title: 'libXmlRpc: workarounds for lazy XML-RPC servers',
+        commit: 'fc83bfd4ae756f2c0b9380428634f3e318530984',
+    },
+    '90c666c0': {
+        title: 'libXmlRpc: clock_gettime() and 64-bit millisecond times (Y2036)',
+        commit: '90c666c0eb87ce2e6e3f1888fd4d9a67ff6eb298',
+    },
+});
+
+/**
  * Findings of this suite, each with its issue draft in upstream-reports/ (not reported yet; the maintainer decides).
  * When an issue exists, put its URL into `issue` and the draft's status line.
  * `fuzzHarness`: the libFuzzer harness that finds it (its findings are then known, not new, on refs without the fix).
@@ -198,6 +223,15 @@ export function refsForPullRequest(number) {
 }
 
 /**
+ * @param {string} short a key of UPSTREAM_COMMITS
+ * @returns {Ref[]}
+ */
+export function refsForCommit(short) {
+    const fix = UPSTREAM_COMMITS[short];
+    return fix ? [{label: `OpenCCU-Base ${short}`, url: `${BASE}/commit/${fix.commit}`, kind: 'commit'}] : [];
+}
+
+/**
  * @param {string} name a finding's name
  * @returns {Ref[]}
  */
@@ -228,6 +262,12 @@ export function describeTest(name, result = {}) {
         if (!seen.has(number)) {
             seen.add(number);
             refs.push(...refsForPullRequest(number));
+        }
+    }
+    for (const m of name.matchAll(/\b([0-9a-f]{8})\b/g)) {
+        if (UPSTREAM_COMMITS[m[1]] && !seen.has(m[1])) {
+            seen.add(m[1]);
+            refs.push(...refsForCommit(m[1]));
         }
     }
     let kind = 'behaviour';

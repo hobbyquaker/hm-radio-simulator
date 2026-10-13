@@ -100,7 +100,7 @@ CMD ["fuzz/run.sh"]
 FROM ${NODE_IMAGE} AS test
 ARG KNOWN_BROKEN=63,115,116,138,140,double-join,read-eof,aes-republish,wired-maintenance,metadata-args,string-uint-conversion,replace-callback,init-blocks,async-callback-threads,dutycycle-upper-bound,flush-drops-events,unknown-interface,json-substr,hexfile-no-data,propertymap-long-line,xmlrpc-select-fd,system-command-slot,no-sigterm
 RUN apt-get update \
- && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata llvm \
+ && apt-get install -y --no-install-recommends socat procps libasan8 libubsan1 libssl3 ca-certificates tzdata llvm libfaketime \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /opt/daemons /opt/daemons
 COPY --from=build /opt/hmlangw /opt/hmlangw

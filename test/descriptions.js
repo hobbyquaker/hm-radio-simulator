@@ -63,6 +63,26 @@ export const DESCRIPTIONS = Object.freeze({
         'hs485d over xmlrpc: every listed method is callable, no unlisted name is (system.methodHelp and direct calls)':
             'hs485d must be able to call every method it lists, and nothing it does not list (XML-RPC).',
     },
+    'test/daemon/older-fixes.test.js': {
+        'hs485d: a wired device without a serial is named ELV and its address in hex, before and after a restart':
+            'A wired device that reports no serial number gets one made of "ELV" and its bus address in hexadecimal, and keeps it after a restart. An old bug wrote the address in decimal.',
+        'hs485d: a link peer whose address no device on the bus has is shown as @ and the address in hex':
+            'A direct link in a wired device points to an address no device on the bus has; hs485d shows that peer as "@" and the address in hexadecimal. The same old bug wrote it in decimal.',
+        'hs485d device directory: files without a dot are skipped, the good device stays':
+            "Files without a dot in hs485d's device directory are ignored and the real device still loads. An old bug cut such names at a wrong position.",
+        'rfd: a receiver that answers like a lazy server (empty-length, split-header, no-params) is done with every event at once, no hang, no retry storm; every request carries <params>': `${rfd} sends events to a receiver that answers sloppily: an empty body, the header and body apart, or a reply without parameters. Each event must be finished at once - at most one immediate retry, never a wait for the timeout - and every request must be complete.`,
+        'hs485d: a receiver that answers like a lazy server (empty-length, split-header, no-params) is done with every event at once, no hang, no retry storm; every request carries <params>':
+            'The same for hs485d: sloppy answers from a receiver cause no hang and at most one immediate retry, and every request is complete.',
+        'rfd: a receiver that does not answer is given up after the callback timeout, whatever the wall clock does': `${rfd} sends an event to a receiver that never answers while its clock is moved. The call must time out after the usual ten seconds.`,
+        'hs485d: a receiver that does not answer is given up after the callback timeout, whatever the wall clock does':
+            'The same for hs485d: a call to a silent receiver times out after the usual ten seconds while the clock is moved.',
+        'the 32-bit millisecond clock wraps while the call is pending':
+            'The clock is set just before the point where an old 32-bit millisecond counter overflowed (every 49.7 days); the timeout must still work.',
+        'the wall clock steps forward by one hour while the call is pending':
+            'The wall clock jumps an hour ahead, as a time sync at start-up can do; the timeout should not end early.',
+        'the wall clock steps back by one hour while the call is pending':
+            'The wall clock jumps an hour back; the timeout should not be stretched by that hour.',
+    },
     'test/daemon/parsers.test.js': {
         'telegrams from a paired device with mutated content reach the device model and do not crash rfd (seeded)':
             'Hundreds of randomly altered radio telegrams arrive from a paired switch; rfd must process them all and keep working.',

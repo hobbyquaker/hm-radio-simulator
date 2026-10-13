@@ -36,6 +36,11 @@ export const MODES = Object.freeze([
     'huge', // a valid response of several MB
     'trickle', // the proper response, one byte every 100 ms
     'twice', // the proper response, twice (an answer for a request that was never sent)
+    // the lazy servers of OpenCCU-Base fc83bfd4 (libXmlRpc's XmlRpcClient::readHeader); XML-RPC only, BIN-RPC answers
+    // properly in these modes
+    'empty-length', // HTTP 200 with `Content-Length: 0` and no body at all
+    'split-header', // the header alone, ending with \r\n\r\n as the last bytes of a write, the body 300 ms later
+    'no-params', // a `<methodResponse>` without `<params>`
 ]);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,7 +80,7 @@ export class RawReceiver {
         this.listDevices = listDevices;
         this.mode = 'ok';
         this.on = (method) => method === 'system.multicall' || method === 'event';
-        /** @type {Array<{method: string, at: number, mode: string}>} */
+        /** @type {Array<{method: string, at: number, mode: string, body?: string}>} */
         this.requests = [];
         this.sockets = new Set();
         this.connections = 0;
@@ -130,7 +135,7 @@ export class RawReceiver {
                     return;
                 }
                 buffer = buffer.subarray(message.length);
-                this.handle(socket, message.method, message.params);
+                this.handle(socket, message.method, message.params, message.body);
                 if (socket.destroyed || socket.isPaused()) {
                     return;
                 }
@@ -171,11 +176,11 @@ export class RawReceiver {
         const body = buffer.subarray(end + 4, length).toString('utf8');
         const method = (/<methodName>([^<]*)<\/methodName>/.exec(body) || [])[1] || '(none)';
         const calls = method === 'system.multicall' ? (body.match(/<name>methodName<\/name>/g) || []).length : 0;
-        return {length, method, params: [calls]};
+        return {length, method, params: [calls], body};
     }
 
-    record(method, mode) {
-        this.requests.push({method, at: Date.now(), mode});
+    record(method, mode, body) {
+        this.requests.push({method, at: Date.now(), mode, ...(body !== undefined ? {body} : {})});
     }
 
     /** The proper answer value of a request. */
@@ -211,9 +216,9 @@ export class RawReceiver {
         return Buffer.concat([Buffer.from('Bin'), Buffer.from([MSG.FAULT]), u32(body.length), body]);
     }
 
-    handle(socket, method, params) {
+    handle(socket, method, params, body) {
         const mode = this.on(method) ? this.mode : 'ok';
-        this.record(method, mode);
+        this.record(method, mode, body);
         const proper = () => this.encode(this.answerValue(method, params));
         switch (mode) {
             case 'ok':
@@ -266,6 +271,30 @@ export class RawReceiver {
                 return;
             case 'twice':
                 socket.write(Buffer.concat([proper(), proper()]));
+                return;
+            case 'empty-length':
+                socket.write(
+                    this.protocol === 'xmlrpc'
+                        ? Buffer.from('HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: 0\r\n\r\n')
+                        : proper(),
+                );
+                return;
+            case 'split-header':
+                if (this.protocol === 'xmlrpc') {
+                    const bytes = proper();
+                    const end = bytes.indexOf('\r\n\r\n') + 4;
+                    socket.write(bytes.subarray(0, end));
+                    setTimeout(() => socket.destroyed || socket.write(bytes.subarray(end)), 300);
+                } else {
+                    socket.write(proper());
+                }
+                return;
+            case 'no-params':
+                socket.write(
+                    this.protocol === 'xmlrpc'
+                        ? httpResponse('<?xml version="1.0"?><methodResponse></methodResponse>')
+                        : proper(),
+                );
                 return;
             default:
                 socket.write(proper());
