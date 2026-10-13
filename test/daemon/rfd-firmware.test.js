@@ -278,7 +278,15 @@ test(
             const from = receiver.received.length;
             assert.equal(await rfd.call('updateFirmware', [UPDATABLE_SERIAL], {timeout: 120000}), true);
             await updatedDescription(rfd);
-            const update = receiver.received.slice(from).find((r) => r.method === 'updateDevice');
+            // the callback is sent after the rebuild from its own thread: wait for it
+            const until = Date.now() + 15000;
+            let update = null;
+            while (!update && Date.now() < until) {
+                update = receiver.received.slice(from).find((r) => r.method === 'updateDevice');
+                if (!update) {
+                    await sleep(100);
+                }
+            }
             assert.ok(
                 update,
                 `updateDevice at the receiver: ${receiver.received
