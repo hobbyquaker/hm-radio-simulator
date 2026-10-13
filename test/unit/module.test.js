@@ -182,6 +182,8 @@ test('SEND_TELEGRAM: the default air reports TELEGRAM_SENT; an acknowledging air
     h.send(TYPE.BIDCOS, BIDCOS.SEND_TELEGRAM, [0x00, 0x00, 0x00, ...telegram]);
     const [, acked] = await h.waitFrames(2);
     assert.equal(acked[3], BIDCOS_STATUS.TELEGRAM_SENT_RECVD_ACK);
+    // measured on an RPI-RF-MOD: the status frame carries the RSSI as a signed byte (statusRssiByte), -55 = 0xc9
+    assert.equal(acked[5], 0xc9);
     // rfd accepts an acknowledged-telegram response of 15 to 32 payload bytes
     assert.ok(acked.length >= 15 && acked.length <= 32, `size ${acked.length}`);
     const ack = decodeTelegram(acked.subarray(6));
@@ -201,7 +203,7 @@ test('events: an event frame stays within the size rfd accepts; the duty-cycle e
     const [event, duty] = await h.waitFrames(2);
     assert.equal(event[0], TYPE.BIDCOS);
     assert.equal(event[2], BIDCOS.EVENT);
-    assert.equal(event[5], 70);
+    assert.equal(event[5], 70); // the event carries the magnitude, unlike the status frame
     assert.ok(event.length >= 15 && event.length <= 32, `size ${event.length}`);
     assert.deepEqual([...duty.subarray(2)], [SYSTEM.EVENT_DUTYCYCLE, 74]);
 });

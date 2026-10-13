@@ -393,6 +393,11 @@ export const DESCRIPTIONS = Object.freeze({
             'Switching on: the command reaches the switch, its confirmation becomes the new state.',
         'a status report from the device becomes an event; rfd acknowledges it':
             'A status report the switch sends on its own becomes an event and is acknowledged.',
+        "the ACK's RSSI: the module reports the status frame's RSSI as a signed byte; rfd shows it in RSSI_PEER and rssiInfo": `${rfd} switches the device and reads the field strength of its acknowledgement. The module sends it as a signed byte, which rfd misreads, so the value is wrong (a finding).`,
+        "RSSI_PEER is the ACK's RSSI in dBm":
+            "The device's RSSI_PEER value must be the acknowledgement's field strength in dBm (negative).",
+        "rssiInfo has the ACK's RSSI in dBm":
+            'The rssiInfo table must show the same value for the device and its interface.',
         'UNREACH: a silent device fails the set, UNREACH and STICKY_UNREACH go up; the device returns, UNREACH goes down':
             'A switch that stops answering is marked unreachable, and cleared again when it comes back.',
         'CONFIG_PENDING: a MASTER parameter for a silent device stays pending and is delivered when it answers':

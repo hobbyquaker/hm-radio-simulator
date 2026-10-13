@@ -192,6 +192,11 @@ export const FINDINGS = Object.freeze({
         draft: '019-system-command-slot.md',
         issue: null,
     },
+    'ack-rssi-sign': {
+        title: "rfd: the RSSI byte in the module's send status (the ACK) is signed; rfd negates it like the event's magnitude",
+        draft: '020-ack-rssi-signed.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

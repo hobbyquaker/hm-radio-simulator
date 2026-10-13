@@ -25,6 +25,7 @@ import {
     SWITCH_ADDRESS,
 } from '../helpers/switch.js';
 import {BIDCOS_STATUS} from '../../lib/commands.js';
+import {regression} from '../helpers/known.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const options = (extra = {}) => ({...skipWithoutDaemons, timeout: 240000, ...extra});
@@ -165,6 +166,41 @@ test('a status report from the device becomes an event; rfd acknowledges it', op
         assert.ok(typeof rssi === 'number' && rssi < 0, `RSSI_DEVICE ${rssi}`);
     }).finally(cleanup);
 });
+
+test(
+    "the ACK's RSSI: the module reports the status frame's RSSI as a signed byte; rfd shows it in RSSI_PEER and rssiInfo (ack-rssi-sign)",
+    options(),
+    async (t) => {
+        // measured on an RPI-RF-MOD: the send status (TELEGRAM_SENT_RECVD_ACK) carries the RSSI of the device's
+        // acknowledgement as a signed byte, the event frame as the magnitude (lib/module.js statusRssiByte); rfd
+        // negates both like the magnitude (CCU2CommController::assembleBidcosFrame), so the ACK's RSSI reaches
+        // RSSI_PEER and rssiInfo as +55 on x86_64 (-201 on ARM) for a device at -55 dBm
+        const {rfd, receiver, air, sw, cleanup} = await setup(t, {device: {rssi: -55}});
+        await withDaemon(rfd, async () => {
+            await pairSwitch(rfd, receiver, air, sw);
+            await rfd.call('setValue', [CH1, 'STATE', true]);
+            assert.equal(sw.behaviour.channel(1).STATE, 200, 'the set reached the device');
+            await sleep(500);
+            const peer = await rfd.call('getValue', [CH0, 'RSSI_PEER']);
+            const info = await rfd.call('rssiInfo', []);
+            const iface = Object.keys(info[SWITCH_SERIAL] || {})[0];
+            const tuple = iface ? info[SWITCH_SERIAL][iface] : null;
+            // measured (3.89.11, x86_64): RSSI_PEER 55, rssiInfo [-55, 55] - the event's value right, the ACK's positive
+            t.diagnostic(
+                `after the set: RSSI_PEER ${peer}, rssiInfo[${SWITCH_SERIAL}][${iface}] ${JSON.stringify(tuple)}`,
+            );
+            assert.equal(typeof peer, 'number', `RSSI_PEER ${peer}`);
+            assert.ok(tuple && typeof tuple[1] === 'number', `rssiInfo ${JSON.stringify(info[SWITCH_SERIAL])}`);
+            await t.test("RSSI_PEER is the ACK's RSSI in dBm", regression('ack-rssi-sign'), () => {
+                assert.equal(peer, -55);
+            });
+            await t.test("rssiInfo has the ACK's RSSI in dBm", regression('ack-rssi-sign'), () => {
+                assert.equal(tuple[1], -55);
+            });
+            assert.ok(rfd.alive);
+        }).finally(cleanup);
+    },
+);
 
 test(
     'UNREACH: a silent device fails the set, UNREACH and STICKY_UNREACH go up; the device returns, UNREACH goes down',

@@ -332,7 +332,7 @@ test('two modules on one air: each hears the device with its own RSSI, overhears
     a.send(central(FT.CENTRAL, [0x02, 0x01, 0xc8, 0, 0], 3));
     const [, status] = await a.waitFrames(2);
     assert.equal(status[3], BIDCOS_STATUS.TELEGRAM_SENT_RECVD_ACK);
-    assert.equal(status[5], 80, 'the acknowledgement carries A’s RSSI');
+    assert.equal(status[5], 0xb0, 'the acknowledgement carries A’s RSSI, as a signed byte (-80; statusRssiByte)');
     const [, overheard] = await b.waitFrames(2);
     assert.equal(overheard[2], BIDCOS.EVENT);
     assert.equal(decodeTelegram(overheard.subarray(6)).type, FT.ACK_OR_NACK);

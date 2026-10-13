@@ -53,8 +53,9 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   aus, liest die Listen und Peers zurück, meldet `newDevices`), Schalten mit `ACK_STATUS` und dem Event dazu,
   eine Statusmeldung des Geräts, `UNREACH`/`STICKY_UNREACH` samt Servicemeldung bei einem stummen Gerät und das
   Zurückkommen, `CONFIG_PENDING` für eine Konfiguration, die erst nach der Rückkehr ankommt, der Duty Cycle, die
-  Events über BIN-RPC und XML-RPC. Jeder Test schreibt die Telegramme der Luftstrecke als Spur in den Bericht, sodass
-  sich die OpenCCU-Base-Versionen vergleichen lassen.
+  Events über BIN-RPC und XML-RPC, der RSSI der Quittung (der Fund `ack-rssi-sign`: das Modul schickt ihn im
+  Sendestatus als vorzeichenbehaftetes Byte, rfd liest ihn wie den Betrag im Event). Jeder Test schreibt die Telegramme
+  der Luftstrecke als Spur in den Bericht, sodass sich die OpenCCU-Base-Versionen vergleichen lassen.
 - **rfd am LAN-Gateway mit AES (`lib/lgw.js`):** ein HM-LGW-Gegenstück in JavaScript mit `Encryption Key`, dem
   `V`-Handshake und AES-128-CFB auf beiden Ports: die Initialisierung durch den verschlüsselten Kanal, ein falscher
   LAN-Schlüssel (rfd meldet `WRONG_KEY` und beendet sich), Klartext, Port 2000 weg, Port 2001 weg, ein stummes
@@ -223,7 +224,7 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
-`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data`, `propertymap-long-line` (siehe Fuzzing), `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s) und `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-019 sind als
+`metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data`, `propertymap-long-line` (siehe Fuzzing), `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s), `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen) und `ack-rssi-sign` (das Modul schickt den RSSI der Quittung im Sendestatus als vorzeichenbehaftetes Byte, rfd negiert ihn wie den Betrag im Event: -216 statt -40 dBm auf dem CCU3, +40 auf x86_64, in `RSSI_PEER` und `rssiInfo`). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-019 sind als
 OpenCCU-Base #161-#179 gemeldet (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)).
 
 ## Wie es funktioniert
@@ -371,7 +372,7 @@ man ihn:
   der ganze Nachweis in `proof.json`. Er kostet zwei Image-Builds je Fix; die CI führt ihn deshalb wöchentlich, auf
   Anforderung (`workflow_dispatch` mit `prove`) und bei einem Push aus, der die Fix-Liste oder einen Regressionstest
   ändert; dazwischen behält der Bericht den letzten. Lokal: `node scripts/prove.mjs local [--fixes 9,16]`;
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`, `ack-rssi-sign`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
