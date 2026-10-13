@@ -396,7 +396,7 @@ test("describeTest: a finding's issue number in the name links the issue and the
         refs.map((r) => [r.kind, r.url]),
         [
             ['issue', 'https://github.com/OpenCCU/OpenCCU-Base/issues/164'],
-            ['commit', 'https://github.com/hobbyquaker/OpenCCU-Base/commit/e04c4a1b72f340c836cc0f4ed686bab752fbb159'],
+            ['commit', 'https://github.com/hobbyquaker/OpenCCU-Base/commit/2386c07aca3c5763336b62ba2c582bd38f5e815c'],
         ],
     );
     // the finding's name and its number in one name: one set of links

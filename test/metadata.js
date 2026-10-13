@@ -222,7 +222,7 @@ export const FINDINGS = Object.freeze({
         title: 'rfd and hs485d do not handle SIGTERM: a pending save is lost on stop',
         draft: '004-no-sigterm-handling.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/164',
-        fork: {commit: 'e04c4a1b72f340c836cc0f4ed686bab752fbb159', branch: 'fix/164-sigterm'},
+        fork: {commit: '2386c07aca3c5763336b62ba2c582bd38f5e815c', branch: 'fix/164-sigterm'},
     },
 });
 
