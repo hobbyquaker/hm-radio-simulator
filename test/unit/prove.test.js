@@ -10,6 +10,7 @@ import {
     proofFixes,
     planJobs,
     proofRelevant,
+    summarySignature,
     proofPattern,
     proofTests,
     judgeFix,
@@ -279,4 +280,66 @@ test('buildReport carries the proof and puts a proof field on the tests the proo
     assert.equal(report.proof, proof);
     assert.equal(report.jobs[0].tests[0].proof.status, 'proven');
     assert.equal(report.jobs[0].tests[1].proof, undefined);
+});
+
+test('summarySignature drops file and line, which move between the parent and the merge commit', () => {
+    assert.equal(
+        summarySignature(
+            'SUMMARY: ThreadSanitizer: data race /openccu-base/src/rfd/hm2/LGWPortWrapper.cpp:108 in HM2::LGWPortWrapper::ReadData(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*)',
+        ),
+        'ThreadSanitizer: data race in HM2::LGWPortWrapper::ReadData(std::string*)',
+    );
+    assert.equal(
+        summarySignature('SUMMARY: AddressSanitizer: heap-use-after-free /src/a.cpp:12:3 in f()'),
+        'AddressSanitizer: heap-use-after-free in f()',
+    );
+    assert.equal(summarySignature('WARNING: ThreadSanitizer: data race (pid=98)'), null);
+});
+
+test('judgeFix under TSan: a race only the parent reports proves the fix, races on both do not block the others', () => {
+    const tsanRun = (side, sanitizers) =>
+        run(side, {
+            release: {runs: 1, tests: [t('a', 'pass')]},
+            tsan: {runs: 1, tests: [t('a', 'fail')], sanitizers},
+        });
+    const proven = judgeFix(
+        9,
+        tsanRun('parent', ['T: data race in old()', 'T: data race in both()']),
+        tsanRun('merge', ['T: data race in both()']),
+        fixes,
+    );
+    assert.equal(proven.status, 'proven');
+    assert.equal(proven.provenBy, 'sanitizer');
+    assert.deepEqual(proven.sanitizerOnlyParent, ['T: data race in old()']);
+    const same = judgeFix(
+        9,
+        tsanRun('parent', ['T: data race in both()']),
+        tsanRun('merge', ['T: data race in both()']),
+        fixes,
+    );
+    assert.equal(same.status, 'not-proven');
+    assert.equal(
+        same.passedOnMerge,
+        true,
+        'the tsan failure on the merge commit is judged by its reports, not as a failed test',
+    );
+});
+
+test('the plan carries the variants a fix is proven in and what the image must build', () => {
+    const jobs = planJobs(
+        {parentOf: () => 'p', contains: () => false},
+        {
+            16: {title: 'x', commit: 'm', proofRepeat: 5, proofVariants: ['release', 'asan', 'tsan']},
+            9: {title: 'y', commit: 'n'},
+        },
+    );
+    assert.deepEqual(
+        jobs.map((j) => [j.fix, j.side, j.variants, j.daemon_variants]),
+        [
+            [9, 'parent', 'release,asan', 'release asan'],
+            [9, 'merge', 'release,asan', 'release asan'],
+            [16, 'parent', 'release,asan,tsan', 'release asan tsan'],
+            [16, 'merge', 'release,asan,tsan', 'release asan tsan'],
+        ],
+    );
 });

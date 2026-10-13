@@ -26,10 +26,13 @@ const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob
  *
  * `proofRepeat`: how often the proof runs the tests on the parent under ASan before it calls the fix "not proven" - for
  * races and lifetime bugs, which a single run may miss (default 1).
+ * `proofVariants`: the daemon variants the proof runs (default release and asan, scripts/prove.mjs PROOF_VARIANTS);
+ * with `tsan` the fix is also judged by ThreadSanitizer's reports - a race signature the parent reports and the merge
+ * commit does not is the fix's proof (`provenBy: 'sanitizer'`).
  *
  * Not listed: #112 (eq3_char_loop, 769c9eb0) and #22 - eq3_char_loop and multimacd are stage 5 (multimacd in a VM);
  * they join this list with their tests.
- * @type {Record<number, {title: string, commit: string, proofRepeat?: number}>}
+ * @type {Record<number, {title: string, commit: string, proofRepeat?: number, proofVariants?: string[]}>}
  */
 export const UPSTREAM_FIXES = Object.freeze({
     4: {
@@ -45,6 +48,7 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'rfd: synchronize LGW controller lifetime during reconnect',
         commit: '2848a5f8f44b8246a09b0eee93203dc7dfde7d2c',
         proofRepeat: 5,
+        proofVariants: ['release', 'asan', 'tsan'],
     },
     17: {
         title: 'LAN gateway: fix case-sensitive serial mismatch between connection and status',
@@ -113,10 +117,38 @@ export const UPSTREAM_COMMITS = Object.freeze({
  *              request; nothing else changes
  * A finding with a fork fix and an issue joins the proof under its issue number (scripts/prove.mjs): its tests' names
  * carry `#<issue>`.
+ * `signatures`: a data race ThreadSanitizer reports (the tsan variant): regular expressions over the SUMMARY lines of
+ * its reports. On a ref known to lack the fix, Daemon.sanitizerReports() leaves reports out whose summaries all match a
+ * known finding's signatures (knownSanitizerReports() has them), so the tests that insist on "no sanitizer report"
+ * keep passing under tsan until a new race appears - which then fails them, as it should.
  * @type {Record<string, {title: string, draft: string, issue: string|null, fuzzHarness?: string, fixedBy?: string,
- *   fork?: {commit: string, branch: string}, proofRepeat?: number}>}
+ *   fork?: {commit: string, branch: string}, proofRepeat?: number, signatures?: RegExp[]}>}
  */
 export const FINDINGS = Object.freeze({
+    'ulc-data-races': {
+        title: "libUnifiedLanComm: the connection state, the receive thread's stop and the hello handling race between the receive thread and the caller (ThreadSanitizer; rfd's HM-LGW and hs485d's HMW-LGW path)",
+        draft: '024-ulc-data-races.md',
+        issue: null,
+        signatures: [
+            /ulc::UnifiedLanCommController::(stopReceiveThread|handleHelloMessage|waitForState|~UnifiedLanCommController|disconnect|connect)\(/,
+            /ulc::LanConnection::(disconnect|connect|waitForData|receive|send)\(/,
+        ],
+    },
+    'copro-request-races': {
+        title: 'rfd: the coprocessor request slot (CCU2CommController RequestInfo, the command copied into it) is written by the serial receive thread and read by the waiting caller outside the lock, and handleIncomingResponse locks a mutex twice (ThreadSanitizer; the area of the system-command-slot finding, #179)',
+        draft: '026-copro-request-races.md',
+        issue: null,
+        signatures: [
+            /HM2::CCU2CommController::(waitForCoProcessorResponse|sendSystemCommand|sendBidcosRequest|internalSendBidcosRequest|sendBidcosTelegram|handleIncomingResponse|handleIncomingSerialFrame|handleIdentifyEvent)\(/,
+            /HM2::CCU2CoprocessorCommand::(operator=|CCU2CoprocessorCommand)\(/,
+        ],
+    },
+    'lgw-wrapper-races': {
+        title: "rfd's and hs485d's LGWPortWrapper: the last-communication timestamp, the keepalive thread's stop flag and the reconnect state are plain variables written by one thread and read by another (ThreadSanitizer)",
+        draft: '025-lgw-wrapper-races.md',
+        issue: null,
+        signatures: [/LGWPortWrapper::(ReadData|SendData|reconnect|\w*KeepAlive\w*)\(/],
+    },
     'double-join': {
         title: 'rfd aborts under ASan on init(url, ""): the receiver dispatcher thread is joined twice (libelvutils Actor::Stop())',
         draft: '001-double-join.md',

@@ -105,7 +105,7 @@ export function collectResults(roots) {
         walk(root);
     }
     // oldest tag -> newer tag -> main; per ref release, asan, coverage
-    const variantOrder = (v) => ['release', 'asan', 'coverage'].indexOf(v) + 1 || 9;
+    const variantOrder = (v) => ['release', 'asan', 'coverage', 'tsan'].indexOf(v) + 1 || 9;
     jobs.sort((a, b) => compareRefs(a.ref, b.ref) || variantOrder(a.variant) - variantOrder(b.variant));
     fuzz.sort((a, b) => compareRefs(a.ref, b.ref));
     return {jobs, fuzz};
@@ -750,7 +750,7 @@ export function renderHtml(report, history = []) {
     const refs = groupByRef(jobs);
     const rows = [...byName.values()];
     const counts = refCounts(rows, refs);
-    const legend = `<span class="chip">A</span> ASan, <span class="chip">C</span> coverage, <span class="chip">R</span> release: the variant(s) with the shown result where the variants of a ref differ (the coverage variant counts only where it differs from release)`;
+    const legend = `<span class="chip">A</span> ASan, <span class="chip">C</span> coverage, <span class="chip">R</span> release, <span class="chip">T</span> ThreadSanitizer (the heads only, on the weekly run or on request): the variant(s) with the shown result where the variants of a ref differ (the coverage variant counts only where it differs from release)`;
 
     // Jobs: one row per ref - commit, the variants with their durations, the combined counts
     h.push(
@@ -894,7 +894,7 @@ export function renderHtml(report, history = []) {
     h.push(`</div>`);
     // the rows where the variants differ, on their own (no JavaScript needed: a plain anchor)
     h.push(
-        `<h2 id="differing">Rows where the variants differ</h2><p class="muted">${differingRows.length ? `${differingRows.length} row(s). ${legend}.` : 'None: release, ASan and coverage agree in every row.'} <a href="#tests">All tests</a>.</p>`,
+        `<h2 id="differing">Rows where the variants differ</h2><p class="muted">${differingRows.length ? `${differingRows.length} row(s). ${legend}.` : 'None: the variants agree in every row.'} <a href="#tests">All tests</a>.</p>`,
     );
     if (differingRows.length) {
         h.push(table(testHead, differingRows.map(testRow)));

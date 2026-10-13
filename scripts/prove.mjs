@@ -100,6 +100,9 @@ export function planJobs({fixes, parentOf, contains, findings = FINDINGS}, all =
                 known_broken: knownBroken((commit) => contains(commit, sha), pullRequests, findings).join(','),
                 pattern: proofPattern(fix),
                 repeat: side === 'parent' ? entry.proofRepeat || 1 : 1,
+                variants: (entry.proofVariants || PROOF_VARIANTS).join(','),
+                // what the image must build (release and asan always are)
+                daemon_variants: [...new Set(['release', 'asan', ...(entry.proofVariants || [])])].join(' '),
             });
         }
     }
@@ -163,7 +166,7 @@ function runSide(o) {
     if (!o.buildFailed) {
         for (const variant of o.variants) {
             // the parent may need several runs to show a race; the merge commit runs once
-            const repeat = o.side === 'parent' && variant === 'asan' ? Number(o.repeat || 1) : 1;
+            const repeat = o.side === 'parent' && variant !== 'release' ? Number(o.repeat || 1) : 1;
             const v = {runs: 0, failedRun: null, tests: []};
             for (let i = 1; i <= repeat; i++) {
                 let results = path.resolve(o.out, `${variant}-${i}`);
@@ -175,6 +178,9 @@ function runSide(o) {
                 fs.mkdirSync(results, {recursive: true});
                 const name = `hmrs-proof-${o.fix}-${o.side}-${variant}-${i}-${process.pid}`;
                 const args = ['run', '--rm', '--init', '--cap-add', 'SYS_NICE', '--name', name];
+                if (variant === 'tsan') {
+                    args.push('--security-opt', 'seccomp=unconfined'); // setarch -R (test/helpers/daemon.js)
+                }
                 args.push('-e', `HMRS_VARIANT=${variant}`, '-e', `HMRS_TEST_NAME_PATTERN=${o.pattern}`);
                 if (o.knownBroken !== undefined) {
                     args.push('-e', `HMRS_KNOWN_BROKEN=${o.knownBroken}`);
@@ -197,6 +203,9 @@ function runSide(o) {
                     v.timedOut = true;
                 }
                 v.tests = tests;
+                v.sanitizers = [
+                    ...new Set([...(v.sanitizers || []), ...sanitizerSignatures(path.join(results, variant))]),
+                ];
                 if (tests.some((t) => t.outcome === 'fail')) {
                     v.failedRun = i;
                     break;
@@ -210,15 +219,60 @@ function runSide(o) {
     return record;
 }
 
+/**
+ * The sanitizer reports of a run (the daemons' asan.* and tsan.* files below the results), as signatures without file
+ * and line, which move between the parent and the merge commit: "data race in HM2::LGWPortWrapper::ReadData(...)".
+ */
+export function sanitizerSignatures(dir) {
+    const found = new Set();
+    const walk = (d) => {
+        let entries;
+        try {
+            entries = fs.readdirSync(d, {withFileTypes: true});
+        } catch {
+            return;
+        }
+        for (const e of entries) {
+            const full = path.join(d, e.name);
+            if (e.isDirectory()) {
+                walk(full);
+            } else if (/^[at]san\./.test(e.name)) {
+                for (const line of fs.readFileSync(full, 'utf8').split('\n')) {
+                    const signature = summarySignature(line);
+                    if (signature) {
+                        found.add(signature);
+                    }
+                }
+            }
+        }
+    };
+    walk(dir);
+    return [...found].sort();
+}
+
+/** "SUMMARY: ThreadSanitizer: data race /src/x.cpp:108 in F(int)" -> "ThreadSanitizer: data race in F(int)" */
+export function summarySignature(line) {
+    const m = /^SUMMARY: (\w+Sanitizer): ([\w -]+?) (?:\S+:\d+(?::\d+)? )?in (.+)$/.exec(line.trim());
+    return m
+        ? `${m[1]}: ${m[2]} in ${m[3].replace(/std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >/g, 'std::string')}`
+        : null;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // judging
 
 const key = (t) => `${t.file}\u0000${t.nesting}\u0000${t.name}`;
 
-/** Per test of one side: 'fail' when it failed in any variant (any run), else 'pass'. */
+/**
+ * Per test of one side: 'fail' when it failed in any variant (any run), else 'pass'. The tsan variant is judged by its
+ * reports instead (judgeFix): races the fix did not touch make a test fail on the merge commit too.
+ */
 function outcomes(run) {
     const map = new Map();
-    for (const v of Object.values(run.variants || {})) {
+    for (const [variant, v] of Object.entries(run.variants || {})) {
+        if (variant === 'tsan') {
+            continue;
+        }
         for (const t of v.tests) {
             const prev = map.get(key(t));
             map.set(key(t), {
@@ -291,8 +345,16 @@ export function judgeFix(fix, parent, merge, all = proofFixes()) {
     }
     entry.failedOnParent = entry.tests.filter((t) => t.parent === 'fail').map((t) => t.name);
     entry.passedOnMerge = entry.tests.every((t) => t.merge === 'pass');
+    // ThreadSanitizer: a race reported on the parent and not on the merge commit is what the fix removed
+    const tsan = (r) => (r.variants.tsan && r.variants.tsan.sanitizers) || null;
+    if (tsan(parent) && tsan(merge)) {
+        entry.sanitizerOnlyParent = tsan(parent).filter((sig) => !tsan(merge).includes(sig));
+    }
     if (entry.tests.some((t) => t.proves)) {
         entry.status = 'proven';
+    } else if (entry.sanitizerOnlyParent && entry.sanitizerOnlyParent.length > 0) {
+        entry.status = 'proven';
+        entry.provenBy = 'sanitizer';
     } else if (entry.failedOnParent.length === 0) {
         entry.status = 'not-proven';
     } else {
@@ -362,8 +424,8 @@ export function proofForTest(test, proof) {
             ...(entry.repo ? {repo: entry.repo} : {}),
             ...(entry.finding ? {finding: entry.finding} : {}),
         };
-        if (t && t.proves) {
-            return {status: 'proven', ...about};
+        if (t && (t.proves || entry.provenBy === 'sanitizer')) {
+            return {status: 'proven', ...about, ...(t.proves ? {} : {by: 'sanitizer'})};
         }
         if (t || (entry.status === 'no-build' && test.nesting === 0)) {
             found = found || {status: entry.status === 'proven' ? 'not-proven' : entry.status, ...about};
@@ -550,7 +612,7 @@ function main(argv) {
                     '--build-arg',
                     `BASE_LABEL=#${job.fix} ${job.side}`,
                     '--build-arg',
-                    'DAEMON_VARIANTS=release asan',
+                    `DAEMON_VARIANTS=${job.daemon_variants}`,
                     '-t',
                     image,
                     HERE,
@@ -566,7 +628,7 @@ function main(argv) {
                 knownBroken: job.known_broken,
                 repeat: job.repeat,
                 pattern: job.pattern,
-                variants: o.variantList,
+                variants: o.variants ? o.variantList : job.variants.split(','),
                 buildFailed: build.status !== 0,
                 lock,
             });

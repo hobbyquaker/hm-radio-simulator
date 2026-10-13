@@ -10,8 +10,8 @@
 
 import {compareRefs} from './refs.mjs';
 
-export const VARIANT_ORDER = Object.freeze(['release', 'asan', 'coverage']);
-export const VARIANT_CHIP = Object.freeze({release: 'R', asan: 'A', coverage: 'C'});
+export const VARIANT_ORDER = Object.freeze(['release', 'asan', 'coverage', 'tsan']);
+export const VARIANT_CHIP = Object.freeze({release: 'R', asan: 'A', coverage: 'C', tsan: 'T'});
 const RANK = {pass: 0, skip: 1, todo: 2, fail: 3};
 
 /** The worse of two statuses. */

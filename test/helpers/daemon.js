@@ -11,6 +11,7 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import {RadioModule} from '../../lib/module.js';
 import {createPtyModule} from '../../lib/pty.js';
@@ -21,6 +22,7 @@ import {WiredBus} from '../../lib/wired.js';
 import {Air} from '../../lib/air.js';
 import {BinRpcClient, XmlRpcClient, freePort} from './rpc.js';
 import {track, untrack} from './hang-guard.js';
+import {knownRacesIn} from './known.js';
 
 export const DAEMONS = process.env.HMRS_DAEMONS || '';
 export const RFTYPES = process.env.HMRS_RFTYPES || '/opt/openccu-base/rftypes';
@@ -46,13 +48,19 @@ export const CENTRAL_ADDRESS = 0x3a2b1c;
 /** A test-only AES key, nothing a real system ever had. */
 export const TEST_KEY_HEX = '00112233445566778899aabbccddeeff';
 
-const READY_TIMEOUT_MS = Number(process.env.HMRS_READY_TIMEOUT_MS || (DAEMONS.endsWith('asan') ? 90000 : 45000));
+const TSAN = DAEMONS.endsWith('tsan');
+const READY_TIMEOUT_MS = Number(
+    process.env.HMRS_READY_TIMEOUT_MS || (DAEMONS.endsWith('asan') || DAEMONS.endsWith('tsan') ? 90000 : 45000),
+);
 const LOG_KEEP = 400;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Variables whose values are lists: combineEnv() joins them instead of replacing one with the other. */
-const LIST_VARIABLES = {LD_PRELOAD: ':', ASAN_OPTIONS: ':', UBSAN_OPTIONS: ':'};
+/** ThreadSanitizer's suppressions (the tsan variant): known third-party noise, each entry with its reason. */
+const TSAN_SUPPRESSIONS = fileURLToPath(new URL('../tsan.supp', import.meta.url));
+
+const LIST_VARIABLES = {LD_PRELOAD: ':', ASAN_OPTIONS: ':', UBSAN_OPTIONS: ':', TSAN_OPTIONS: ':'};
 
 /**
  * Merges environment additions for a daemon: later ones win, except for LD_PRELOAD and the sanitizer options, whose
@@ -87,6 +95,13 @@ function daemonEnv(workdir, extra = {}) {
             ASAN_OPTIONS:
                 process.env.ASAN_OPTIONS || `detect_leaks=0:abort_on_error=1:log_path=${path.join(workdir, 'asan')}`,
             UBSAN_OPTIONS: process.env.UBSAN_OPTIONS || `print_stacktrace=1:log_path=${path.join(workdir, 'ubsan')}`,
+            // the tsan variant: every report into the work dir (a test with one fails, see withDaemon), the known
+            // third-party noise suppressed (test/tsan.supp)
+            // exitcode=0: the daemon's own exit code stays what the tests measure (ThreadSanitizer would turn it
+            // into 66 after any report), the reports are in the files
+            TSAN_OPTIONS:
+                process.env.TSAN_OPTIONS ||
+                `halt_on_error=0:exitcode=0:second_deadlock_stack=1:history_size=4:log_path=${path.join(workdir, 'tsan')}:suppressions=${TSAN_SUPPRESSIONS}`,
             TZ: 'Europe/Berlin',
         },
         extra,
@@ -124,7 +139,16 @@ export class Daemon {
 
     start() {
         track(this); // stopped by the hang guard after the last test if a timed-out test left it running
-        this.proc = spawn(this.bin, this.args, {
+        // ThreadSanitizer cannot map its shadow memory when the kernel randomises mmap with more bits than it expects
+        // ("unexpected memory mapping"): the tsan variant starts the daemon without address randomisation (setarch -R
+        // execs it, the pid stays); the container needs `--security-opt seccomp=unconfined` for that personality
+        const [bin, args] = TSAN
+            ? [
+                  'setarch',
+                  [{x64: 'x86_64', arm64: 'aarch64'}[process.arch] || process.arch, '-R', this.bin, ...this.args],
+              ]
+            : [this.bin, this.args];
+        this.proc = spawn(bin, args, {
             cwd: this.workdir,
             env: daemonEnv(this.workdir, this.extraEnv),
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -209,12 +233,31 @@ export class Daemon {
         return this.log.filter((line) => pattern.test(line));
     }
 
-    /** The sanitizer reports written next to the log, if any. */
+    /**
+     * The sanitizer reports written next to the log, if any - without the ThreadSanitizer reports whose every
+     * SUMMARY line a known finding explains on this ref (test/metadata.js FINDINGS `signatures`, HMRS_KNOWN_BROKEN):
+     * those are the races already on file, knownSanitizerReports() lists them; a report with a line no finding
+     * explains is a new one and stays here.
+     */
     sanitizerReports() {
+        return this.allSanitizerReports().filter((r) => !r.known);
+    }
+
+    /** The ThreadSanitizer reports of races already on file (see sanitizerReports), with the findings' names. */
+    knownSanitizerReports() {
+        return this.allSanitizerReports().filter((r) => r.known);
+    }
+
+    allSanitizerReports() {
         return fs
             .readdirSync(this.workdir)
-            .filter((f) => f.startsWith('asan.') || f.startsWith('ubsan.'))
-            .map((f) => ({file: f, text: fs.readFileSync(path.join(this.workdir, f), 'utf8')}));
+            .filter((f) => f.startsWith('asan.') || f.startsWith('ubsan.') || f.startsWith('tsan.'))
+            .map((f) => {
+                const text = fs.readFileSync(path.join(this.workdir, f), 'utf8');
+                const findings = f.startsWith('tsan.') ? knownRacesIn(text) : [];
+                const known = findings.length > 0 && findings.every(Boolean);
+                return {file: f, text, known, findings: [...new Set(findings.filter(Boolean))]};
+            });
     }
 
     /** CPU ticks (user + system) the daemon has used so far, from /proc. */

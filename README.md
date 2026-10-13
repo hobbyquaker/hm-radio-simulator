@@ -215,7 +215,16 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
   Zeichen: der Daemon startet nie).
 
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer; dazu
-kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
+kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_), und eine vierte, `tsan`
+(ThreadSanitizer, gcc `-fsanitize=thread`), die nur auf den Köpfen läuft - `main` und der `lite`-Zweig des Forks, wo ein
+Race-Fix zuerst landet -, wöchentlich mit dem Beweis der Regressionstests oder auf Anfrage (`workflow_dispatch`-Eingabe
+`tsan`), und nur mit den Dateien der Thread-Pfade (`HMRS_TEST_FILES`: die LAN-Gateways beider Daemons, das
+Coprozessor-Protokoll am Pseudo-Terminal, die seriellen Lesefehler, der verschwindende Empfänger, zwei Interfaces -
+rund 100 Tests in zehn Minuten; die ganze Suite unter ThreadSanitizer dauert Stunden). Unter ThreadSanitizer starten die Daemons ohne Adress-Randomisierung (`setarch -R`, sonst „unexpected memory
+mapping" auf heutigen Kernels), wofür der Container `--security-opt seccomp=unconfined` braucht; jeder Bericht landet
+neben dem Log des Daemons, `test/tsan.supp` hält die Unterdrückungen für Fremdcode (jede mit Grund, bisher keine), und
+ein Race in den Daemons selbst ist ein Fund. Der Beweis von #16 läuft auch unter `tsan`: eine Race-Signatur, die der
+Commit vor dem Fix meldet und der Fix nicht mehr, ist der Nachweis. Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`; der Bericht nennt das auf einem Tag **bekannt** (known: ein Release ändert sich nicht mehr, der Fehler ist dort einfach bekannt) und auf einem `head` **todo** (der Fix steht noch aus).
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Welche Tests das je Version sind, wird nicht von Hand gepflegt:
 `scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist: als Vorfahre oder, auf einem Fork-Zweig, übernommen (eine Zeile `cherry picked from commit <sha>`, sonst dieselbe Patch-ID). Ein Fix, den es nur im Fork gibt, zählt mit seinem Commit im Fork, bis upstream ihn übernimmt; dann kommt nur der Merge-Commit dazu. Gegen
@@ -251,7 +260,14 @@ als Quittung: `SendUpdataFrame` prüft die Antwort nie, das Update endet mit `tr
 bei seiner Version oder im Bootloader) und `info-blank-line` (`RFFirmwareManager::TrimLine` läuft mit einem
 vorzeichenlosen Index unter null: eine Leerzeile in `User Firmware Dir/<dir>/info` wirft `std::out_of_range`,
 niemand fängt es, rfd stirbt beim Start). Der Hexfile-Pfad von hs485d brachte `bootloader-pagesize-zero` (ein Bootloader, der die
-Seitengröße 0 meldet: `HS485Device::WriteFlash` rechnet `start % pagesize`, SIGFPE).
+Seitengröße 0 meldet: `HS485Device::WriteFlash` rechnet `start % pagesize`, SIGFPE). Die `tsan`-Variante meldet auf
+`main` drei Gruppen von Data Races, die als Funde mit ihren Signaturen geführt werden (`test/metadata.js`
+`signatures`; auf einem Stand, dem der Fix fehlt, zählt ein Bericht mit nur solchen Signaturen nicht als neuer):
+`ulc-data-races` (libUnifiedLanComm, der LAN-Gateway-Transport beider Daemons: Verbindungszustand, Stop des
+Empfangs-Threads, Hello-Verarbeitung - nicht #6/#12, sondern was nach deren Fixes bleibt), `lgw-wrapper-races` (die
+`volatile`-Variablen von rfds und hs485ds `LGWPortWrapper`: Zeitstempel, Keepalive-Flags, Reconnect) und
+`copro-request-races` (rfds Coprozessor-Anfrageplatz: Status ohne Lock gelesen, die Antwort unter einem Race kopiert,
+ein doppeltes Lock in `handleIncomingResponse` - das Umfeld von #179).
 
 ## Wie es funktioniert
 

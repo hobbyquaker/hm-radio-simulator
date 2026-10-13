@@ -1,0 +1,6 @@
+# ThreadSanitizer suppressions for the tsan variant (test/helpers/daemon.js passes this file in TSAN_OPTIONS).
+#
+# Only third-party noise belongs here, never a race in the daemons or their own libraries: those are findings. Each
+# entry says why it is noise. Format: https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+#
+# (none yet)

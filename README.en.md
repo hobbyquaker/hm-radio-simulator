@@ -84,7 +84,14 @@ acknowledgement: `SendUpdataFrame` never checks the response, the update ends wi
 device keeps its version or sits in its bootloader) and `info-blank-line` (`RFFirmwareManager::TrimLine` runs an
 unsigned index below zero: a blank line in `User Firmware Dir/<dir>/info` throws `std::out_of_range`, nothing catches
 it, rfd dies at start-up). hs485d's Hexfile path added `bootloader-pagesize-zero` (a bootloader that reports a page size
-of 0: `HS485Device::WriteFlash` computes `start % pagesize`, SIGFPE).
+of 0: `HS485Device::WriteFlash` computes `start % pagesize`, SIGFPE). The `tsan` variant reports three groups of data
+races on `main`, kept as findings with their signatures (`test/metadata.js` `signatures`; on a ref that lacks the fix a
+report with only such signatures does not count as a new one): `ulc-data-races` (libUnifiedLanComm, the LAN-gateway
+transport of both daemons: the connection state, the receive thread's stop, the hello handling - not #6/#12 but what
+remains after their fixes), `lgw-wrapper-races` (the `volatile` members of rfd's and hs485d's `LGWPortWrapper`: the
+timestamp, the keepalive flags, the reconnect) and `copro-request-races` (rfd's coprocessor request slot: the status
+read outside the lock, the response copied under a race, a double lock in `handleIncomingResponse` - the area of
+#179).
 
 ## Running it
 
@@ -172,7 +179,16 @@ tracefile and llvm-cov's JSON - file paths and counts, no source text; with an O
 `genhtml --prefix /openccu-base coverage.info` renders the annotated view). Before OpenCCU-Base #164's fix the daemons had no
 SIGTERM handler and would lose their profile when the suite stops them, so the variant uses clang's continuous mode,
 where the counters live in an mmapped file. clang was chosen because rfd and hs485d build and pass the suite with it unchanged; the
-release and ASan variants stay on gcc.
+release and ASan variants stay on gcc. A fourth variant, `tsan` (ThreadSanitizer, gcc `-fsanitize=thread`), runs on the
+heads only - `main` and the fork's `lite`, where a race fix lands first - on the weekly run with the proof or on request
+(`workflow_dispatch` input `tsan`), and only with the files of the threaded paths (`HMRS_TEST_FILES`: both daemons' LAN
+gateways, the coprocessor protocol on the pty, the serial read errors, the vanishing receiver, two interfaces - about a
+hundred tests in ten minutes; the whole suite under ThreadSanitizer takes hours). Under ThreadSanitizer the daemons start without address randomisation (`setarch -R`;
+"unexpected memory mapping" otherwise on today's kernels), for which the container needs
+`--security-opt seccomp=unconfined`; every report lands next to the daemon's log, `test/tsan.supp` holds the
+suppressions for third-party code (each with its reason; none yet), and a race in the daemons themselves is a finding.
+The proof of #16 runs under `tsan` too: a race signature the commit before the fix reports and the fix no longer does is
+the evidence.
 
 **The differential:** the release jobs keep the answers of the sweeps (`results/<variant>/sweep/*.json`, short
 summaries: a struct's keys, an array's length and first element, a fault's code and text). The report compares

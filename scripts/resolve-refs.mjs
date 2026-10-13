@@ -15,7 +15,8 @@
  * Usage:
  *   node scripts/resolve-refs.mjs [--repo <url>] [--main <sha>] [--tags <n>] [--fork <repo>@<branch>[=<label>]]...
  *                                 [--no-forks] [--github-output]
- *     prints {refs, daemons, fuzz} as JSON; with --github-output also writes refs=, daemons=, fuzz= to $GITHUB_OUTPUT
+ *     prints {refs, daemons, fuzz, tsan} as JSON; with --github-output also writes refs=, daemons=, fuzz=, tsan= to
+ *     $GITHUB_OUTPUT (tsan: the heads, for the ThreadSanitizer job)
  *     (the matrices of the CI's daemon and fuzz jobs). --main tests that commit as main (the upstream watch); --tags
  *     the number of upstream release tags (default 1); --fork replaces FORK_REFS by fork branches, --no-forks leaves
  *     them out.
@@ -56,7 +57,7 @@ function judged(history, sha) {
 /**
  * The refs of FORK_REFS (or of `forks`) resolved in a history: a tag entry to the fork's newest matching tag (left out
  * when the fork has none), a branch entry to its head.
- * @returns {Array<{ref: string, repo: string, build: string, sha: string}>}
+ * @returns {Array<{ref: string, repo: string, build: string, sha: string, head?: boolean}>} `head` marks a branch
  */
 export function resolveForks(history, forks = FORK_REFS) {
     return forks.flatMap((f) => {
@@ -71,7 +72,7 @@ export function resolveForks(history, forks = FORK_REFS) {
         }
         // a fork branch is built at the commit resolved here, so the image and its known-broken list agree
         const sha = history.resolve(f.repo, f.ref);
-        return [{ref: f.label, repo: f.repo, build: sha, sha}];
+        return [{ref: f.label, repo: f.repo, build: sha, sha, head: true}];
     });
 }
 
@@ -85,7 +86,7 @@ export function resolve({repo = UPSTREAM_REPO, main = '', tags = 1, forks = FORK
         const mainSha = main || history.resolve(repo, 'main');
         const refs = [
             ...picked.map((t) => ({ref: t, repo, build: t, sha: history.resolve(repo, t)})),
-            {ref: 'main', repo, build: mainSha, sha: mainSha},
+            {ref: 'main', repo, build: mainSha, sha: mainSha, head: true},
             ...resolveForks(history, forks),
         ].map((r) => ({...r, ...judged(history, r.sha)}));
         const daemons = refs.flatMap((r) =>
@@ -97,6 +98,17 @@ export function resolve({repo = UPSTREAM_REPO, main = '', tags = 1, forks = FORK
                 known_broken: r.knownBroken,
             })),
         );
+        // ThreadSanitizer runs on the heads only (main, the fork's branch): a race fix lands there first, and a tag
+        // cannot change any more
+        const tsan = refs
+            .filter((r) => r.head)
+            .map((r) => ({
+                base_ref: r.ref,
+                base_repo: r.repo,
+                build_ref: r.build,
+                variant: 'tsan',
+                known_broken: r.knownBroken,
+            }));
         const fuzz = refs.map((r) => ({
             base_ref: r.ref,
             base_repo: r.repo,
@@ -104,7 +116,7 @@ export function resolve({repo = UPSTREAM_REPO, main = '', tags = 1, forks = FORK
             expect_findings: r.expectFuzzFindings,
             known_harnesses: r.knownHarnesses,
         }));
-        return {refs, daemons, fuzz};
+        return {refs, daemons, fuzz, tsan};
     } finally {
         history.close();
     }
@@ -192,7 +204,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         if (process.argv.includes('--github-output') && process.env.GITHUB_OUTPUT) {
             fs.appendFileSync(
                 process.env.GITHUB_OUTPUT,
-                `refs=${JSON.stringify(result.refs)}\ndaemons=${JSON.stringify(result.daemons)}\nfuzz=${JSON.stringify(result.fuzz)}\n`,
+                `refs=${JSON.stringify(result.refs)}\ndaemons=${JSON.stringify(result.daemons)}\nfuzz=${JSON.stringify(result.fuzz)}\ntsan=${JSON.stringify(result.tsan)}\n`,
             );
         }
     }

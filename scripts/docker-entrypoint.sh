@@ -39,11 +39,15 @@ if [ -d /results ] && [ "$#" -gt 0 ] && [ "$1" = "npm" ]; then
   if [ -n "${HMRS_TEST_NAME_PATTERN:-}" ]; then
     filter=(--test-name-pattern="${HMRS_TEST_NAME_PATTERN}")
   fi
+  # HMRS_TEST_FILES: the test files to run (space-separated globs) instead of the whole daemon suite - the CI's
+  # ThreadSanitizer job runs the files of the threaded paths, the whole suite under tsan takes hours
+  # shellcheck disable=SC2206
+  files=(${HMRS_TEST_FILES:-test/daemon/*.test.js})
   node --test --test-concurrency=1 "${filter[@]}" \
     --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="/results/${variant}/junit.xml" \
     --test-reporter=./scripts/json-reporter.mjs --test-reporter-destination="/results/${variant}/tests.json" \
-    'test/daemon/*.test.js'
+    "${files[@]}"
   status=$?
   if [ "${variant}" = coverage ]; then
     scripts/coverage.sh "/results/${variant}/profiles" "${HMRS_DAEMONS}" "/results/${variant}" || status=1
