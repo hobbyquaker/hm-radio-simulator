@@ -331,6 +331,12 @@ scripts/run-tests.sh --ref main --variants release --fuzz 60
 
 Der Container läuft mit `--cap-add SYS_NICE` (für hmlangw, siehe oben); `scripts/run-tests.sh` und die CI setzen das.
 
+Jeder Daemon-Test hat ein eigenes Timeout, und `test/helpers/hang-guard.js` lässt eine Testdatei scheitern, deren Prozess
+nach dem letzten Test nicht endet (ein offenes Handle, ein Daemon, den ein abgelaufener Test zurückließ - so lief
+`hs485d-lgw.test.js` einmal 20 Stunden): zurückgebliebene Daemons werden beendet und genannt, und nach
+`HMRS_HANG_GRACE_MS` (30 s) gibt der Wächter die offenen Handles aus und beendet den Prozess mit 1, statt dass
+`node --test` ewig wartet.
+
 Das Image basiert absichtlich auf Debian trixie: Die Sanitizer-Laufzeiten von bookworm (LLVM 14, GCC 12) stürzen auf
 Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer Segfault in jedem vierten ASan-Lauf
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.

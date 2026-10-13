@@ -20,6 +20,7 @@ import {createHmwLgwFront} from '../../lib/hmwlgw.js';
 import {WiredBus} from '../../lib/wired.js';
 import {Air} from '../../lib/air.js';
 import {BinRpcClient, XmlRpcClient, freePort} from './rpc.js';
+import {track, untrack} from './hang-guard.js';
 
 export const DAEMONS = process.env.HMRS_DAEMONS || '';
 export const RFTYPES = process.env.HMRS_RFTYPES || '/opt/openccu-base/rftypes';
@@ -122,6 +123,7 @@ export class Daemon {
     }
 
     start() {
+        track(this); // stopped by the hang guard after the last test if a timed-out test left it running
         this.proc = spawn(this.bin, this.args, {
             cwd: this.workdir,
             env: daemonEnv(this.workdir, this.extraEnv),
@@ -278,6 +280,7 @@ export class Daemon {
         if (this.module) {
             this.module.close();
         }
+        untrack(this);
         return this.exit;
     }
 

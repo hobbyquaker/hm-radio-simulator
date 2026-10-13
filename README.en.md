@@ -105,6 +105,11 @@ docker build -f docker/Dockerfile --target fuzz --build-arg BASE_REF=main -t hm-
 docker run --rm -e FUZZ_SECONDS=60 -v "$PWD/results/fuzz:/results" hm-radio-simulator-fuzz
 ```
 
+Every daemon test has a timeout of its own, and `test/helpers/hang-guard.js` fails a test file whose process does not
+end after its last test (an open handle, a daemon a timed-out test left behind - `hs485d-lgw.test.js` once ran for
+20 hours that way): daemons left running are stopped and named, and after `HMRS_HANG_GRACE_MS` (30 s) the guard prints
+the open handles and exits with 1 instead of letting `node --test` wait for ever.
+
 `--cap-add SYS_NICE` is for hmlangw, which starts its threads with `SCHED_RR`; without the capability it exits silently
 with code 1 and the LAN-gateway tests fail at start.
 
