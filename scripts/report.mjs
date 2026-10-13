@@ -35,7 +35,7 @@ import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
 import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
 import {renderFilterBar, FILTER_SCRIPT, FILTER_CSS} from './filter.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
-import {compareRefs, commitUrl, forkOf, refDisplay, refText, FORK_REFS, RELEASE_TAG} from './refs.mjs';
+import {compareRefs, commitUrl, forkOf, refDisplay, refText, statusWord, FORK_REFS, RELEASE_TAG} from './refs.mjs';
 import {proofForTest} from './prove.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
@@ -296,7 +296,7 @@ export function renderSummaryMarkdown(report) {
         // one row per ref: the variants with their durations, the combined counts (a test counts with its worst result)
         const refs = groupByRef(report.jobs);
         const rows = testRows(report.jobs);
-        lines.push('| OpenCCU-Base | variants | pass | fail | todo (known) | skip |');
+        lines.push('| OpenCCU-Base | variants | pass | fail | known / todo | skip |');
         lines.push('| --- | --- | ---: | ---: | ---: | ---: |');
         for (const {ref, counts: c} of refCounts(rows, refs)) {
             lines.push(
@@ -739,7 +739,7 @@ export function renderHtml(report, history = []) {
     );
     h.push(`<div class="card"><div class="big fail">${totals.fail}</div><div class="label">failed</div></div>`);
     h.push(
-        `<div class="card"><div class="big todo">${totals.todo}</div><div class="label">todo: known broken on that ref</div></div>`,
+        `<div class="card"><div class="big todo">${totals.todo}</div><div class="label">known (on a tag) or todo (on a head): broken on that ref, its fix missing</div></div>`,
     );
     h.push(
         `<div class="card"><div class="big ${fuzzFindings ? 'todo' : 'pass'}">${fuzzFindings}</div><div class="label">new fuzz findings (expected ones on old refs not counted)</div></div>`,
@@ -754,7 +754,7 @@ export function renderHtml(report, history = []) {
 
     // Jobs: one row per ref - commit, the variants with their durations, the combined counts
     h.push(
-        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side: upstream's newest release tag and the head of main, ${forkRefsText()}chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix: neither its merge commit nor a pick of it (<code>cherry picked from</code>, or the same patch). The counts combine the variants: a test counts with its worst result.</p>`,
+        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side: upstream's newest release tag and the head of main, ${forkRefsText()}chosen anew on every run (scripts/resolve-refs.mjs). A test is known (on a tag) or todo (on a head) on a ref that lacks its fix: neither its merge commit nor a pick of it (<code>cherry picked from</code>, or the same patch). The counts combine the variants: a test counts with its worst result.</p>`,
     );
     h.push(
         table(
@@ -764,7 +764,7 @@ export function renderHtml(report, history = []) {
                 {label: 'variants', cls: 'v'},
                 {label: 'pass', cls: 'r'},
                 {label: 'fail', cls: 'r'},
-                {label: 'todo', cls: 'r'},
+                {label: 'known / todo', cls: 'r'},
                 {label: 'skip', cls: 'r'},
             ],
             counts.map(({ref, counts: c, differing}) => {
@@ -783,7 +783,7 @@ export function renderHtml(report, history = []) {
                     `<span class="variants">${ref.jobs.map((j) => `<span class="vd" title="${esc(j.variant)}: ${esc(seconds(j.durationMs))}">${esc(VARIANT_CHIP[j.variant] || j.variant)} ${esc(seconds(j.durationMs))}</span>`).join(' ')}</span>`,
                     `<span class="pass">${c.pass}</span>`,
                     `<span class="fail">${c.fail}</span>`,
-                    `<span class="todo">${c.todo}</span>`,
+                    `<span class="todo" title="${esc(statusWord('todo', ref.ref))}">${c.todo} <span class="word">${esc(statusWord('todo', ref.ref))}</span></span>`,
                     `<span class="skip">${c.skip}</span>`,
                 ];
             }),
@@ -793,7 +793,7 @@ export function renderHtml(report, history = []) {
     // Tests: one line per test at load; the explanation, diagnostics and per-variant results behind a collapsible
     const differingRows = rows.filter((row) => refs.some((ref) => (combine(row.results, ref) || {}).differs));
     h.push(
-        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (todo everywhere, except on a fork branch that carries its fix); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A <span class="todo">todo</span> is a test on a ref that predates the fix. ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
+        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (known or todo everywhere, except on a fork branch that carries its fix); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A test on a ref that lacks its fix runs as <span class="todo">known</span> on a tag (a release cannot change any more: the bug is known there) and as <span class="todo">todo</span> on a head (the fix is still to come). ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
     );
     const testHead = [
         {label: 'test'},
@@ -839,12 +839,12 @@ export function renderHtml(report, history = []) {
         }
         combined.forEach((c, i) => {
             if (c && c.differs) {
-                body += `<div class="diag">${esc(refText(refs[i].ref))}: ${c.variants.map((v) => `${esc(v.variant)} <span class="${v.status}">${esc(STATUS_MARK[v.status] || v.status)} ${esc(v.status)}</span> ${esc(duration(v.durationMs))}`).join(' · ')}</div>`;
+                body += `<div class="diag">${esc(refText(refs[i].ref))}: ${c.variants.map((v) => `${esc(v.variant)} <span class="${v.status}">${esc(STATUS_MARK[v.status] || v.status)} ${esc(statusWord(v.status, refs[i].ref))}</span> ${esc(duration(v.durationMs))}`).join(' · ')}</div>`;
             }
         });
         const name = `<details class="row"><summary>${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}</summary>${body}</details>`;
         const cells = [name, kindBadge + (proof ? ' ' + proofMark(proof) : ''), links.join(' · ')];
-        combined.forEach((c) => {
+        combined.forEach((c, i) => {
             if (!c) {
                 cells.push(`<span class="muted">-</span>`);
                 return;
@@ -853,12 +853,12 @@ export function renderHtml(report, history = []) {
                 .map((v) => {
                     const note =
                         typeof v.todo === 'string' ? `: ${v.todo}` : typeof v.skip === 'string' ? `: ${v.skip}` : '';
-                    return `${v.variant}: ${v.status} ${duration(v.durationMs)}${note}`;
+                    return `${v.variant}: ${statusWord(v.status, refs[i].ref)} ${duration(v.durationMs)}${note}`;
                 })
                 .join('\n');
             const chips = c.chips.map((x) => `<span class="chip ${c.status}">${esc(x)}</span>`).join('');
             cells.push(
-                `<span class="${c.status}${c.differs ? ' differs' : ''}" title="${esc(title)}">${esc(STATUS_MARK[c.status] || c.status)} <span class="word">${esc(c.status)}</span>${chips ? ' ' + chips : ''}</span>`,
+                `<span class="${c.status}${c.differs ? ' differs' : ''}" title="${esc(title)}">${esc(STATUS_MARK[c.status] || c.status)} <span class="word">${esc(statusWord(c.status, refs[i].ref))}</span>${chips ? ' ' + chips : ''}</span>`,
             );
         });
         // what the filter (task 37) matches on
@@ -882,6 +882,7 @@ export function renderHtml(report, history = []) {
         renderFilterBar(
             rows.map(testRow).map((r) => r.attrs),
             refs.map((r) => refText(r.ref)),
+            refs.map((r) => statusWord('todo', r.ref)),
         ),
     );
     h.push(`<div id="test-tables">`);
@@ -1091,7 +1092,7 @@ export function renderHtml(report, history = []) {
                     {label: 'overall', cls: 's r'},
                     {label: 'pass', cls: 'r'},
                     {label: 'fail', cls: 'r'},
-                    {label: 'todo', cls: 'r'},
+                    {label: 'known / todo', cls: 'r'},
                     {label: 'fuzz findings', cls: 'r'},
                 ],
                 history.map((entry) => [

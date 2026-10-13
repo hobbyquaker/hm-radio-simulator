@@ -15,6 +15,8 @@ import {
     refDisplay,
     refText,
     refPairText,
+    statusWord,
+    isTagRef,
     newestTag,
     compareVersions,
     FORK_TAG,
@@ -225,4 +227,13 @@ test("the upstream watch's heads from ls-remote: upstream's newest tag and main,
     ]);
     // a fork without an openccu-lite tag yet: the branch alone
     assert.deepEqual(headsOf({...remotes, [FORK_REPO]: `${sha('6')}\trefs/heads/lite`}).slice(2), [`lite ${sha('6')}`]);
+});
+
+test('a missing fix is "known" on a tag and "todo" on a head; the data stays todo', () => {
+    assert.equal(statusWord('todo', '3.89.11'), 'known');
+    assert.equal(statusWord('todo', 'lite@v1.0.0-beta.2'), 'known');
+    assert.equal(statusWord('todo', 'main'), 'todo');
+    assert.equal(statusWord('todo', 'lite'), 'todo');
+    assert.equal(statusWord('pass', '3.89.11'), 'pass');
+    assert.ok(isTagRef('3.89.11') && isTagRef('lite@v1.0.0-beta.2') && !isTagRef('main') && !isTagRef('lite'));
 });

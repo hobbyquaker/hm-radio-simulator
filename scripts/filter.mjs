@@ -22,15 +22,10 @@ const esc = (text) =>
  * The chips: [group, token, label, test(attrs)].
  * @param {string[]} refs the refs in column order (data-r0, data-r1, ...)
  */
-export function chipDefinitions(refs) {
+export function chipDefinitions(refs, todoWords = []) {
     const chips = [];
     for (const r of ['fail', 'todo', 'pass', 'skip']) {
-        chips.push([
-            'result',
-            r,
-            r === 'todo' ? 'todo (known broken)' : r,
-            (a) => a['data-result'].split(' ').includes(r),
-        ]);
+        chips.push(['result', r, r === 'todo' ? 'known / todo' : r, (a) => a['data-result'].split(' ').includes(r)]);
     }
     chips.push(['differs', 'differs', 'variants differ', (a) => a['data-differs'] === 'yes']);
     for (const d of ['rfd', 'hs485d']) {
@@ -55,7 +50,7 @@ export function chipDefinitions(refs) {
             chips.push([
                 `ref${i}`,
                 `r${i}-${r}`,
-                `${r === 'fail' ? 'fails' : 'todo'} on ${ref}`,
+                `${r === 'fail' ? 'fails' : todoWords[i] || 'todo'} on ${ref}`,
                 (a) => a[`data-r${i}`] === r,
             ]);
         }
@@ -68,9 +63,9 @@ export function chipDefinitions(refs) {
  * @param {object[]} rows the rows' attributes, one per test (the file tables, not the differing-rows table)
  * @param {string[]} refs
  */
-export function renderFilterBar(rows, refs) {
+export function renderFilterBar(rows, refs, todoWords = []) {
     const groups = new Map();
-    for (const [group, token, label, test] of chipDefinitions(refs)) {
+    for (const [group, token, label, test] of chipDefinitions(refs, todoWords)) {
         const count = rows.filter(test).length;
         if (!count) {
             continue;

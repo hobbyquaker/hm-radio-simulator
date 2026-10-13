@@ -195,7 +195,7 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
 
 Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitizer/UndefinedBehaviorSanitizer; dazu
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
-Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
+Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`; der Bericht nennt das auf einem Tag **bekannt** (known: ein Release ändert sich nicht mehr, der Fehler ist dort einfach bekannt) und auf einem `head` **todo** (der Fix steht noch aus).
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Welche Tests das je Version sind, wird nicht von Hand gepflegt:
 `scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist: als Vorfahre oder, auf einem Fork-Zweig, übernommen (eine Zeile `cherry picked from commit <sha>`, sonst dieselbe Patch-ID). Ein Fix, den es nur im Fork gibt, zählt mit seinem Commit im Fork, bis upstream ihn übernimmt; dann kommt nur der Merge-Commit dazu. Gegen
 `3.89.11` betrifft das #138 und #140
@@ -359,14 +359,14 @@ description" scheitern), dann die Diagnosen. Ein Link führt zu den Zeilen, in d
 eine **Filterleiste** (Ergebnis, abweichende Varianten, Daemon, Art, Beweis, Ergebnis auf einem Stand, Textsuche über
 Name, Datei und Beschreibung, jeweils mit Anzahl); der Filter steht im Link (`#f=fail,rfd&q=lgw`), so lässt sich eine
 Ansicht teilen. Ohne JavaScript bleibt die Leiste verborgen und alle Zeilen sichtbar. Ganz oben steht
-ein **Trend** je Version: bestanden, todo, fehlgeschlagen und übersprungen für rfd und hs485d und die Zeilenabdeckung
+ein **Trend** je Version: bestanden, bekannt bzw. todo, fehlgeschlagen und übersprungen für rfd und hs485d und die Zeilenabdeckung
 (je Daemon und insgesamt), jeweils mit der Änderung gegenüber dem vorigen Lauf (▲/▼, = unverändert; grün besser, rot
 schlechter) und einer kleinen Verlaufslinie über die aufbewahrten Läufe. Eine Version, die erst neu im Fenster ist,
 zeigt, seit wann sie dabei ist. So liest
 man ihn:
 
 - **regression** - der Test pinnt einen behobenen Fehler in OpenCCU-Base fest und verlinkt den Pull Request und den
-  Merge-Commit (oder, bei einem älteren Fix ohne Pull Request, den Commit); auf einer Version vor dem Fix läuft er als **todo** (bekannt kaputt, der Lauf bleibt grün);
+  Merge-Commit (oder, bei einem älteren Fix ohne Pull Request, den Commit); auf einer Version vor dem Fix läuft er als **todo**, im Bericht auf einem Tag **known** (bekannt) und auf einem `head` **todo** (der Lauf bleibt grün);
 - **proven** / **not proven** - ob ein Regressionstest ohne seinen Fix nachweislich scheitert: `scripts/prove.mjs` baut
   die Daemons am Commit vor dem Fix und am Merge-Commit und lässt dort nur die Tests mit der Nummer des Fixes laufen,
   normal und mit ASan (Races und Lebensdauerfehler am Commit davor bis zu fünfmal unter ASan). **proven**: Der Test

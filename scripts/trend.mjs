@@ -1,5 +1,6 @@
 /**
- * The trend panel at the top of the report: per OpenCCU-Base ref a card with rfd's and hs485d's pass/todo/fail/skip
+ * The trend panel at the top of the report: per OpenCCU-Base ref a card with rfd's and hs485d's pass/todo/fail/skip (todo
+ * shown as "known" on a tag, refs.mjs statusWord)
  * and the line coverage (per daemon and summed over everything the coverage variant measures), each value with a
  * sparkline over the kept history and its change against the previous run of that ref.
  *
@@ -10,7 +11,7 @@
  */
 
 import {groupByRef, combine} from './combine.mjs';
-import {commitUrl, refDisplay} from './refs.mjs';
+import {commitUrl, refDisplay, statusWord} from './refs.mjs';
 
 /** Which daemon a test belongs to: hs485d when its file or name says so, else rfd. */
 export function daemonOf(test) {
@@ -199,7 +200,7 @@ export function renderTrendPanel(report, history) {
         const runs = withRef.length;
         const part = (daemon) =>
             ['pass', 'todo', 'fail', 'skip']
-                .map((m) => cell(series(history, ref, [daemon, m]), m, {ref, title: m}))
+                .map((m) => cell(series(history, ref, [daemon, m]), m, {ref, title: statusWord(m, ref)}))
                 .join('');
         const cov = [
             ['rfd', 'rfd'],

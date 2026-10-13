@@ -134,6 +134,20 @@ export function refDisplay(label, forks = FORK_REFS) {
     return {group: '', groupUrl: '', name: l};
 }
 
+/** Whether a ref is a tag (upstream's release tag or the fork's openccu-lite tag), not a branch head. */
+export function isTagRef(label, forks = FORK_REFS) {
+    const f = forkOf(label, forks);
+    return f ? f.kind === 'tag' : RELEASE_TAG.test(String(label));
+}
+
+/**
+ * The word for a result on a ref (the maintainer, 2026-10-13): a test whose fix a ref lacks runs as todo; on a tag,
+ * which cannot change any more, the report calls it "known", on a head "todo". Only the wording: the data stays todo.
+ */
+export function statusWord(status, label, forks = FORK_REFS) {
+    return status === 'todo' && isTagRef(label, forks) ? 'known' : status;
+}
+
 /** A ref as one line of text: "<group> <name>", e.g. "hobbyquaker/OpenCCU-Base/lite 1.0.0-beta.2". */
 export function refText(label, forks = FORK_REFS) {
     const d = refDisplay(label, forks);

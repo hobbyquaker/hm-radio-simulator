@@ -168,6 +168,10 @@ test('the HTML report: one column per ref, one line per row with the explanation
         /<th class="grp" colspan="2" scope="colgroup"><a href="https:\/\/github\.com\/OpenCCU\/OpenCCU-Base\/tree\/main">OpenCCU\/<wbr>OpenCCU-<wbr>Base\/<wbr>main<\/a><\/th>/,
     );
     assert.match(html, /<th class="" rowspan="2">test<\/th>/);
+    // a missing fix reads "known" on the tag and "todo" on the head (the fixture's 3.89.11 and main)
+    assert.match(html, /<span class="todo"[^>]*>⚠️ <span class="word">known<\/span>/);
+    assert.match(html, /<span class="todo"[^>]*>⚠️ <span class="word">todo<\/span>/);
+    assert.match(html, /known \/ todo/);
     assert.doesNotMatch(html, /<span class="muted">asan<\/span><\/th>/, 'no per-variant columns');
     // every test row is one line at load: the name is the summary of a closed <details>, cut with an ellipsis
     assert.match(
