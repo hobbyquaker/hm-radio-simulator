@@ -1,7 +1,8 @@
 /**
  * The OpenCCU-Base history the refs are resolved in and their known-broken lists derived from: a bare, tree-less clone
  * of OpenCCU-Base (`--filter=tree:0`: the commits without file contents) plus the branches of the forks
- * (scripts/refs.mjs FORK_REFS, test/metadata.js FORK_REPO) under `refs/forks/<n>/`, fetched into the same object store.
+ * (scripts/refs.mjs FORK_REFS, test/metadata.js FORK_REPO) under `refs/forks/<n>/` and their tags under
+ * `refs/fork-tags/<n>/`, fetched into the same object store (never as upstream's own branches and tags).
  *
  * Whether a ref contains a fix (contains below) is answered in three steps:
  *   1. the fix's commit is an ancestor of the ref (upstream merged it before the ref);
@@ -48,8 +49,8 @@ function sameRepo(a, b) {
 /**
  * Opens a history in a git directory: `git` runs git there; contains, resolve and parentOf answer from it.
  * Exposed apart from openHistory so the unit tests can run it on a local fixture repository.
- * @param {string} dir a (bare) repository with upstream's branches and tags as its own and the forks' branches under
- *   refs/forks/<n>/
+ * @param {string} dir a (bare) repository with upstream's branches and tags as its own, the forks' branches under
+ *   refs/forks/<n>/ and their tags under refs/fork-tags/<n>/
  * @param {{upstream?: string, forks?: string[]}} o the repositories, in the order of refs/forks/<n>
  */
 export function historyAt(dir, {upstream = UPSTREAM_REPO, forks = []} = {}) {
@@ -135,7 +136,7 @@ export function historyAt(dir, {upstream = UPSTREAM_REPO, forks = []} = {}) {
             if (n < 0) {
                 throw new Error(`${repo} is not a repository of this history`);
             }
-            candidates.push(`refs/forks/${n}/${ref}`);
+            candidates.push(`refs/forks/${n}/${ref}`, `refs/fork-tags/${n}/${ref}^{commit}`);
         }
         candidates.push(`${ref}^{commit}`);
         for (const c of candidates) {
@@ -155,6 +156,16 @@ export function historyAt(dir, {upstream = UPSTREAM_REPO, forks = []} = {}) {
         resolve,
         parentOf: (sha) => git(['rev-parse', `${sha}^1`]),
         tags: () => git(['tag', '-l']).split('\n').filter(Boolean),
+        /** The tags of a fork (its copies of upstream's tags included). */
+        forkTags(repo) {
+            const n = forks.findIndex((f) => sameRepo(f, repo));
+            if (n < 0) {
+                throw new Error(`${repo} is not a repository of this history`);
+            }
+            return git(['for-each-ref', '--format=%(refname:strip=3)', `refs/fork-tags/${n}/`])
+                .split('\n')
+                .filter(Boolean);
+        },
     };
 }
 
@@ -184,6 +195,7 @@ export function openHistory({upstream = UPSTREAM_REPO, forks = [FORK_REPO]} = {}
                 '--filter=tree:0',
                 remote,
                 `+refs/heads/*:refs/forks/${n}/*`,
+                `+refs/tags/*:refs/fork-tags/${n}/*`,
             ]);
         });
     } catch (err) {

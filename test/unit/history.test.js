@@ -6,14 +6,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {openHistory, pickedCommits, sameCommit} from '../../scripts/history.mjs';
-import {knownBroken} from '../../scripts/refs.mjs';
+import {knownBroken, newestTag} from '../../scripts/refs.mjs';
 
 /**
  * A fixture pair of repositories, made with git in a temporary directory:
  *
  *   upstream  base (tag 1.0) - fixA (an upstream fix) - more (main)
  *   fork      main as upstream; fix/x: fixX off main (a fix not upstream yet), fix/y: fixY (not picked anywhere);
- *             lite (off 1.0): fixA picked with -x, fixX picked without -x (only its patch id says so), an own commit
+ *             lite (off 1.0): fixA picked with -x (tag v1.0.0-beta.1), fixX picked without -x (only its patch id says
+ *             so), an own commit (annotated tag v1.0.0-beta.2); the clone keeps upstream's tag 1.0 as well
  */
 function fixture() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hmrs-history-'));
@@ -51,8 +52,10 @@ function fixture() {
     const fixY = commit(fork, 'y.c', 'int y = 3;\n', 'fix y');
     git(fork, 'checkout', '-q', '-b', 'lite', '1.0');
     git(fork, 'cherry-pick', '-x', fixA);
+    git(fork, 'tag', 'v1.0.0-beta.1');
     git(fork, 'cherry-pick', fixX); // no -x: the message does not say so
     commit(fork, 'own.c', 'int own;\n', 'own');
+    git(fork, 'tag', '-a', '-m', 'openccu-lite 1.0.0-beta.2', 'v1.0.0-beta.2');
     git(fork, 'checkout', '-q', 'main');
     return {root, up: `file://${up}`, fork: `file://${fork}`, fixA, fixX, fixY};
 }
@@ -78,7 +81,12 @@ test('the history: a fix is in a ref as an ancestor, picked with -x, or by its p
         assert.equal(history.resolve(f.fork, lite.slice(0, 12)), lite, 'a commit id resolves too');
         assert.throws(() => history.resolve(f.fork, 'nope'), /cannot resolve/);
         assert.throws(() => history.resolve('file:///elsewhere', 'main'), /not a repository of this history/);
-        assert.deepEqual(history.tags(), ['1.0']);
+        assert.deepEqual(history.tags(), ['1.0'], "the fork's tags are not upstream's");
+        assert.deepEqual(history.forkTags(f.fork), ['1.0', 'v1.0.0-beta.1', 'v1.0.0-beta.2']);
+        assert.equal(newestTag(history.forkTags(f.fork)), 'v1.0.0-beta.2');
+        assert.equal(history.resolve(f.fork, 'v1.0.0-beta.2'), lite, 'an annotated fork tag resolves to its commit');
+        const beta1 = history.resolve(f.fork, 'v1.0.0-beta.1');
+        assert.throws(() => history.forkTags('file:///elsewhere'), /not a repository of this history/);
 
         assert.equal(history.contains(f.fixA, main), 'ancestor');
         assert.equal(history.contains(f.fixA, tag), false);
@@ -96,6 +104,10 @@ test('the history: a fix is in a ref as an ancestor, picked with -x, or by its p
         assert.deepEqual(known(tag), ['1', 'x', 'y', 'open']);
         assert.deepEqual(known(main), ['x', 'y', 'open']);
         assert.deepEqual(known(lite), ['y', 'open']);
+        // a fork tag contains a fix when its commit does: beta.1 has the pick of fixA, not yet fixX
+        assert.equal(history.contains(f.fixA, beta1), 'picked');
+        assert.equal(history.contains(f.fixX, beta1), false);
+        assert.deepEqual(known(beta1), ['x', 'y', 'open']);
     } finally {
         history.close();
         fs.rmSync(f.root, {recursive: true, force: true});

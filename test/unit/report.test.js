@@ -349,11 +349,17 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
     );
 });
 
-test('a fork branch column links its commits in the fork; a fork trigger is linked there too', () => {
+test('a fork column links its commits in the fork; a fork or tag trigger is linked where the commit is', () => {
     assert.equal(
-        triggerHtml(`lite-3.89.11 ${'e'.repeat(40)}`),
-        `lite-3.89.11 <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
+        triggerHtml(`lite ${'e'.repeat(40)}`),
+        `lite <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
     );
+    assert.match(
+        triggerHtml(`lite@v1.0.0-beta.3 ${'e'.repeat(40)}`),
+        /^lite@v1\.0\.0-beta\.3 <a class="mono" href="https:\/\/github\.com\/hobbyquaker\/OpenCCU-Base\/commit\/e{40}">/,
+    );
+    assert.match(triggerHtml('3.89.12 abcdef1'), /OpenCCU\/OpenCCU-Base\/commit\/abcdef1/);
+    assert.equal(triggerHtml('lite-3.89.11 abcdef1'), 'lite-3.89.11 abcdef1', 'an unknown label is plain text');
     assert.match(triggerHtml('OpenCCU-Base 1234567'), /OpenCCU\/OpenCCU-Base\/commit\/1234567/);
     assert.equal(triggerHtml('push <b>'), 'push &lt;b&gt;');
 });

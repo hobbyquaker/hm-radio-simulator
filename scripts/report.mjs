@@ -35,7 +35,7 @@ import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
 import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
 import {renderFilterBar, FILTER_SCRIPT, FILTER_CSS} from './filter.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
-import {compareRefs, commitUrl, FORK_REFS} from './refs.mjs';
+import {compareRefs, commitUrl, forkOf, FORK_REFS, RELEASE_TAG} from './refs.mjs';
 import {proofForTest} from './prove.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
@@ -716,7 +716,7 @@ export function renderHtml(report, history = []) {
 
     // Jobs: one row per ref - commit, the variants with their durations, the combined counts
     h.push(
-        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side: the two newest release tags, ${forkRefsText()}and the head of main, chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix: neither its merge commit nor a pick of it (<code>cherry picked from</code>, or the same patch). The counts combine the variants: a test counts with its worst result.</p>`,
+        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side: upstream's newest release tag and the head of main, ${forkRefsText()}chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix: neither its merge commit nor a pick of it (<code>cherry picked from</code>, or the same patch). The counts combine the variants: a test counts with its worst result.</p>`,
     );
     h.push(
         table(
@@ -1072,23 +1072,35 @@ export function renderHtml(report, history = []) {
     return h.join('\n') + '\n';
 }
 
-/** The fork branches in words, for the Jobs paragraph: "the head of the branch lite-3.89.11 of the fork ... (...), ". */
+/**
+ * The fork refs in words, for the Jobs paragraph: "openccu-lite's newest tag (v*) and the head of its branch lite on the
+ * fork ... (...), ".
+ */
 function forkRefsText(forks = FORK_REFS) {
-    return forks
-        .map((f) => {
-            const repo = f.repo.replace(/\.git$/, '');
-            return `the head of the branch ${esc(f.ref)} of the fork <a href="${esc(repo)}">${esc(repo.replace('https://github.com/', ''))}</a> (${esc(f.base)} with the fixes openccu-lite builds with: picked from upstream, or not upstream yet), `;
+    const repos = [...new Set(forks.map((f) => f.repo))];
+    return repos
+        .map((repo) => {
+            const web = repo.replace(/\.git$/, '');
+            const parts = forks
+                .filter((f) => f.repo === repo)
+                .map((f) =>
+                    f.kind === 'tag'
+                        ? `the newest openccu-lite tag (<code>v*</code>, shown as <code>${esc(f.prefix)}&lt;tag&gt;</code>)`
+                        : `the head of the branch <code>${esc(f.ref)}</code>`,
+                );
+            return `${parts.join(' and ')} of the fork <a href="${esc(web)}">${esc(web.replace('https://github.com/', ''))}</a> (OpenCCU-Base's release with the fixes openccu-lite builds with: picked from upstream, or not upstream yet), `;
         })
         .join('');
 }
 
 /**
- * "OpenCCU-Base <sha>" (upstream main moved) or "<fork label> <sha>" (a fork branch moved, the upstream watch) with
- * the commit linked, any other trigger text as it is.
+ * What triggered a run of the upstream watch, with the commit linked: "OpenCCU-Base <sha>" (upstream main moved),
+ * "<tag> <sha>" (a new upstream release tag) or "<fork label> <sha>" (the fork's tag or branch moved); any other
+ * trigger text as it is.
  */
 export function triggerHtml(trigger) {
     const m = /^(\S+) ([0-9a-f]{7,40})$/.exec(trigger || '');
-    if (m && (m[1] === 'OpenCCU-Base' || FORK_REFS.some((f) => f.label === m[1]))) {
+    if (m && (m[1] === 'OpenCCU-Base' || RELEASE_TAG.test(m[1]) || forkOf(m[1]))) {
         const url = m[1] === 'OpenCCU-Base' ? `${BASE}/commit/${m[2]}` : commitUrl(m[1], m[2]);
         return `${esc(m[1])} <a class="mono" href="${esc(url)}">${esc(m[2].slice(0, 7))}</a>`;
     }

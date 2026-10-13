@@ -46,9 +46,10 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
 
-  # which OpenCCU-Base refs this run tests: the two newest release tags, main's head (or the upstream watch's commit)
-  # and the head of openccu-lite's fork branch lite-3.89.11 (scripts/refs.mjs FORK_REFS), each with its known-broken
-  # list derived from the fixes' commits - ancestors, or picked onto a fork branch (scripts/resolve-refs.mjs)
+  # which OpenCCU-Base refs this run tests: upstream's newest release tag and main's head (or the upstream watch's
+  # commit), and on openccu-lite's fork hobbyquaker/OpenCCU-Base its newest openccu-lite tag (v*) and the head of the
+  # branch lite (scripts/refs.mjs FORK_REFS), each with its known-broken list derived from the fixes' commits -
+  # ancestors, or picked onto the fork (scripts/resolve-refs.mjs)
   refs:
     name: OpenCCU-Base refs
     runs-on: ubuntu-latest
@@ -237,7 +238,8 @@ jobs:
           path: proof/proof-run.json
           if-no-files-found: ignore
 
-  # the test report: the Markdown overview of the whole run and the static site for GitHub Pages (scripts/report.mjs)
+  # the test report: the Markdown overview of the whole run and the site as an artifact, on every branch
+  # (scripts/build-site.sh); main publishes it in the deploy job below
   report:
     name: test report
     runs-on: ubuntu-latest
@@ -252,58 +254,32 @@ jobs:
         with:
           path: artifacts
           pattern: '*-results-*'
-      - name: fetch the published report (the history)
-        run: |
-          site=https://hobbyquaker.github.io/hm-radio-simulator
-          mkdir -p previous
-          # the main sweep records of the previous run, for the differential against the previously tested commit
-          mkdir -p previous/sweep
-          curl -fsSL "$site/sweep/main.json" -o previous/sweep/main.json || rm -f previous/sweep/main.json
-          # the proof of the regression tests, kept when this run does not prove
-          curl -fsSL "$site/proof.json" -o previous/proof.json || rm -f previous/proof.json
-          if curl -fsSL "$site/history.json" -o previous/history.json; then
-            for id in $(node -e 'console.log(JSON.parse(require("fs").readFileSync("previous/history.json","utf8")).map((e) => e.id).join(" "))'); do
-              mkdir -p "previous/runs/$id"
-              curl -fsSL "$site/runs/$id/index.html" -o "previous/runs/$id/index.html" || true
-              curl -fsSL "$site/runs/$id/report.json" -o "previous/runs/$id/report.json" || true
-            done
-          else
-            echo "no published history yet"
-          fi
       - uses: actions/download-artifact@v4
         if: needs.prove.result != 'skipped'
         with:
           path: proofs
           pattern: 'proof-*'
-      - name: judge the proof runs (or keep the published proof)
-        run: |
-          node scripts/prove.mjs collect proofs --previous previous/proof.json --out proof.json > proof.txt || true
-          if [ -s proof.txt ]; then
-            { echo '### Proof of the regression tests'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          fi
       - name: build the report
-        run: |
-          node scripts/report.mjs collect --out site --previous previous --keep 20 --proof proof.json \
-            --repo-sha "$GITHUB_SHA" --ref "$GITHUB_REF_NAME" --run-id "$GITHUB_RUN_ID" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            --trigger "${{ inputs.trigger }}" artifacts
-          cat site/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          TRIGGER: ${{ inputs.trigger }}
+        run: SUMMARY="$GITHUB_STEP_SUMMARY" scripts/build-site.sh artifacts proofs site "$TRIGGER"
       - uses: actions/upload-artifact@v4
         with:
           name: test-report
           path: site
-      - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
-        with:
-          path: site
 
   # GitHub Pages (source "GitHub Actions"): https://hobbyquaker.github.io/hm-radio-simulator/
+  # Fetching the published history, building the site and deploying it are one job in one concurrency group, so
+  # overlapping runs (a push and the upstream watch) publish one after another and each adds its entry to the history
+  # the previous one published (B-2). GitHub keeps at most one run waiting per group: a third run that arrives while
+  # one publishes and one waits replaces the waiting one, whose entry is then missing.
   deploy:
     name: publish the report
     runs-on: ubuntu-latest
-    needs: report
+    needs: [report, prove]
     if: github.ref == 'refs/heads/main' && always() && needs.report.result == 'success'
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -313,5 +289,25 @@ jobs:
       group: pages
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: '*-results-*'
+      - uses: actions/download-artifact@v4
+        if: needs.prove.result != 'skipped'
+        with:
+          path: proofs
+          pattern: 'proof-*'
+      - name: build the report on the history published last
+        env:
+          TRIGGER: ${{ inputs.trigger }}
+        run: scripts/build-site.sh artifacts proofs site "$TRIGGER"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4

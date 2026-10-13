@@ -2,9 +2,9 @@
  * The differential of the sweeps: every daemon job of the release variant leaves the records of the RPC method sweep
  * and the device-type sweep (results/<variant>/sweep/<name>.json, test/helpers/sweep.js); the report compares them
  *
- *   - between neighbouring refs of one run (the older tag against the newer one, the newer one against main): what a
- *     consumer sees change from release to release and up to the upstream head; a fork branch (scripts/refs.mjs
- *     FORK_REFS) against the tag it starts from;
+ *   - between neighbouring upstream refs of one run (the release tag against main, older tags against newer ones when
+ *     a run has several): what a consumer sees change from the release up to the upstream head; each fork ref
+ *     (scripts/refs.mjs FORK_REFS: openccu-lite's tag and branch) against the run's newest upstream release tag;
  *   - between main now and main as the previous published report tested it (the upstream watch, task 14), when the
  *     OpenCCU-Base commit changed in between.
  *
@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {compareRefs, FORK_REFS} from './refs.mjs';
+import {compareRefs, forkOf, FORK_REFS, RELEASE_TAG} from './refs.mjs';
 
 /** Keys (flattened paths) whose answers differ between refs by design. */
 export const DIFF_IGNORE = Object.freeze([/^getVersion\(/]);
@@ -106,11 +106,12 @@ export function diffSweeps(from, to, ignore = DIFF_IGNORE) {
  */
 export function buildDifferential(jobs, previousMain = null, forks = FORK_REFS) {
     const sections = [];
-    // neighbours in the report's order among the upstream refs: oldest tag -> newer tag -> main; a fork branch against
-    // the tag it starts from (what its picked and own fixes change)
-    const all = jobs.filter((j) => j.variant === 'release' && j.sweep).sort((a, b) => compareRefs(a.ref, b.ref));
-    const fork = (ref) => forks.find((f) => f.label === ref);
+    // neighbours in the report's order among the upstream refs: oldest tag -> newer tag -> main; a fork ref against
+    // the newest upstream release tag of the run (what its picked and own fixes change)
+    const all = jobs.filter((j) => j.variant === 'release' && j.sweep).sort((a, b) => compareRefs(a.ref, b.ref, forks));
+    const fork = (ref) => forkOf(ref, forks);
     const release = all.filter((j) => !fork(j.ref));
+    const newestTag = release.filter((j) => RELEASE_TAG.test(j.ref)).pop();
     const main = release.find((j) => j.ref === 'main');
     for (let i = 0; i + 1 < release.length; i++) {
         const [from, to] = [release[i], release[i + 1]];
@@ -122,7 +123,7 @@ export function buildDifferential(jobs, previousMain = null, forks = FORK_REFS) 
         });
     }
     for (const to of all.filter((j) => fork(j.ref))) {
-        const from = release.find((j) => j.ref === fork(to.ref).base);
+        const from = newestTag;
         if (from) {
             sections.push({
                 title: `${from.ref} → ${to.ref}`,

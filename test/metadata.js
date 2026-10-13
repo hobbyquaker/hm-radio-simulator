@@ -13,7 +13,7 @@
  */
 
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
-/** The fork that carries fixes before they are upstream (openccu-lite builds from its branch lite-3.89.11). */
+/** The fork that carries fixes before they are upstream (openccu-lite builds from its branch lite and tags each build). */
 export const FORK_REPO = 'https://github.com/hobbyquaker/OpenCCU-Base.git';
 const FORK = FORK_REPO.replace(/\.git$/, '');
 const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob/main/upstream-reports';

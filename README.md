@@ -198,7 +198,7 @@ kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ei
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Welche Tests das je Version sind, wird nicht von Hand gepflegt:
 `scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist: als Vorfahre oder, auf einem Fork-Zweig, übernommen (eine Zeile `cherry picked from commit <sha>`, sonst dieselbe Patch-ID). Ein Fix, den es nur im Fork gibt, zählt mit seinem Commit im Fork, bis upstream ihn übernimmt; dann kommt nur der Merge-Commit dazu. Gegen
-`3.89.9` und `3.89.11` betrifft das #138 und #140
+`3.89.11` betrifft das #138 und #140
 sowie zwölf Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
@@ -342,15 +342,14 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander: die beiden neuesten Release-Tags (heute `3.89.9` und `3.89.11`), den aktuellen Stand von `main` und den Zweig `lite-3.89.11` des Forks [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base). Aus diesem Zweig baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Tag `3.89.11` mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests, etwa zu #164, #165, #170 und #171). So zeigt der Bericht, was dieser Build behebt und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt, der Zweig wie `main` auf seinen neuesten Commit
-(`scripts/resolve-refs.mjs`: Tags der Form `X.Y.Z`, nach Version sortiert); kommt ein neues Tag dazu, fällt das älteste
-heraus. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) das neueste openccu-lite-Tag (`v*`, heute `v1.0.0-beta.2`, im Bericht `lite@v1.0.0-beta.2`) und den aktuellen Stand des Zweigs `lite`. Aus diesem Zweig baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests, etwa zu #164, #165, #170 und #171); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was der letzte openccu-lite-Build und der Zweig beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
+(`scripts/resolve-refs.mjs`: upstream Tags der Form `X.Y.Z`, im Fork Tags der Form `vX.Y.Z[-…]`, je nach Version sortiert; die Kopien der Upstream-Tags im Fork zählen nicht); ein neues Tag ersetzt das bisherige, die Zweige zählen mit ihrem neuesten Commit. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
 
 ## Testbericht
 
 Jeder CI-Lauf schreibt eine Markdown-Übersicht in seine Zusammenfassung auf GitHub (je Job, und für den ganzen Lauf im
 Job "test report"). Der Lauf auf `main` veröffentlicht dazu einen HTML-Bericht auf GitHub Pages:
-**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die vier OpenCCU-Base-Stände nebeneinander (älteres Tag, neueres Tag, `lite-3.89.11`, `main`, je mit verlinktem Commit; die Commits des Zweigs im Fork), dazu die Fuzzing-Läufe und ein Verlauf der letzten 20 Läufe
+**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die vier OpenCCU-Base-Stände nebeneinander (`3.89.11`, `main`, `lite@v1.0.0-beta.2`, `lite`, je mit verlinktem Commit; die Commits des Forks im Fork), dazu die Fuzzing-Läufe und ein Verlauf der letzten 20 Läufe
 (`runs/<id>/`). Je Version gibt es **eine** Ergebnisspalte: Stimmen die Varianten (normal, ASan, coverage) überein,
 steht dort ihr gemeinsames Ergebnis; weichen sie ab, das schlechteste mit einem kleinen Chip für die Variante (`A`
 ASan, `C` coverage, `R` normal), Tooltip und Aufklappbereich zeigen jede Variante. Die coverage-Variante zählt nur, wo
@@ -400,10 +399,13 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 ## Wenn sich OpenCCU-Base bewegt
 
 Ein Push in ein fremdes Repository kann unseren Workflow nicht auslösen. Deshalb fragt der Workflow
-`upstream-watch.yml` alle 15 Minuten den Stand von OpenCCU-Base `main` und des Fork-Zweigs `lite-3.89.11` ab, merkt sich die zuletzt geprüften Commits auf dem Branch `upstream-state` (nur dieser Workflow schreibt ihn) und lässt bei einem neuen Commit die Suite genau dafür laufen - über den CI-Workflow als wiederverwendbaren Workflow, mit den beiden neuesten Tags daneben wie sonst auch. Der Lauf erscheint im Bericht und im Verlauf mit "triggered by OpenCCU-Base `<sha>`" (oder "lite-3.89.11 `<sha>`", wenn sich nur der Zweig bewegt hat) und verlinktem Commit. Mehrere Commits innerhalb
+`upstream-watch.yml` alle 15 Minuten beide Repositories ab (`git ls-remote`, kein Klon): bei OpenCCU/OpenCCU-Base das neueste Release-Tag und `main`, beim Fork das neueste openccu-lite-Tag und den Zweig `lite`. Er merkt sich die zuletzt geprüften Stände auf dem Branch `upstream-state` (nur dieser Workflow schreibt ihn) und lässt, sobald sich einer davon bewegt hat, die Suite laufen - über den CI-Workflow als wiederverwendbaren Workflow, für den gesehenen `main`-Commit und mit allen vier Ständen wie sonst auch. Der Lauf erscheint im Bericht und im Verlauf mit "triggered by OpenCCU-Base `<sha>`", wenn sich `main` bewegt hat, sonst mit dem ersten neuen Stand, etwa "lite `<sha>`" oder "lite@v1.0.0-beta.3 `<sha>`", und verlinktem Commit. Mehrere Bewegungen innerhalb
 eines Intervalls prüft er als ihren neuesten Stand; der Commit auf dem Zustandsbranch zählt zugleich als Aktivität, so
 dass GitHub den Zeitplan nicht abschaltet. Ein roter Lauf hinterlässt eine Warnung im Lauf; ein Issue dazu öffnet er
 nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force` prüft den aktuellen Stand erneut.
+Überschneiden sich zwei Läufe (ein Push und die Überwachung), veröffentlichen sie ihren Bericht nacheinander: Verlauf
+holen, Bericht bauen und veröffentlichen sind ein Job in einer gemeinsamen Concurrency-Gruppe, so dass jeder Lauf auf
+dem zuletzt veröffentlichten Verlauf aufsetzt und keiner den Eintrag des anderen verliert.
 
 ## Roadmap
 

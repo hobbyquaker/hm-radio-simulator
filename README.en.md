@@ -50,7 +50,7 @@ for rfd; a wired LAN gateway with a wired actuator for hs485d). See _Stages_ for
 | `test/unit/`                                | the simulator itself: framing and CRC, the module state machine, the raw BIN-RPC encoder, the LGW front's cipher streams, the AES handshake, the device model                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 A regression test for a bug the chosen OpenCCU-Base ref does not have the fix for runs as `todo` (`HMRS_KNOWN_BROKEN`,
-derived per ref, not kept by hand: `scripts/resolve-refs.mjs` checks whether each upstream fix's merge commit is in the ref: as an ancestor or, on a fork branch, picked - a `cherry picked from commit <sha>` line, else the same patch id; a fix that exists only on the fork counts by its fork commit until upstream merges it, and then only the merge commit is added), so the run shows what happens without going red. Against `3.89.9` and `3.89.11` that is #138 and #140, plus
+derived per ref, not kept by hand: `scripts/resolve-refs.mjs` checks whether each upstream fix's merge commit is in the ref: as an ancestor or, on a fork branch, picked - a `cherry picked from commit <sha>` line, else the same patch id; a fix that exists only on the fork counts by its fork commit until upstream merges it, and then only the merge commit is added), so the run shows what happens without going red. Against `3.89.11` that is #138 and #140, plus
 twelve findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
@@ -120,8 +120,8 @@ Environment inside the image: `HMRS_VARIANT` (`release`, `asan`), `HMRS_KNOWN_BR
 (the frame fuzzer's seed, logged by every run), `HMRS_FUZZ_FRAMES` (default 400). Results: `results/<variant>/junit.xml`,
 the daemons' logs and sanitizer reports under `results/<variant>/work/`, fuzz artifacts under `results/fuzz/artifacts/`.
 
-CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side: the two newest release tags (today `3.89.9` and `3.89.11`), the head of `main` and the branch `lite-3.89.11` of the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base). [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the `3.89.11` tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #170 and #171), so the report shows what that build fixes that upstream does not yet. The refs are chosen anew on every run, the branch at its head like `main`
-(`scripts/resolve-refs.mjs`: tags of the form `X.Y.Z`, ordered by version; a new tag pushes the oldest out). Each ref
+CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite tag (`v*`, today `v1.0.0-beta.2`, shown as `lite@v1.0.0-beta.2`) and the head of the branch `lite`. [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #170 and #171), and every openccu-lite build tags the commit it built with its version. So the report shows what the last openccu-lite build and the branch fix that upstream does not yet. The refs are chosen anew on every run
+(`scripts/resolve-refs.mjs`: upstream tags of the form `X.Y.Z`, fork tags of the form `vX.Y.Z[-…]`, each ordered by version; the fork's copies of upstream's tags do not count); a new tag replaces the previous one, the branches count at their head. Each ref
 gets the daemon suite in the release, ASan and coverage variants and 60 s of each fuzz harness (findings fail the job,
 except on a ref without #140's fixes, where they are expected and only reported). The docker layers are cached per ref.
 
@@ -130,7 +130,7 @@ except on a ref without #140's fixes, where they are expected and only reported)
 Every CI run writes a Markdown overview into its summary on GitHub (per job, and for the whole run in the "test report"
 job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://hobbyquaker.github.io/hm-radio-simulator/>**
 
-- the four OpenCCU-Base refs side by side (older tag, newer tag, `lite-3.89.11`, `main`, each with its commit linked; the branch's in the fork), the fuzz runs
+- the four OpenCCU-Base refs side by side (`3.89.11`, `main`, `lite@v1.0.0-beta.2`, `lite`, each with its commit linked; the fork's in the fork), the fuzz runs
   and the history of the last 20 runs (`runs/<id>/`). There is **one** result column per ref: where the variants
   (release, ASan, coverage) agree it shows their result, where they differ the worst one with a small chip naming the
   variant (`A` ASan, `C` coverage, `R` release) - the tooltip and the row's collapsible show each variant; the coverage
@@ -179,12 +179,14 @@ OpenCCU-Base commit, `fuzz/run.sh` a `fuzz-summary.json`; `test/metadata.js` hol
 
 ## When OpenCCU-Base moves
 
-A push in someone else's repository cannot trigger our workflow, so `upstream-watch.yml` polls the heads of OpenCCU-Base `main` and of the fork branch `lite-3.89.11` every 15 minutes, keeps the last tested commits on the branch `upstream-state` (written only by
-this workflow), and when the head is new runs the suite for that exact commit - through the CI workflow as a reusable
-workflow, with the two newest tags next to it as always. The run shows up on the report and in its history as "triggered by OpenCCU-Base `<sha>`" (or "lite-3.89.11 `<sha>`" when only the branch moved) with the commit linked. Several upstream commits within one interval are tested as their newest
-head; the commit on the state branch also counts as repository activity, so GitHub does not disable the schedule. A red
+A push in someone else's repository cannot trigger our workflow, so `upstream-watch.yml` polls both repositories every 15 minutes (`git ls-remote`, no clone): OpenCCU/OpenCCU-Base's newest release tag and `main`, the fork's newest openccu-lite tag and its branch `lite`. It keeps the last tested refs on the branch `upstream-state` (written only by
+this workflow), and when any of them moved runs the suite - through the CI workflow as a reusable workflow, for the
+`main` commit it saw and with all four refs as always. The run shows up on the report and in its history as "triggered by OpenCCU-Base `<sha>`" when `main` moved, else by the first new ref, e.g. "lite `<sha>`" or "lite@v1.0.0-beta.3 `<sha>`", with the commit linked. Several moves within one interval are tested as their newest
+heads; the commit on the state branch also counts as repository activity, so GitHub does not disable the schedule. A red
 run leaves a warning on the run; it does not open an issue unless the maintainer wants that. `workflow_dispatch` with
-`force` re-tests the current head.
+`force` re-tests the current refs. When two runs overlap (a push and the watch), they publish their reports one after
+the other: fetching the published history, building the report and deploying it are one job in one concurrency group,
+so each run starts from the history the previous one published and neither drops the other's entry.
 
 ## The simulated module
 

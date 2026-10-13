@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Which OpenCCU-Base refs a run tests, and what is known broken on each - chosen, not hard-coded: the two newest
- * release tags (`X.Y.Z`, ordered by version), the head of main, and the head of each fork branch of FORK_REFS
- * (scripts/refs.mjs: openccu-lite's lite-3.89.11 of hobbyquaker/OpenCCU-Base). A new upstream tag pushes the oldest one
- * out on the next run.
+ * Which OpenCCU-Base refs a run tests, and what is known broken on each - chosen, not hard-coded: upstream's newest
+ * release tag (`X.Y.Z`, by version) and the head of main, and the refs of FORK_REFS (scripts/refs.mjs): the newest
+ * openccu-lite tag (`v*`, by version) and the head of the branch lite of the fork hobbyquaker/OpenCCU-Base. A new tag on
+ * either side replaces the previous one on the next run.
  *
  * The known-broken list of a ref is derived, not kept by hand: an upstream fix (test/metadata.js UPSTREAM_FIXES, a pull
  * request with its merge commit) is known broken on a ref that does not contain its commit; a finding of this suite
@@ -16,13 +16,18 @@
  *   node scripts/resolve-refs.mjs [--repo <url>] [--main <sha>] [--tags <n>] [--fork <repo>@<branch>[=<label>]]...
  *                                 [--no-forks] [--github-output]
  *     prints {refs, daemons, fuzz} as JSON; with --github-output also writes refs=, daemons=, fuzz= to $GITHUB_OUTPUT
- *     (the matrices of the CI's daemon and fuzz jobs). --main tests that commit as main (the upstream watch); --fork
- *     replaces FORK_REFS, --no-forks leaves them out.
+ *     (the matrices of the CI's daemon and fuzz jobs). --main tests that commit as main (the upstream watch); --tags
+ *     the number of upstream release tags (default 1); --fork replaces FORK_REFS by fork branches, --no-forks leaves
+ *     them out.
+ *   node scripts/resolve-refs.mjs --heads [--repo <url>]
+ *     prints "<label> <commit>" per ref a run would test, from `git ls-remote` alone (no clone): the upstream watch
+ *     compares them with the last tested ones
  *   node scripts/resolve-refs.mjs --known <ref> [--harnesses] [--repo <url>]
  *     prints the known-broken list of one ref of --repo (OpenCCU-Base or a fork), or with --harnesses its
  *     FUZZ_KNOWN_HARNESSES (scripts/run-tests.sh)
  */
 
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 
 import {
@@ -30,6 +35,7 @@ import {
     FORK_REFS,
     UPSTREAM_REPO,
     newestReleaseTags,
+    newestTag,
     knownBroken,
     knownHarnesses,
     parseRefSpec,
@@ -48,9 +54,31 @@ function judged(history, sha) {
 }
 
 /**
- * @param {{repo?: string, main?: string, tags?: number, forks?: Array<{label: string, repo: string, ref: string}>}} o
+ * The refs of FORK_REFS (or of `forks`) resolved in a history: a tag entry to the fork's newest matching tag (left out
+ * when the fork has none), a branch entry to its head.
+ * @returns {Array<{ref: string, repo: string, build: string, sha: string}>}
  */
-export function resolve({repo = UPSTREAM_REPO, main = '', tags = 2, forks = FORK_REFS}) {
+export function resolveForks(history, forks = FORK_REFS) {
+    return forks.flatMap((f) => {
+        if (f.kind === 'tag') {
+            const tag = newestTag(history.forkTags(f.repo), f.pattern);
+            if (!tag) {
+                console.error(`no tag matching ${f.pattern} in ${f.repo}: left out`);
+                return [];
+            }
+            const sha = history.resolve(f.repo, tag);
+            return [{ref: `${f.prefix}${tag}`, repo: f.repo, build: sha, sha}];
+        }
+        // a fork branch is built at the commit resolved here, so the image and its known-broken list agree
+        const sha = history.resolve(f.repo, f.ref);
+        return [{ref: f.label, repo: f.repo, build: sha, sha}];
+    });
+}
+
+/**
+ * @param {{repo?: string, main?: string, tags?: number, forks?: typeof FORK_REFS}} o
+ */
+export function resolve({repo = UPSTREAM_REPO, main = '', tags = 1, forks = FORK_REFS}) {
     const history = openHistory({upstream: repo, forks: [FORK_REPO, ...forks.map((f) => f.repo)]});
     try {
         const picked = newestReleaseTags(history.tags(), tags);
@@ -58,11 +86,7 @@ export function resolve({repo = UPSTREAM_REPO, main = '', tags = 2, forks = FORK
         const refs = [
             ...picked.map((t) => ({ref: t, repo, build: t, sha: history.resolve(repo, t)})),
             {ref: 'main', repo, build: mainSha, sha: mainSha},
-            // a fork branch is built at the commit resolved here, so the image and its known-broken list agree
-            ...forks.map((f) => {
-                const sha = history.resolve(f.repo, f.ref);
-                return {ref: f.label, repo: f.repo, build: sha, sha};
-            }),
+            ...resolveForks(history, forks),
         ].map((r) => ({...r, ...judged(history, r.sha)}));
         const daemons = refs.flatMap((r) =>
             VARIANTS.map((variant) => ({
@@ -86,6 +110,44 @@ export function resolve({repo = UPSTREAM_REPO, main = '', tags = 2, forks = FORK
     }
 }
 
+/**
+ * The refs of a run from `git ls-remote` output: "<sha>\t<ref>" lines per repository (tags peeled with `^{}`).
+ * @param {Record<string, string>} remotes the ls-remote output per repository
+ * @returns {string[]} "<label> <commit>" lines in the report's order
+ */
+export function headsOf(remotes, {repo = UPSTREAM_REPO, tags = 1, forks = FORK_REFS} = {}) {
+    const parse = (text) => {
+        const refs = new Map();
+        for (const line of String(text || '').split('\n')) {
+            const [sha, name] = line.split('\t');
+            if (sha && name) {
+                // a peeled tag (`^{}`, the commit of an annotated tag) wins over the tag object
+                const key = name.replace(/\^\{\}$/, '');
+                if (name.endsWith('^{}') || !refs.has(key)) {
+                    refs.set(key, sha);
+                }
+            }
+        }
+        return refs;
+    };
+    const tagsOf = (refs) => [...refs.keys()].filter((k) => k.startsWith('refs/tags/')).map((k) => k.slice(10));
+    const up = parse(remotes[repo]);
+    const lines = newestReleaseTags(tagsOf(up), tags).map((t) => `${t} ${up.get(`refs/tags/${t}`)}`);
+    lines.push(`main ${up.get('refs/heads/main')}`);
+    for (const f of forks) {
+        const refs = parse(remotes[f.repo]);
+        if (f.kind === 'tag') {
+            const tag = newestTag(tagsOf(refs), f.pattern);
+            if (tag) {
+                lines.push(`${f.prefix}${tag} ${refs.get(`refs/tags/${tag}`)}`);
+            }
+        } else if (refs.has(`refs/heads/${f.ref}`)) {
+            lines.push(`${f.label} ${refs.get(`refs/heads/${f.ref}`)}`);
+        }
+    }
+    return lines;
+}
+
 function arg(name, fallback = '') {
     const i = process.argv.indexOf(name);
     return i >= 0 ? process.argv[i + 1] : fallback;
@@ -107,16 +169,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         } finally {
             history.close();
         }
+    } else if (process.argv.includes('--heads')) {
+        const repo = arg('--repo', UPSTREAM_REPO);
+        const remotes = {};
+        for (const r of new Set([repo, ...FORK_REFS.map((f) => f.repo)])) {
+            remotes[r] = execFileSync('git', ['ls-remote', '--heads', '--tags', r], {encoding: 'utf8'});
+        }
+        console.log(headsOf(remotes, {repo, tags: Number(arg('--tags', '1'))}).join('\n'));
     } else {
         const forks = process.argv.includes('--no-forks')
             ? []
             : args('--fork').length
-              ? args('--fork').map((spec) => parseRefSpec(spec))
+              ? args('--fork').map((spec) => ({kind: 'branch', ...parseRefSpec(spec)}))
               : FORK_REFS;
         const result = resolve({
             repo: arg('--repo', UPSTREAM_REPO),
             main: arg('--main'),
-            tags: Number(arg('--tags', '2')),
+            tags: Number(arg('--tags', '1')),
             forks,
         });
         console.log(JSON.stringify(result, null, 2));

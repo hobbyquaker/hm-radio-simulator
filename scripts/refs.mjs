@@ -8,27 +8,92 @@ import {UPSTREAM_FIXES, FINDINGS, FORK_REPO, issueNumber} from '../test/metadata
 export const VARIANTS = Object.freeze(['release', 'asan', 'coverage']);
 export const RELEASE_TAG = /^\d+(\.\d+)+$/;
 
-/** Where the refs come from: OpenCCU-Base itself, and the forks of FORK_REFS. */
+/** Where the refs come from: OpenCCU-Base itself, and the fork of FORK_REFS. */
 export const UPSTREAM_REPO = 'https://github.com/OpenCCU/OpenCCU-Base.git';
 
 /**
- * Branches of forks of OpenCCU-Base that every run tests beside the upstream refs, each resolved to its head anew
- * like main. `label` is the column on the report; `base` the upstream tag the branch starts from (the differential
- * compares the branch with it).
+ * openccu-lite's tags on the fork: the image version of each build round, `v1.0.0-beta.2` and the like (the fork also
+ * carries upstream's own tags such as 3.89.11, which never count as the fork's).
+ */
+export const FORK_TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
+
+/**
+ * The refs of forks of OpenCCU-Base that every run tests beside upstream's newest release tag and main, each resolved
+ * anew on every run:
+ *   - `{kind: 'tag', prefix, repo, pattern}`: the fork's newest tag matching `pattern` (by version), labelled
+ *     `<prefix><tag>` on the report, e.g. `lite@v1.0.0-beta.2`;
+ *   - `{kind: 'branch', label, repo, ref}`: the head of a branch, labelled `label`.
+ * The differential compares each with the run's upstream release tag.
  *
- * lite-3.89.11: openccu-lite builds its daemons from this branch - the 3.89.11 tag plus upstream fixes picked onto it
- * (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, test/metadata.js FINDINGS
- * `fork`), so the report shows what that build fixes that upstream does not yet.
- * @type {ReadonlyArray<{label: string, repo: string, ref: string, base: string}>}
+ * openccu-lite builds its daemons from the fork hobbyquaker/OpenCCU-Base: the branch `lite` is OpenCCU-Base's release
+ * plus upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request
+ * candidates, test/metadata.js FINDINGS `fork`); every openccu-lite build round tags the commit it builds with its
+ * version. So the report shows what the last openccu-lite build and the branch's head fix that upstream does not yet.
+ * @type {ReadonlyArray<{kind: 'tag', prefix: string, repo: string, pattern: RegExp}|
+ *   {kind: 'branch', label: string, repo: string, ref: string}>}
  */
 export const FORK_REFS = Object.freeze([
-    Object.freeze({
-        label: 'lite-3.89.11',
-        repo: FORK_REPO,
-        ref: 'lite-3.89.11',
-        base: '3.89.11',
-    }),
+    Object.freeze({kind: 'tag', prefix: 'lite@', repo: FORK_REPO, pattern: FORK_TAG}),
+    Object.freeze({kind: 'branch', label: 'lite', repo: FORK_REPO, ref: 'lite'}),
 ]);
+
+/** The FORK_REFS entry a report label belongs to, or undefined for an upstream ref. */
+export function forkOf(label, forks = FORK_REFS) {
+    const l = String(label);
+    return forks.find((f) =>
+        f.kind === 'tag' ? l.startsWith(f.prefix) && f.pattern.test(l.slice(f.prefix.length)) : f.label === l,
+    );
+}
+
+/** The tag of a fork tag's label (`lite@v1.0.0-beta.2` -> `v1.0.0-beta.2`), else ''. */
+function forkTagOf(label, forks = FORK_REFS) {
+    const f = forkOf(label, forks);
+    return f && f.kind === 'tag' ? String(label).slice(f.prefix.length) : '';
+}
+
+/**
+ * Compares two versions `[v]X.Y.Z[-pre]` as semver does: the numbers, then a release after its prereleases, then the
+ * prerelease identifiers (numbers numerically, below words; words lexically).
+ */
+export function compareVersions(a, b) {
+    const split = (v) => {
+        const [core, ...pre] = String(v).replace(/^v/, '').split('-');
+        return {core: core.split('.').map(Number), pre: pre.length ? pre.join('-').split('.') : []};
+    };
+    const x = split(a);
+    const y = split(b);
+    for (let i = 0; i < Math.max(x.core.length, y.core.length); i++) {
+        if ((x.core[i] || 0) !== (y.core[i] || 0)) {
+            return (x.core[i] || 0) - (y.core[i] || 0);
+        }
+    }
+    if (!x.pre.length || !y.pre.length) {
+        return y.pre.length - x.pre.length;
+    }
+    for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+        const [p, q] = [x.pre[i], y.pre[i]];
+        if (p === undefined || q === undefined) {
+            return p === undefined ? -1 : 1;
+        }
+        const [np, nq] = [/^\d+$/.test(p), /^\d+$/.test(q)];
+        if (np && nq && Number(p) !== Number(q)) {
+            return Number(p) - Number(q);
+        }
+        if (np !== nq) {
+            return np ? -1 : 1;
+        }
+        if (!np && p !== q) {
+            return p < q ? -1 : 1;
+        }
+    }
+    return 0;
+}
+
+/** The newest tag of a list that matches `pattern`, by version, or '' when none does. */
+export function newestTag(tags, pattern = FORK_TAG) {
+    const list = tags.filter((t) => pattern.test(t)).sort(compareVersions);
+    return list.length ? list[list.length - 1] : '';
+}
 
 /**
  * A ref with its repository, `<repo>@<branch>` (split at the last `@`, so `git@host:x.git@branch` works), optionally
@@ -54,7 +119,7 @@ export function webUrl(repo) {
 
 /** The web address of the repository a report column (a ref's label) was built from. */
 export function repoOfRef(label, forks = FORK_REFS) {
-    const fork = forks.find((f) => f.label === label);
+    const fork = forkOf(label, forks);
     return webUrl(fork ? fork.repo : UPSTREAM_REPO);
 }
 
@@ -63,21 +128,29 @@ export function commitUrl(label, sha, forks = FORK_REFS) {
     return `${repoOfRef(label, forks)}/commit/${sha}`;
 }
 
-/** Orders refs as the report shows them: release tags by version, oldest first, then anything else, main last. */
-export function compareRefs(a, b) {
-    const rank = (r) => (r === 'main' ? 2 : RELEASE_TAG.test(r) ? 0 : 1);
+/**
+ * Orders refs as the report shows them: upstream's release tags by version, oldest first, then main; then the fork's
+ * tags by version and the fork's branches (FORK_REFS); anything else last.
+ */
+export function compareRefs(a, b, forks = FORK_REFS) {
+    const rank = (r) => {
+        if (RELEASE_TAG.test(r)) {
+            return 0;
+        }
+        if (r === 'main') {
+            return 1;
+        }
+        const f = forkOf(r, forks);
+        return f ? (f.kind === 'tag' ? 2 : 3) : 4;
+    };
     if (rank(a) !== rank(b)) {
         return rank(a) - rank(b);
     }
     if (rank(a) === 0) {
-        const x = a.split('.').map(Number);
-        const y = b.split('.').map(Number);
-        for (let i = 0; i < Math.max(x.length, y.length); i++) {
-            if ((x[i] || 0) !== (y[i] || 0)) {
-                return (x[i] || 0) - (y[i] || 0);
-            }
-        }
-        return 0;
+        return compareVersions(a, b);
+    }
+    if (rank(a) === 2) {
+        return compareVersions(forkTagOf(a, forks), forkTagOf(b, forks));
     }
     return a.localeCompare(b);
 }
@@ -94,7 +167,7 @@ export function knownHarnesses(known, findings = FINDINGS) {
 }
 
 /** The newest `count` release tags of a tag list, oldest first. */
-export function newestReleaseTags(tags, count = 2) {
+export function newestReleaseTags(tags, count = 1) {
     return tags
         .filter((t) => RELEASE_TAG.test(t))
         .sort(compareRefs)
