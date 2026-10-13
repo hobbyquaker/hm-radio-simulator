@@ -213,10 +213,11 @@ export const DESCRIPTIONS = Object.freeze({
         'AES: port 2000 dropped while a telegram is in flight - no crash, the set fails, the reconnect follows (#16 shape)':
             'The connection drops while a command is on its way: the command fails, rfd does not crash and reconnects.',
         'the AES policy of the remote is restored':
-            "After the radio module restarts, the remote's security settings should be back in the module; today they are not.",
-        'a key press after the re-init reaches the receiver': 'A key press after the restart still arrives.',
-        'AES: the module power-cycled behind the gateway - rfd republishes the paired devices and keys (restoreConfigToCoprocessor), but not the AES policy':
-            'The radio module behind the gateway loses power and comes back: rfd hands it the paired devices and keys again, but not the per-channel security settings.',
+            "After the radio module restarts, the remote's security settings must be back in the module (OpenCCU-Base #165).",
+        'a key press after the re-init reaches the receiver':
+            'A key press after the restart still arrives (OpenCCU-Base #165).',
+        '#165 AES: the module power-cycled behind the gateway - rfd republishes the paired devices, the keys and the per-channel AES policy (restoreConfigToCoprocessor)':
+            'The radio module behind the gateway loses power and comes back: rfd hands it the paired devices, the keys and the per-channel security settings again (OpenCCU-Base #165: before the fix the security settings were missing).',
     },
     'test/daemon/rfd-lgw-recovery.test.js': {
         'AES: the restore after a reconnect fails twice (SET_CLOCK answered with an error) - rfd drops the connection, retries after 5 s and is back only with a complete restore (#13)':

@@ -228,7 +228,7 @@ test(
 );
 
 test(
-    'AES: the module power-cycled behind the gateway - rfd republishes the paired devices and keys (restoreConfigToCoprocessor), but not the AES policy',
+    '#165 AES: the module power-cycled behind the gateway - rfd republishes the paired devices, the keys and the per-channel AES policy (restoreConfigToCoprocessor)',
     options(),
     async (t) => {
         const rfd = await startRfd({lgwFront: {serial: SERIAL, key: KEY}});
@@ -263,8 +263,8 @@ test(
             // restored key table)
             await rfd.call('setValue', [`${sw.serial}:1`, 'STATE', true]);
             assert.equal(sw.behaviour.channel(1).STATE, 200);
-            // the finding: republishAllDevices re-adds the devices and keys, but the per-channel AES policy is not
-            // set again, so the module does not authenticate the remote's key events and rfd rejects them
+            // OpenCCU-Base #165: republishAllDevices re-added the devices and keys, but the per-channel AES policy was
+            // not set again, so the module did not authenticate the remote's key events and rfd rejected them
             const policyBack = await waitUntil(
                 () => {
                     const policy = module.authentication.get(REMOTE_ADDRESS);

@@ -91,7 +91,8 @@ export const FINDINGS = Object.freeze({
     'aes-republish': {
         title: 'rfd does not restore the per-channel AES policy (AUTHENTICATION_ON) when it republishes devices after a coprocessor re-init',
         draft: '005-aes-policy-after-reinit.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/165',
+        fixedBy: '800f1312692b18ff93f02d41ec89b667c97d82eb',
     },
     'wired-maintenance': {
         title: 'hs485d: a newly discovered wired device gets plain channels - its maintenance channel (UNREACH, STICKY_UNREACH, CONFIG_PENDING) works only after a restart',
