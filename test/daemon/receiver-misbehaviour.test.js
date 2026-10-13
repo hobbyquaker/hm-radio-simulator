@@ -11,12 +11,14 @@
  *
  * - events: one HSSXmlRpcEventDispatcher thread per receiver, XmlRpcClient timeout 10 000 ms
  *   (`m_pClient->setTimeout(10000)`), each batch tried twice - so a hanging receiver should cost only its own thread;
- * - init: `HSSManager::XmlRpcCallSync()` (system.listMethods, listDevices) on the daemon's main loop with the client's
- *   default timeout of -1, i.e. none;
- * - newDevices/deleteDevices/replaceDevice: `AsyncXmlRpcSender`, a detached thread per call, no timeout either.
+ * - init: `HSSManager::XmlRpcCallSync()` (system.listMethods, listDevices) on the daemon's main loop: before
+ *   OpenCCU-Base #170 with the client's default timeout of -1, i.e. none; with the fix a 30 000 ms timeout
+ *   (`c.setTimeout(30000)`), so a receiver that never answers freezes the daemon for at most that long per callback;
+ * - newDevices/deleteDevices/replaceDevice: `AsyncXmlRpcSender`, a detached thread per call; no timeout before
+ *   OpenCCU-Base #171, 30 000 ms with the fix.
  *
- * Timing assumptions: margins of 3 s for "at once" (the well-behaved receiver normally has its event in ~20 ms), and
- * 2 x 10 s + slack for a hanging receiver's dispatcher to give up on a batch.
+ * Timing assumptions: margins of 3 s for "at once" (the well-behaved receiver normally has its event in ~20 ms),
+ * 2 x 10 s + slack for a hanging receiver's dispatcher to give up on a batch, and 30 s + slack for the init callbacks.
  */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,6 +36,11 @@ import {WiredBus, WiredDevice} from '../../lib/wired.js';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** HSSXmlRpcEventDispatcher's client timeout (libhsscomm), each batch tried twice. */
 const DISPATCH_TIMEOUT_MS = 10000;
+/**
+ * The timeout of the init callbacks (`HSSManager::XmlRpcCallSync`, OpenCCU-Base #170) and of the asynchronous
+ * callbacks (`AsyncXmlRpcSender`, OpenCCU-Base #171), both `setTimeout(30000)`.
+ */
+const CALLBACK_TIMEOUT_MS = 30000;
 const AT_ONCE_MS = 3000;
 
 /** The modes that hit event deliveries (see raw-receiver.js). */
@@ -267,10 +274,12 @@ for (const flavour of FLAVOURS) {
     );
 
     test(
-        `${flavour.name}: init with a receiver that never answers blocks nothing (the init-blocks finding)`,
+        `${flavour.name}: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding)`,
         {...skipWithoutDaemons, ...regression('init-blocks'), timeout: 300000},
         async (t) => {
-            // HSSManager::PlatformInit -> XmlRpcCallSync("system.listMethods") with no timeout, on the main loop
+            // HSSManager::PlatformInit -> XmlRpcCallSync("system.listMethods") on the main loop: without a timeout the
+            // daemon stands still until the receiver closes; with OpenCCU-Base #170 it answers again after
+            // CALLBACK_TIMEOUT_MS, the receiver still connected (listDevices, which the receiver answers, follows)
             const good = await startReceiver();
             const daemon = await flavour.start(good);
             const probe = new BinRpcClient(daemon.port);
@@ -279,28 +288,43 @@ for (const flavour of FLAVOURS) {
             const initClient = new BinRpcClient(daemon.port);
             await withDaemon(daemon, async () => {
                 const pending = initClient
-                    .call('init', flavour.initArgs(bad.url, 'silent'), {timeout: 120000})
-                    .catch(() => {});
-                await waitForRequest(bad, (r) => r.method === 'system.listMethods', 5000);
-                const results = [];
-                for (let i = 0; i < 3; i++) {
-                    const at = Date.now();
-                    const r = await eventGetsThrough(daemon, good, probe, `while-init-${i}`).then(
-                        () => `ok after ${Date.now() - at} ms`,
-                        (e) => `blocked: ${e.message}`,
+                    .call('init', flavour.initArgs(bad.url, 'silent'), {timeout: 2 * CALLBACK_TIMEOUT_MS + AT_ONCE_MS})
+                    .then(
+                        () => 'answered',
+                        (e) => `failed: ${e.message}`,
                     );
-                    results.push(r);
-                }
-                t.diagnostic(`while the receiver keeps init waiting: ${results.join('; ')}`);
-                // release the daemon: the receiver goes away, the waiting call fails
-                await bad.stop();
-                await pending;
-                assert.ok(daemon.alive);
-                await eventGetsThrough(daemon, good, probe, 'after-release');
                 assert.ok(
-                    results.every((r) => r.startsWith('ok')),
-                    `RPC and events stalled while init waited for the receiver: ${results.join('; ')}`,
+                    await waitForRequest(bad, (r) => r.method === 'system.listMethods', 5000),
+                    'the receiver got system.listMethods',
                 );
+                const stalledAt = Date.now();
+                // probe with a fresh client each time: a call the daemon answers late must not confuse the next one
+                let unanswered = 0;
+                let recoveredAfter = null;
+                while (recoveredAfter === null && Date.now() - stalledAt < CALLBACK_TIMEOUT_MS + 2 * AT_ONCE_MS) {
+                    const client = new BinRpcClient(daemon.port);
+                    try {
+                        await client.call('listDevices', [], {timeout: AT_ONCE_MS});
+                        recoveredAfter = Date.now() - stalledAt;
+                    } catch {
+                        unanswered++;
+                    } finally {
+                        client.client.close();
+                    }
+                }
+                t.diagnostic(
+                    `while the receiver keeps init waiting: ${unanswered} probes of ${AT_ONCE_MS} ms unanswered; RPC answered again after ${recoveredAfter} ms (bound ${CALLBACK_TIMEOUT_MS} ms)`,
+                );
+                assert.notEqual(
+                    recoveredAfter,
+                    null,
+                    `RPC stalled for more than ${CALLBACK_TIMEOUT_MS} ms while init waited for the receiver`,
+                );
+                const outcome = await pending;
+                t.diagnostic(`init ${outcome}`);
+                assert.equal(outcome, 'answered');
+                assert.ok(daemon.alive);
+                await eventGetsThrough(daemon, good, probe, 'after-recovery');
             }).finally(async () => {
                 probe.client.close();
                 initClient.client.close();
@@ -314,7 +338,8 @@ for (const flavour of FLAVOURS) {
         `${flavour.name}: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding)`,
         {...skipWithoutDaemons, ...regression('async-callback-threads'), timeout: 300000},
         async (t) => {
-            // newDevices goes through AsyncXmlRpcSender: a detached thread per call with no client timeout
+            // newDevices goes through AsyncXmlRpcSender: a detached thread per call, with no client timeout before
+            // OpenCCU-Base #171 and CALLBACK_TIMEOUT_MS since - after that the threads must be gone
             const good = await startReceiver();
             const daemon = await flavour.start(good);
             const bad = await startRawReceiver();
@@ -330,7 +355,7 @@ for (const flavour of FLAVOURS) {
                     (r) => r.method === 'newDevices' && bad.calls('newDevices').length >= rounds,
                     10000,
                 );
-                await sleep(2 * DISPATCH_TIMEOUT_MS + 2000);
+                await sleep(CALLBACK_TIMEOUT_MS + 2 * AT_ONCE_MS);
                 const after = resources(daemon);
                 t.diagnostic(
                     `${bad.calls('newDevices').length} unanswered newDevices: threads ${before.threads} -> ${after.threads}, fds ${before.fds} -> ${after.fds}`,

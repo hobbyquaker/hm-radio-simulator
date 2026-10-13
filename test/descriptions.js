@@ -109,8 +109,8 @@ export const DESCRIPTIONS = Object.freeze({
             'The same thirteen kinds of misbehaving receiver over XML-RPC; rfd must keep serving everything else.',
         'rfd: init with a receiver that answers listDevices with a huge or an invalid list - the daemon survives and answers':
             'A registering program answers with an enormous or nonsensical device list; rfd must survive and keep answering.',
-        'rfd: init with a receiver that never answers blocks nothing (the init-blocks finding)':
-            'A program that registers and then never answers should not freeze rfd; today the whole daemon waits for it.',
+        'rfd: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding)':
+            'A program that registers and then never answers may stall rfd for the callback timeout at most; before OpenCCU-Base #170 the whole daemon waited for it for good.',
         'rfd: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding)':
             'Each unanswered device announcement should not leave a thread behind; today every one does, for good.',
         'rfd: a client re-registering in a tight loop, two receivers with one id, a receiver URL that leads nowhere':
@@ -121,8 +121,8 @@ export const DESCRIPTIONS = Object.freeze({
             'The same thirteen kinds of misbehaving receiver over XML-RPC; hs485d must keep serving everything else.',
         'hs485d: init with a receiver that answers listDevices with a huge or an invalid list - the daemon survives and answers':
             'A registering program answers with an enormous or nonsensical device list; hs485d must survive and keep answering.',
-        'hs485d: init with a receiver that never answers blocks nothing (the init-blocks finding)':
-            'A program that registers and then never answers should not freeze hs485d; today the whole daemon waits for it.',
+        'hs485d: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding)':
+            'A program that registers and then never answers may stall hs485d for the callback timeout at most; before OpenCCU-Base #170 the whole daemon waited for it for good.',
         'hs485d: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding)':
             'Each unanswered device announcement should not leave a thread behind; today every one does, for good.',
         'hs485d: a client re-registering in a tight loop, two receivers with one id, a receiver URL that leads nowhere':
