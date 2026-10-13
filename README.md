@@ -110,6 +110,20 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Senden; kommt sie als erste an, wechselt rfd erst mit dem nächsten Senden. Fällt ein Interface aus, laufen die Geräte
   am anderen weiter, und ein Gerät mit Roaming wird übernommen. Die Duty-Cycle-Stufen (0/40/65/80/90/95/98/99 %): ein
   Event je Stufenwechsel, keins innerhalb einer Stufe, je Interface, abwärts mit Hysterese.
+- **Firmware-Updates (OTAU) mit rfd:** ein HM-LC-Sw2PBU-FM (`rf_s_2conf_644.xml`, `updatable="true"`) mit einem
+  Bootloader im Gerätemodell. Die Firmware-Dateien, die rfd kennt (`Firmware Dir/fwmap`, beim Start gelesen;
+  `User Firmware Dir/<dir>/info` mit `refreshDeployedDeviceFirmwareList`, die höhere Version gewinnt),
+  `AVAILABLE_FIRMWARE` und `UPDATABLE`; das Update selbst: der Bootloader-Start mit `INFO_SERIAL`, das Umschalten
+  auf 100 kbit/s (`WRITE_TRX_REG`, `SET_100K_DATARATE`), die Update-Frames in rfds 50/48-Byte-Stücken, zurück auf
+  10 kbit/s, `DEVICE_IN_BOOTLOADER` 1 → 0, das Gerät neu aufgebaut mit der neuen Version (`newDevices` oder
+  `updateDevice`). Die Fehlerwege: Duty Cycle (-8), Gerät außer Reichweite bei 100 kbit/s (-9, und die Fortsetzung,
+  wenn es wieder da ist, ohne zweiten Bootloader-Start), außer Reichweite direkt nach dem Start, ein Update, das
+  auf halbem Weg abbricht, ein Bootloader, der nicht startet (`UPDATE_PENDING`, das Update läuft beim nächsten
+  Telegramm des Geräts), falsche Dateien (fehlend, abgeschnitten, kein Eintrag). Zwei Funde: `update-nack-ignored`
+  (ein NACK des Geräts auf einen Update-Frame gilt rfd als Quittung, das Update endet "erfolgreich" und das Gerät
+  wird mit der neuen Version neu aufgebaut) und `info-blank-line` (eine Leerzeile in einer `info`-Datei beendet rfd
+  beim Start). -7 (Interface nicht updatefähig) ist mit den simulierten Interfaces nicht erreichbar, beide
+  sind `CCU2BidcosRemoteInterface`.
 - **hs485d am Wired-LAN-Gateway (HMW-LGW, `lib/hmwlgw.js`)** mit einem simulierten Schaltaktor (HMW-LC-Sw2-DR aus
   den `hs485types`-Beschreibungen des Images) am Bus (`lib/wired.js`): der Verbindungsaufbau mit demselben Vorspiel wie
   beim HM-LGW (auch verschlüsselt mit `-k`), das Keepalive `K` alle 20 s, die Gerätesuche (`D` → `d`/`c`, dann `h`/`v`/`n`
@@ -119,6 +133,13 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Keepalive-Ausfall mit Wiederverbindung und der Neustart mit den Gerätedateien, darunter ein Typ-Byte ≥ 0x80
   ([#9](https://github.com/OpenCCU/OpenCCU-Base/pull/9)) - und nach dem Neustart der Wartungskanal, der dem neu
   gefundenen Gerät fehlt (`wired-maintenance`).
+- **Firmware-Updates mit hs485d (der Hexfile-Pfad):** `Firmware Dir/fwmap` nennt je Gerätetyp (`H17V0`) eine
+  Intel-HEX-Datei, die Version als Zahl oder als `@<Adresse>` des Versionsworts im Image; `AVAILABLE_FIRMWARE`
+  daraus. Das Update: `z` zweimal, `u` in die Anwendung, `u` an den Bootloader, `p` (Seitengröße), die Seiten mit
+  `w`, der Verify mit `r`, `g`, `Z` zweimal, das Gerät aus frischem `h`/`v` neu aufgebaut (`newDevices` mit der
+  neuen Version). Ein Verify-Fehler (false, kein Neuaufbau), ein Gerät, das den Bootloader nicht betritt, eine
+  HEX-Datei mit Prüfsummenfehler und mit einem unbekannten Record-Typ. Ein Fund: `bootloader-pagesize-zero`
+  (antwortet der Bootloader auf `p` mit 0, teilt hs485d durch null und stirbt mit SIGFPE).
 - **Die UDP-Gerätesuche** (libLanDeviceUtils, `lib/eq3udp.js`): ein simuliertes eQ-3-LAN-Gerät beantwortet die
   Suche auf UDP 43439 - rfd findet so ein nur per Seriennummer konfiguriertes HM-LGW, hs485d sein HMW-LGW (`-s`), und
   hs485d sucht das Gateway bei jeder Wiederverbindung so, auch wenn es mit `-h` gestartet wurde.
@@ -199,7 +220,7 @@ Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Ver
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Welche Tests das je Version sind, wird nicht von Hand gepflegt:
 `scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist: als Vorfahre oder, auf einem Fork-Zweig, übernommen (eine Zeile `cherry picked from commit <sha>`, sonst dieselbe Patch-ID). Ein Fix, den es nur im Fork gibt, zählt mit seinem Commit im Fork, bis upstream ihn übernimmt; dann kommt nur der Merge-Commit dazu. Gegen
 `3.89.11` betrifft das #138 und #140
-sowie zwölf Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
+sowie die Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
 zweites Mal gejoint wird (libelvutils `Actor::Stop()`); der normale Build merkt davon nichts. Der zweite Fund ohne Issue ist `read-eof`: Ein Pseudo-Terminal, dessen Master
 verschwunden ist, beantwortet `read()` mit 0 (Dateiende), was #115/#116 nicht als Fehler behandeln (sie behandeln -1:
@@ -225,7 +246,12 @@ der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindu
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
 einen Socket für immer zurück. Gegen `main` bleiben `double-join`, `read-eof`, `aes-republish`, `wired-maintenance`,
 `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads` `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest) `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren), `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldet Erfolg und speichert es; das Gerät hängt dann am Standard-Interface), `json-substr`, `hexfile-no-data`, `propertymap-long-line` (siehe Fuzzing), `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s), `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen) und `ack-rssi-sign` (das Modul schickt den RSSI der Quittung im Sendestatus als vorzeichenbehaftetes Byte, rfd negiert ihn wie den Betrag im Event: -216 statt -40 dBm auf dem CCU3, +40 auf x86_64, in `RSSI_PEER` und `rssiInfo`). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-019 sind als
-OpenCCU-Base #161-#179 gemeldet, 020 als #185 (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)).
+OpenCCU-Base #161-#179 gemeldet, 020 als #185 (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)). Die Firmware-Update-Tests brachten `update-nack-ignored` (ein NACK des Geräts auf einen Update-Frame gilt
+als Quittung: `SendUpdataFrame` prüft die Antwort nie, das Update endet mit `true` und `Rebuild`, das Gerät bleibt
+bei seiner Version oder im Bootloader) und `info-blank-line` (`RFFirmwareManager::TrimLine` läuft mit einem
+vorzeichenlosen Index unter null: eine Leerzeile in `User Firmware Dir/<dir>/info` wirft `std::out_of_range`,
+niemand fängt es, rfd stirbt beim Start). Der Hexfile-Pfad von hs485d brachte `bootloader-pagesize-zero` (ein Bootloader, der die
+Seitengröße 0 meldet: `HS485Device::WriteFlash` rechnet `start % pagesize`, SIGFPE).
 
 ## Wie es funktioniert
 

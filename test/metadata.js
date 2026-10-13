@@ -213,6 +213,21 @@ export const FINDINGS = Object.freeze({
         draft: '020-ack-rssi-signed.md',
         issue: null,
     },
+    'update-nack-ignored': {
+        title: "rfd: a device's NACK to a firmware update frame counts as delivered - the update ends as a success and the device is rebuilt with the new version (BidcosInterfaceConcentrator::SendUpdataFrame never checks the response)",
+        draft: '021-update-nack-ignored.md',
+        issue: null,
+    },
+    'info-blank-line': {
+        title: 'rfd terminates on a blank line in a user firmware info file: RFFirmwareManager::TrimLine runs its unsigned loop index below zero (std::out_of_range, uncaught)',
+        draft: '022-info-blank-line.md',
+        issue: null,
+    },
+    'bootloader-pagesize-zero': {
+        title: "hs485d dies with SIGFPE when a wired device's bootloader answers the page-size request with 0 (HS485Device::WriteFlash divides by it)",
+        draft: '023-bootloader-pagesize-zero.md',
+        issue: null,
+    },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
         draft: '003-exit-rpc-method.md',

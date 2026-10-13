@@ -26,6 +26,12 @@ export const LAZY_TYPE = 'HM-RC-4-2';
 export const MOTION_SERIAL = 'SIMMD00001';
 export const MOTION_ADDRESS = 0x6789ab;
 export const MOTION_TYPE = 'HM-Sec-MDIR';
+export const UPDATABLE_SERIAL = 'SIMPBU0001';
+export const UPDATABLE_ADDRESS = 0x2a2b2c;
+export const UPDATABLE_TYPE = 'HM-LC-Sw2PBU-FM';
+/** The type code of the HM-LC-Sw2PBU-FM as rfd's fwmap names it (decimal 257 = 0x0101) and its lowest firmware. */
+export const UPDATABLE_TYPE_CODE = 0x0101;
+export const UPDATABLE_FIRMWARE = 0x29;
 export const BURST_SERIAL = 'SIMBA00001';
 export const BURST_ADDRESS = 0x56789a;
 export const BURST_TYPE = 'HM-LC-Sw1-Ba-PCB';
@@ -176,6 +182,26 @@ export function attachBurstSwitch(rfd, options = {}) {
             description: description('rf_s_ba.xml'),
             typeId: BURST_TYPE,
             rxMode: 'burst',
+            ...options,
+        }),
+    );
+    return {air, device};
+}
+
+/**
+ * A switch whose type rfd may update: the HM-LC-Sw2PBU-FM (rf_s_2conf_644.xml, `updatable="true"`, the frames of
+ * rf_s.xml, two switch channels, no peering channel in the announcement). `bootloader` are the update knobs
+ * (lib/device.js BOOTLOADER_DEFAULTS).
+ */
+export function attachUpdatableSwitch(rfd, options = {}) {
+    const air = airOf(rfd);
+    const device = air.add(
+        new BidcosDevice({
+            address: UPDATABLE_ADDRESS,
+            serial: UPDATABLE_SERIAL,
+            description: description('rf_s_2conf_644.xml'),
+            typeId: UPDATABLE_TYPE,
+            channelCount: 2,
             ...options,
         }),
     );

@@ -11,6 +11,21 @@
 const rfd = 'rfd, the BidCoS radio daemon,';
 
 export const DESCRIPTIONS = Object.freeze({
+    'test/daemon/hs485d-firmware.test.js': {
+        'AVAILABLE_FIRMWARE from the fwmap: a literal version, and the version word read from the hex (@address)':
+            'hs485d, the wired daemon, learns the firmware it can offer a device type from its fwmap: as a version written there, or read from the firmware file itself; a type without a usable entry offers none.',
+        'the update: sleep mode, u, the page size, the pages written and verified, g, the device rebuilt with the new version':
+            'hs485d updates a simulated wired device: the bus is put to sleep, the device enters its bootloader, the pages are written and read back, the application is started, and the device is announced again with its new version.',
+        'a verify mismatch: the write spoils a byte, the read-back differs, hs485d reports false and does not rebuild':
+            'A page that reads back differently from what was written: hs485d stops the verify there, reports the update as failed and keeps the old version.',
+        'the device does not enter its bootloader: the bootloader frames go unanswered, hs485d reports false':
+            'A device that ignores the update command: the bootloader commands get no answer and hs485d reports the update as failed without writing anything.',
+        'a bootloader that answers a page size of 0: hs485d reports false and lives (bootloader-pagesize-zero)':
+            'A device whose bootloader answers the page-size question with 0: hs485d must report a failure. It divides by the answer and dies instead (a finding).',
+        'hs485d survives the answer': 'hs485d must still be running after the update attempt.',
+        'hex files with a checksum error and with a record type hs485d does not know: loaded with a warning':
+            'A firmware file with a wrong record checksum and with a record type hs485d does not handle is still read; hs485d warns and the update uses the data records.',
+    },
     'test/daemon/hs485d-lgw.test.js': {
         'hs485d connects through the gateway: the hello and the switch, an empty bus, the keepalive every 20 s':
             'hs485d, the wired daemon, connects to a simulated wired LAN gateway (HMW-LGW). The test checks the greeting, the switch to the binary protocol and the keepalive every 20 seconds.',
@@ -385,6 +400,29 @@ export const DESCRIPTIONS = Object.freeze({
             'Calling the metadata methods with an argument missing should give an error; under the memory checker it shows a use-after-free today.',
         'a device type with type_conversion_string_unsigned_integer (HM-OU-LED16) is instantiated without a sanitizer report (the string-uint-conversion finding)':
             'Creating an HM-OU-LED16 should be clean; under the memory checker it shows a dangling pointer today.',
+    },
+    'test/daemon/rfd-firmware.test.js': {
+        'AVAILABLE_FIRMWARE and UPDATABLE: the fwmap names the file for the type; user firmware wins with the higher version': `${rfd} reads the firmware files it may offer from its fwmap at start-up and from user-deployed firmware directories on request; a device whose type can be updated shows the available version, one whose type cannot shows none, and the higher of two versions wins.`,
+        'the update: the bootloader starts, 100 kbit/s, the frames, 10 kbit/s, the device is rebuilt with the new firmware': `${rfd} updates a simulated device's firmware: it starts the device's bootloader, switches both to the fast data rate, sends the update frames, switches back and announces the device again with its new version.`,
+        'Call UpdateDevice On OTAU Device Rebuild: the rebuilt device is reported with updateDevice, not newDevices':
+            'With the configuration option set, the updated device is reported to the receiver as an update of the existing device instead of as a new one.',
+        '-8: the duty cycle leaves no room for the update; nothing is sent to the device': `${rfd} refuses the update with fault -8 when the module's duty cycle would not leave a fifth free after it; nothing goes over the air, and the update stays pending.`,
+        '-9: the device is out of range at 100 kbit/s - four tries, then "out of range"; back in range, the update resumes without a restart': `A device that stops hearing the fast data rate: ${rfd} sends the first frame four times and reports -9. Once the device is back, a second call resumes with the device still in its bootloader.`,
+        'out of range right after the bootloader start: "Unable to set datarate to 100k" after three tries': `A device that vanishes right after entering its bootloader: ${rfd} tries the data-rate switch three times and gives up with its own message.`,
+        'an update that stops half-way: a later frame stays unacknowledged - "Firmware update aborted"': `When a later frame is never acknowledged, ${rfd} reports the update as aborted after four tries, leaves the device flagged as in its bootloader and keeps the update pending.`,
+        'the bootloader does not start (the device is away): "didn\'t start", UPDATE_PENDING, the update runs on the device\'s next telegram': `A device that does not answer the bootloader start: ${rfd} reports it, marks the update as pending and runs it as soon as the device sends a telegram of its own.`,
+        'the bootloader refuses to start (NACK): the same pending update':
+            'A device that refuses to enter its bootloader is handled the same way: the update is pending and runs later.',
+        'wrong files: a missing file, a file cut short, no entry for the type': `${rfd} reports a firmware file it cannot read (missing, cut short, or none for the type) without touching the device, and works once the file is whole.`,
+        'a file the device refuses (another type, a bad CRC): the NACK is not an acknowledgement (update-nack-ignored)': `The simulated device refuses the update frames of a file meant for another device type or with a bad checksum. ${rfd} takes the refusal for an acknowledgement and reports the update as done (a finding).`,
+        'a NACKed first frame ends the update as "out of range" (-9), not as a success':
+            'A refused first frame must end the update with an error, not with success.',
+        'the device is not rebuilt after a refused file':
+            'A device that refused the file must keep its old firmware version in rfd.',
+        'a NACKed later frame ends the update as "aborted", not as a success':
+            'A refused later frame must end the update as aborted, not with success.',
+        'a user firmware info file with a blank line: rfd starts and reads the rest (info-blank-line)': `A user-deployed firmware whose info file has a blank line: ${rfd} must start and read the rest of the file. It dies instead (a finding).`,
+        'rfd survives the blank line': 'rfd must come up with such a file in place.',
     },
     'test/daemon/rfd-switch.test.js': {
         'pairing: install mode, the device announces itself, rfd configures it and reports newDevices':

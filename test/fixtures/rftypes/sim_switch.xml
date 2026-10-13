@@ -3,7 +3,7 @@
      (the real files are read from the Base checkout in the image and are not part of this repository). -->
 <device version="1" supports_aes="true">
   <supported_types>
-    <type name="simulated switch actuator" id="SIM-Sw1" priority="2">
+    <type name="simulated switch actuator" id="SIM-Sw1" priority="2" updatable="true">
       <parameter index="9.0" size="1.0" cond_op="GE" const_value="0x24"/>
       <parameter index="10.0" size="2.0" const_value="0x0011"/>
     </type>
