@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {compareRefs, forkOf, FORK_REFS, RELEASE_TAG} from './refs.mjs';
+import {compareRefs, forkOf, refPairText, refText, FORK_REFS, RELEASE_TAG} from './refs.mjs';
 
 /** Keys (flattened paths) whose answers differ between refs by design. */
 export const DIFF_IGNORE = Object.freeze([/^getVersion\(/]);
@@ -116,7 +116,7 @@ export function buildDifferential(jobs, previousMain = null, forks = FORK_REFS) 
     for (let i = 0; i + 1 < release.length; i++) {
         const [from, to] = [release[i], release[i + 1]];
         sections.push({
-            title: `${from.ref} → ${to.ref}`,
+            title: refPairText(from.ref, to.ref, forks),
             from: {ref: from.ref, baseCommit: from.baseCommit},
             to: {ref: to.ref, baseCommit: to.baseCommit},
             diff: diffSweeps(from.sweep, to.sweep),
@@ -126,7 +126,7 @@ export function buildDifferential(jobs, previousMain = null, forks = FORK_REFS) 
         const from = newestTag;
         if (from) {
             sections.push({
-                title: `${from.ref} → ${to.ref}`,
+                title: refPairText(from.ref, to.ref, forks),
                 from: {ref: from.ref, baseCommit: from.baseCommit},
                 to: {ref: to.ref, baseCommit: to.baseCommit},
                 diff: diffSweeps(from.sweep, to.sweep),
@@ -135,7 +135,7 @@ export function buildDifferential(jobs, previousMain = null, forks = FORK_REFS) 
     }
     if (main && previousMain && previousMain.records && previousMain.baseCommit !== main.baseCommit) {
         sections.push({
-            title: 'main: the previously tested commit → this one',
+            title: `${refText('main', forks)}: the previously tested commit → this one`,
             from: {ref: 'main', baseCommit: previousMain.baseCommit},
             to: {ref: 'main', baseCommit: main.baseCommit},
             diff: diffSweeps(previousMain.records, main.sweep),

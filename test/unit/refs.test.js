@@ -12,6 +12,9 @@ import {
     forkFixes,
     findingFixes,
     forkOf,
+    refDisplay,
+    refText,
+    refPairText,
     newestTag,
     compareVersions,
     FORK_TAG,
@@ -58,6 +61,28 @@ test("the fork's newest openccu-lite tag: v* by version, upstream's tags in the 
     assert.equal(compareVersions('1.0.0-beta', 'v1.0.0-beta.1') < 0, true, 'fewer identifiers sort first');
 });
 
+test("the report's names: repository and branch above, the tag without its v or head below", () => {
+    assert.deepEqual(refDisplay('3.89.11'), {
+        group: 'OpenCCU/OpenCCU-Base/main',
+        groupUrl: 'https://github.com/OpenCCU/OpenCCU-Base/tree/main',
+        name: '3.89.11',
+    });
+    assert.equal(refDisplay('main').name, 'head');
+    assert.deepEqual(refDisplay('lite@v1.0.0-beta.2'), {
+        group: 'hobbyquaker/OpenCCU-Base/lite',
+        groupUrl: 'https://github.com/hobbyquaker/OpenCCU-Base/tree/lite',
+        name: '1.0.0-beta.2',
+    });
+    assert.equal(refText('lite'), 'hobbyquaker/OpenCCU-Base/lite head');
+    assert.deepEqual(
+        refDisplay('lite-3.89.11'),
+        {group: '', groupUrl: '', name: 'lite-3.89.11'},
+        'an old label as it is',
+    );
+    assert.equal(refPairText('3.89.11', 'main'), 'OpenCCU/OpenCCU-Base/main: 3.89.11 → head');
+    assert.equal(refPairText('lite@v1.0.0-beta.2', 'lite'), 'hobbyquaker/OpenCCU-Base/lite: 1.0.0-beta.2 → head');
+});
+
 test('a label belongs to the fork when it is the branch or <prefix><v tag>', () => {
     assert.equal(forkOf('lite').kind, 'branch');
     assert.equal(forkOf('lite@v1.0.0-beta.2').kind, 'tag');
@@ -80,8 +105,8 @@ test('the differential compares neighbours: the older tag with the newer one, th
     assert.deepEqual(
         sections.map((s) => [s.title, s.diff.changed]),
         [
-            ['3.89.9 → 3.89.11', 1],
-            ['3.89.11 → main', 1],
+            ['OpenCCU/OpenCCU-Base/main: 3.89.9 → 3.89.11', 1],
+            ['OpenCCU/OpenCCU-Base/main: 3.89.11 → head', 1],
         ],
     );
 });
@@ -165,7 +190,11 @@ test("the differential compares each fork ref with the run's upstream release ta
     ]);
     assert.deepEqual(
         sections.map((s) => s.title),
-        ['3.89.11 → main', '3.89.11 → lite@v1.0.0-beta.2', '3.89.11 → lite'],
+        [
+            'OpenCCU/OpenCCU-Base/main: 3.89.11 → head',
+            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite 1.0.0-beta.2',
+            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite head',
+        ],
     );
 });
 

@@ -129,12 +129,12 @@ test('the report carries the differential of the fixture refs and the previous m
     });
     assert.equal(report.differential.length, 2);
     const [refs, previous] = report.differential;
-    assert.equal(refs.title, '3.89.11 → main');
+    assert.equal(refs.title, 'OpenCCU/OpenCCU-Base/main: 3.89.11 → head');
     assert.deepEqual(
         {changed: refs.diff.changed, added: refs.diff.added, removed: refs.diff.removed, ignored: refs.diff.ignored},
         {changed: 1, added: 1, removed: 1, ignored: 1},
     );
-    assert.ok(previous.title.startsWith('main: the previously tested commit'));
+    assert.ok(previous.title.startsWith('OpenCCU/OpenCCU-Base/main head: the previously tested commit'));
     assert.ok(
         report.jobs.every((j) => !('sweep' in JSON.parse(JSON.stringify(j)))),
         'the records stay out of report.json',
@@ -151,8 +151,11 @@ test('the report carries the differential of the fixture refs and the previous m
     const md = renderSummaryMarkdown(report);
     assert.match(md, /### Load \(airtime computed, not measured\)/);
     assert.match(md, /### listMethods tells the truth/);
-    assert.match(md, /\| rfd \| binrpc \| main \| 55 \| 55 \| none \| system\.multicall \|/);
-    assert.match(md, /### Differential: 3\.89\.11 → main/);
+    assert.match(
+        md,
+        /\| rfd \| binrpc \| OpenCCU\/OpenCCU-Base\/main head \| 55 \| 55 \| none \| system\.multicall \|/,
+    );
+    assert.match(md, /### Differential: OpenCCU\/OpenCCU-Base\/main: 3\.89\.11 → head/);
     assert.match(md, /fault -2 Unknown instance → fault -5 Unknown parameter/);
     const html = renderHtml(report);
     assert.match(html, /<h2>Differential<\/h2>/);

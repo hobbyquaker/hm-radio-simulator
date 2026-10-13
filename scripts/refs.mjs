@@ -20,8 +20,8 @@ export const FORK_TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
 /**
  * The refs of forks of OpenCCU-Base that every run tests beside upstream's newest release tag and main, each resolved
  * anew on every run:
- *   - `{kind: 'tag', prefix, repo, pattern}`: the fork's newest tag matching `pattern` (by version), labelled
- *     `<prefix><tag>` on the report, e.g. `lite@v1.0.0-beta.2`;
+ *   - `{kind: 'tag', prefix, repo, pattern, branch}`: the fork's newest tag matching `pattern` (by version), labelled
+ *     `<prefix><tag>` internally, e.g. `lite@v1.0.0-beta.2`, and shown under the branch it is cut from (refDisplay);
  *   - `{kind: 'branch', label, repo, ref}`: the head of a branch, labelled `label`.
  * The differential compares each with the run's upstream release tag.
  *
@@ -33,7 +33,7 @@ export const FORK_TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
  *   {kind: 'branch', label: string, repo: string, ref: string}>}
  */
 export const FORK_REFS = Object.freeze([
-    Object.freeze({kind: 'tag', prefix: 'lite@', repo: FORK_REPO, pattern: FORK_TAG}),
+    Object.freeze({kind: 'tag', prefix: 'lite@', repo: FORK_REPO, pattern: FORK_TAG, branch: 'lite'}),
     Object.freeze({kind: 'branch', label: 'lite', repo: FORK_REPO, ref: 'lite'}),
 ]);
 
@@ -108,6 +108,47 @@ export function parseRefSpec(spec, upstream = UPSTREAM_REPO) {
     }
     const ref = body.slice(at + 1);
     return {label: label || ref, repo: body.slice(0, at), ref};
+}
+
+/**
+ * How the report shows a ref (the maintainer's two header rows): grouped by repository and branch -
+ * `OpenCCU/OpenCCU-Base/main` above upstream's release tag and main's head, `hobbyquaker/OpenCCU-Base/lite` above the
+ * fork's openccu-lite tag and lite's head - and named within the group by the tag (without the `v`) or `head`.
+ * @returns {{group: string, groupUrl: string, name: string}} group '' for a ref outside both repositories
+ */
+export function refDisplay(label, forks = FORK_REFS) {
+    const l = String(label);
+    const f = forkOf(l, forks);
+    const named = (repo, branch) => {
+        const web = webUrl(repo);
+        return {group: `${web.replace(/^https:\/\/github\.com\//, '')}/${branch}`, groupUrl: `${web}/tree/${branch}`};
+    };
+    if (f) {
+        return f.kind === 'tag'
+            ? {...named(f.repo, f.branch), name: l.slice(f.prefix.length).replace(/^v/, '')}
+            : {...named(f.repo, f.ref), name: 'head'};
+    }
+    if (l === 'main' || RELEASE_TAG.test(l)) {
+        return {...named(UPSTREAM_REPO, 'main'), name: l === 'main' ? 'head' : l};
+    }
+    return {group: '', groupUrl: '', name: l};
+}
+
+/** A ref as one line of text: "<group> <name>", e.g. "hobbyquaker/OpenCCU-Base/lite 1.0.0-beta.2". */
+export function refText(label, forks = FORK_REFS) {
+    const d = refDisplay(label, forks);
+    return d.group ? `${d.group} ${d.name}` : d.name;
+}
+
+/**
+ * Two refs as "from → to": within one group "<group>: <from> → <to>" ("OpenCCU/OpenCCU-Base/main: 3.89.11 → head"),
+ * across groups both in full.
+ */
+export function refPairText(from, to, forks = FORK_REFS) {
+    const [a, b] = [refDisplay(from, forks), refDisplay(to, forks)];
+    return a.group && a.group === b.group
+        ? `${a.group}: ${a.name} → ${b.name}`
+        : `${refText(from, forks)} → ${refText(to, forks)}`;
 }
 
 /** The web address of a repository (`.git` dropped), for commit and pull request links. */

@@ -72,15 +72,15 @@ test('the Markdown summary lists the jobs, the failure and the known-broken test
     // one row per ref, the variants with their durations, the combined counts
     assert.match(
         md,
-        /\| 3\.89\.11 \(\[3ed652a\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/commit\/3ed652a4[0-9a-f]+\)\) \| release \d+ s \| 3 \| 0 \| 2 \| 0 \|/,
+        /\| OpenCCU\/OpenCCU-Base\/main 3\.89\.11 \(\[3ed652a\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/commit\/3ed652a4[0-9a-f]+\)\) \| release \d+ s \| 3 \| 0 \| 2 \| 0 \|/,
     );
     assert.match(
         md,
-        /\| main \(\[030dba7\]\([^)]+\)\) \| release \d+ s · asan \d+ s · coverage \d+ s \| 3 \| 2 \| 1 \| 0 \|/,
+        /\| OpenCCU\/OpenCCU-Base\/main head \(\[030dba7\]\([^)]+\)\) \| release \d+ s · asan \d+ s · coverage \d+ s \| 3 \| 2 \| 1 \| 0 \|/,
     );
     assert.match(
         md,
-        /### Failures\n\n- ❌ \*\*rfd initialises the simulated module and reports the interface CONNECTED\*\* \(main: release, asan\): rfd did not answer/,
+        /### Failures\n\n- ❌ \*\*rfd initialises the simulated module and reports the interface CONNECTED\*\* \(OpenCCU\/OpenCCU-Base\/main head: release, asan\): rfd did not answer/,
     );
     assert.match(md, /### Where the variants differ\n\n[^]*frame fuzzing[^\n]* - main: release ✅ asan ❌/);
     assert.match(md, /\[OpenCCU-Base \\#138\]\(https:\/\/github.com\/OpenCCU\/OpenCCU-Base\/pull\/138\)/);
@@ -157,10 +157,17 @@ test('the HTML report: one column per ref, one line per row with the explanation
     );
     assert.ok(html.includes('rfd used 200 clock ticks in the 2 s after the hangup'));
     assert.ok(html.includes('runs/x/'), 'the history links to the kept run');
-    // one result column per ref (two refs in the fixture), not per job
-    const refRe = /<th class="r">(3\.89\.11|main) <a class="mono muted" href="[^"]+\/commit\/[0-9a-f]+">/g;
+    // one result column per ref (two refs in the fixture), not per job: the repository and branch spans them above,
+    // the tag or "head" names each below, its commit under it
+    const refRe =
+        /<th class="r">(3\.89\.11|head)<br><a class="mono muted" href="[^"]+\/commit\/[0-9a-f]+" title="[0-9a-f]{40}">/g;
     const refHeads = html.match(refRe) || [];
     assert.ok(refHeads.length >= 4 && refHeads.length % 2 === 0, `ref columns: ${refHeads.length}`);
+    assert.match(
+        html,
+        /<th class="grp" colspan="2" scope="colgroup"><a href="https:\/\/github\.com\/OpenCCU\/OpenCCU-Base\/tree\/main">OpenCCU\/<wbr>OpenCCU-<wbr>Base\/<wbr>main<\/a><\/th>/,
+    );
+    assert.match(html, /<th class="" rowspan="2">test<\/th>/);
     assert.doesNotMatch(html, /<span class="muted">asan<\/span><\/th>/, 'no per-variant columns');
     // every test row is one line at load: the name is the summary of a closed <details>, cut with an ellipsis
     assert.match(
@@ -208,7 +215,7 @@ test('the HTML report: one column per ref, one line per row with the explanation
     );
     for (const t of tables) {
         assert.match(t, /^<table [^>]*><colgroup><col>/, 'the first column takes the rest');
-        const expected = t.includes('<th class="">test</th>') ? 2 : 4;
+        const expected = /<th class=""( rowspan="2")?>test<\/th>/.test(t) ? 2 : 4;
         assert.equal((t.match(/<col class="r">/g) || []).length, expected, `result columns: ${t.slice(0, 200)}`);
         assert.equal((t.match(/<th class="r">/g) || []).length, expected, 'result headers');
     }
@@ -298,7 +305,10 @@ test('coverage: the lcov summary per component, the section, the links and the h
             fs.existsSync(path.join(out, 'runs', report.id, 'coverage-main-030dba7-abcdef0.info')),
             'the tracefile is published',
         );
-        assert.ok(html.includes('coverage main: rfd 36.7 %, hs485d 10.0 %'), 'the history line');
+        assert.ok(
+            html.includes('coverage OpenCCU/OpenCCU-Base/main head: rfd 36.7 %, hs485d 10.0 %'),
+            'the history line',
+        );
     } finally {
         fs.rmSync(out, {recursive: true, force: true});
     }
@@ -352,13 +362,16 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
 test('a fork column links its commits in the fork; a fork or tag trigger is linked where the commit is', () => {
     assert.equal(
         triggerHtml(`lite ${'e'.repeat(40)}`),
-        `lite <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
+        `hobbyquaker/OpenCCU-Base/lite head <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
     );
     assert.match(
         triggerHtml(`lite@v1.0.0-beta.3 ${'e'.repeat(40)}`),
-        /^lite@v1\.0\.0-beta\.3 <a class="mono" href="https:\/\/github\.com\/hobbyquaker\/OpenCCU-Base\/commit\/e{40}">/,
+        /^hobbyquaker\/OpenCCU-Base\/lite 1\.0\.0-beta\.3 <a class="mono" href="https:\/\/github\.com\/hobbyquaker\/OpenCCU-Base\/commit\/e{40}">/,
     );
-    assert.match(triggerHtml('3.89.12 abcdef1'), /OpenCCU\/OpenCCU-Base\/commit\/abcdef1/);
+    assert.match(
+        triggerHtml('3.89.12 abcdef1'),
+        /^OpenCCU\/OpenCCU-Base\/main 3\.89\.12 .*OpenCCU\/OpenCCU-Base\/commit\/abcdef1/,
+    );
     assert.equal(triggerHtml('lite-3.89.11 abcdef1'), 'lite-3.89.11 abcdef1', 'an unknown label is plain text');
     assert.match(triggerHtml('OpenCCU-Base 1234567'), /OpenCCU\/OpenCCU-Base\/commit\/1234567/);
     assert.equal(triggerHtml('push <b>'), 'push &lt;b&gt;');

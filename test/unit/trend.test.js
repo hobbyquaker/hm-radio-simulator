@@ -71,8 +71,19 @@ test('the panel: a card per ref with arrows coloured by meaning, a ref new in th
     ];
     const html = renderTrendPanel(report, history);
     assert.equal((html.match(/<section class="trend-card">/g) || []).length, 2);
-    assert.match(html, /<span class="tr-ref">3\.89\.11<\/span>[^]*?2 runs since 2026-10-11/);
-    assert.match(html, /<span class="tr-ref">main<\/span>[^]*?3 runs since 2026-10-10/);
+    assert.match(
+        html,
+        /<span class="tr-ref" title="OpenCCU\/OpenCCU-Base\/main 3\.89\.11">3\.89\.11<\/span>[^]*?2 runs since 2026-10-11/,
+    );
+    assert.match(
+        html,
+        /<span class="tr-ref" title="OpenCCU\/OpenCCU-Base\/main head">head<\/span>[^]*?3 runs since 2026-10-10/,
+    );
+    // one row per repository and branch, its refs side by side
+    assert.match(
+        html,
+        /<div class="tg-head"><a href="https:\/\/github\.com\/OpenCCU\/OpenCCU-Base\/tree\/main">OpenCCU\/OpenCCU-Base\/main<\/a><\/div><div class="trend n2">/,
+    );
     // main rfd: fail 0 -> 2 is worse (red), coverage 30 -> 36.7 better (green)
     assert.match(html, /<span class="tn fail">2<\/span><span class="td bad"[^>]*>▲ 2<\/span>/);
     assert.match(html, /<span class="tn coverage">36\.7 %<\/span><span class="td good"[^>]*>▲ 6\.7<\/span>/);

@@ -35,13 +35,18 @@ import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
 import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
 import {renderFilterBar, FILTER_SCRIPT, FILTER_CSS} from './filter.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
-import {compareRefs, commitUrl, forkOf, FORK_REFS, RELEASE_TAG} from './refs.mjs';
+import {compareRefs, commitUrl, forkOf, refDisplay, refText, FORK_REFS, RELEASE_TAG} from './refs.mjs';
 import {proofForTest} from './prove.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
 /** A commit of a report column, linked in the repository the column was built from (a fork branch: the fork). */
 const refCommit = (ref, sha) => commitUrl(ref, sha);
+/** A ref in a cell: its repository and branch muted, then the tag or `head` (refs.mjs refDisplay). */
+const refHtml = (ref) => {
+    const d = refDisplay(ref);
+    return d.group ? `<span class="muted">${esc(d.group)}</span> ${esc(d.name)}` : esc(d.name);
+};
 
 // ---------------------------------------------------------------------------------------------------------------
 // collecting
@@ -295,7 +300,7 @@ export function renderSummaryMarkdown(report) {
         lines.push('| --- | --- | ---: | ---: | ---: | ---: |');
         for (const {ref, counts: c} of refCounts(rows, refs)) {
             lines.push(
-                `| ${ref.ref} ([${short(ref.baseCommit)}](${refCommit(ref.ref, ref.baseCommit)})) | ${ref.jobs.map((j) => `${j.variant} ${seconds(j.durationMs)}`).join(' · ')} | ${c.pass} | ${c.fail} | ${c.todo} | ${c.skip} |`,
+                `| ${refText(ref.ref)} ([${short(ref.baseCommit)}](${refCommit(ref.ref, ref.baseCommit)})) | ${ref.jobs.map((j) => `${j.variant} ${seconds(j.durationMs)}`).join(' · ')} | ${c.pass} | ${c.fail} | ${c.todo} | ${c.skip} |`,
             );
         }
         lines.push('');
@@ -304,7 +309,7 @@ export function renderSummaryMarkdown(report) {
                 .map((ref) => {
                     const c = combine(row.results, ref);
                     const variants = c ? c.variants.filter((v) => v.status === status).map((v) => v.variant) : [];
-                    return variants.length ? `${ref.ref}: ${variants.join(', ')}` : null;
+                    return variants.length ? `${refText(ref.ref)}: ${variants.join(', ')}` : null;
                 })
                 .filter(Boolean)
                 .join('; ');
@@ -370,7 +375,7 @@ export function renderSummaryMarkdown(report) {
         lines.push('| --- | --- | ---: | ---: | ---: | ---: | --- |');
         for (const r of report.load) {
             lines.push(
-                `| ${r.run} | ${r.ref} | ${r.offered ?? '-'} | ${r.achieved ?? '-'} | ${r.p95 === null ? '-' : `${r.p95} ms`} | ${r.events} | ${escapeMd(r.note)} |`,
+                `| ${r.run} | ${refText(r.ref)} | ${r.offered ?? '-'} | ${r.achieved ?? '-'} | ${r.p95 === null ? '-' : `${r.p95} ms`} | ${r.events} | ${escapeMd(r.note)} |`,
             );
         }
         lines.push('');
@@ -384,7 +389,7 @@ export function renderSummaryMarkdown(report) {
         lines.push('| --- | --- | --- | ---: | ---: | --- | --- |');
         for (const r of report.listMethods) {
             lines.push(
-                `| ${r.daemon} | ${r.protocol} | ${r.ref} | ${r.listed} | ${r.callable} | ${r.unlistedCallable.join(', ') || 'none'} | ${r.helpGaps.join(', ') || 'none'} |`,
+                `| ${r.daemon} | ${r.protocol} | ${refText(r.ref)} | ${r.listed} | ${r.callable} | ${r.unlistedCallable.join(', ') || 'none'} | ${r.helpGaps.join(', ') || 'none'} |`,
             );
         }
         lines.push('');
@@ -418,7 +423,7 @@ export function renderSummaryMarkdown(report) {
         for (const run of report.fuzz) {
             for (const h of run.harnesses) {
                 lines.push(
-                    `| ${run.ref} ([${short(run.baseCommit)}](${refCommit(run.ref, run.baseCommit)})) | ${h.name} | ${h.seconds} s | ${h.execs ?? '?'} | ${h.findings.length ? h.findings.map((f) => f.type).join(', ') + (h.known ? ` (known finding ${h.known})` : run.expected ? ' (expected on this ref)' : '') : 'none'} |`,
+                    `| ${refText(run.ref)} ([${short(run.baseCommit)}](${refCommit(run.ref, run.baseCommit)})) | ${h.name} | ${h.seconds} s | ${h.execs ?? '?'} | ${h.findings.length ? h.findings.map((f) => f.type).join(', ') + (h.known ? ` (known finding ${h.known})` : run.expected ? ' (expected on this ref)' : '') : 'none'} |`,
                 );
             }
         }
@@ -502,6 +507,8 @@ th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--
   overflow-wrap: anywhere; }
 th { color: var(--muted); font-weight: 600; font-size: .85rem; }
 th.r, td.r { text-align: right; font-variant-numeric: tabular-nums; padding-left: .9rem; } td.r { white-space: nowrap; }
+th.grp { text-align: center; color: var(--fg); border-bottom: 1px solid var(--line); overflow-wrap: normal; }
+th.grp + th.grp { border-left: 1px solid var(--line); }
 td.name { overflow-wrap: anywhere; }
 .badge { display: inline-block; padding: 0 .5em; border-radius: 999px; font-size: .78em; font-weight: 600; line-height: 1.6;
   border: 1px solid currentColor; }
@@ -524,6 +531,8 @@ footer { margin-top: 3rem; color: var(--muted); font-size: .85rem; }
   th.c, th.k, th.l, th.d, th.v, td.c, td.k, td.l, td.d, td.v { padding: 0; border: 0; overflow: hidden; visibility: hidden;
     font-size: 0; line-height: 0; }
   td.r { white-space: nowrap; } .word { display: none; }
+  thead th.r, thead th.grp { font-size: .68rem; overflow-wrap: normal; padding-left: .2rem; padding-right: .2rem; }
+  thead th.r .mono { font-size: .6rem; }
   .phone-only { display: block; margin-top: .2rem; } summary .phone-only { display: inline; } }
 `;
 const CSS = CSS_BASE + TREND_CSS + FILTER_CSS;
@@ -540,7 +549,36 @@ function table(head, rows) {
         const cls = (c.cls || '').split(' ').find((x) => ['r', 'c', 's', 'k', 'l', 'd', 'v'].includes(x));
         return cls ? `<col class="${cls}">` : '<col>';
     });
-    const ths = head.map((c) => `<th class="${esc(c.cls || '')}">${c.raw ? c.label : esc(c.label)}</th>`);
+    const th = (c, attrs = '') => `<th class="${esc(c.cls || '')}"${attrs}>${c.raw ? c.label : esc(c.label)}</th>`;
+    // two header rows when columns carry a `group` ({label, url}): the group spans its columns above them, the other
+    // columns span both rows
+    let thead;
+    if (head.some((c) => c.group)) {
+        const upper = [];
+        const lower = [];
+        for (let i = 0; i < head.length; i++) {
+            const c = head[i];
+            if (!c.group) {
+                upper.push(th(c, ' rowspan="2"'));
+                continue;
+            }
+            let n = 1;
+            while (i + n < head.length && head[i + n].group && head[i + n].group.label === c.group.label) {
+                n++;
+            }
+            const text = esc(c.group.label).replace(/[/-]/g, '$&<wbr>');
+            upper.push(
+                `<th class="grp" colspan="${n}" scope="colgroup">${c.group.url ? `<a href="${esc(c.group.url)}">${text}</a>` : text}</th>`,
+            );
+            for (let k = 0; k < n; k++) {
+                lower.push(th(head[i + k]));
+            }
+            i += n - 1;
+        }
+        thead = `<thead><tr>${upper.join('')}</tr><tr>${lower.join('')}</tr></thead>`;
+    } else {
+        thead = `<thead><tr>${head.map((c) => th(c)).join('')}</tr></thead>`;
+    }
     // a row is its cells, or {cells, attrs} with attributes for the <tr> (the filter's data-*)
     const trs = rows.map((row) => {
         const cells = Array.isArray(row) ? row : row.cells;
@@ -566,7 +604,7 @@ function table(head, rows) {
         .filter(Boolean)
         .map((x) => `var(${widths[x]})`);
     const min = `calc(var(--w-name) + ${fixed.length ? fixed.join(' + ') : '0px'})`;
-    return `<div class="scroll"><table style="min-width: ${min}"><colgroup>${cols.join('')}</colgroup><thead><tr>${ths.join('')}</tr></thead><tbody>\n${trs.join('\n')}\n</tbody></table></div>`;
+    return `<div class="scroll"><table style="min-width: ${min}"><colgroup>${cols.join('')}</colgroup>${thead}<tbody>\n${trs.join('\n')}\n</tbody></table></div>`;
 }
 
 const PROOF = {
@@ -737,7 +775,7 @@ export function renderHtml(report, history = []) {
                             `<li><span class="mono">${esc(j.variant)}</span>: ${esc(seconds(j.durationMs))} · <span class="pass">${j.counts.pass}</span> / <span class="fail">${j.counts.fail}</span> / <span class="todo">${j.counts.todo}</span> / <span class="skip">${j.counts.skip}</span></li>`,
                     )
                     .join('');
-                const summary = `${esc(ref.ref)}${differing ? ` <span class="chip" title="rows where the variants differ">${differing} differ</span>` : ''}`;
+                const summary = `${refHtml(ref.ref)}${differing ? ` <span class="chip" title="rows where the variants differ">${differing} differ</span>` : ''}`;
                 const body = `<ul class="plain">${perVariant}</ul>${known.length ? `<div class="diag">known broken: ${esc(known.join(', '))}</div>` : ''}`;
                 return [
                     `<details class="row"><summary>${summary}<span class="phone-only mono"> ${esc(short(ref.baseCommit))}</span></summary>${body}</details>`,
@@ -761,11 +799,15 @@ export function renderHtml(report, history = []) {
         {label: 'test'},
         {label: 'kind', cls: 'k'},
         {label: 'links', cls: 'l'},
-        ...refs.map((ref) => ({
-            label: `${esc(ref.ref)} <a class="mono muted" href="${esc(refCommit(ref.ref, ref.baseCommit))}">${esc(short(ref.baseCommit))}</a>`,
-            cls: 'r',
-            raw: true,
-        })),
+        ...refs.map((ref) => {
+            const d = refDisplay(ref.ref);
+            return {
+                label: `${esc(d.name).replace(/-/g, '-<wbr>')}<br><a class="mono muted" href="${esc(refCommit(ref.ref, ref.baseCommit))}" title="${esc(ref.baseCommit)}">${esc(short(ref.baseCommit))}</a>`,
+                cls: 'r',
+                raw: true,
+                group: d.group ? {label: d.group, url: d.groupUrl} : undefined,
+            };
+        }),
     ];
     const testRow = (row) => {
         const first = [...row.results.values()][0];
@@ -797,7 +839,7 @@ export function renderHtml(report, history = []) {
         }
         combined.forEach((c, i) => {
             if (c && c.differs) {
-                body += `<div class="diag">${esc(refs[i].ref)}: ${c.variants.map((v) => `${esc(v.variant)} <span class="${v.status}">${esc(STATUS_MARK[v.status] || v.status)} ${esc(v.status)}</span> ${esc(duration(v.durationMs))}`).join(' · ')}</div>`;
+                body += `<div class="diag">${esc(refText(refs[i].ref))}: ${c.variants.map((v) => `${esc(v.variant)} <span class="${v.status}">${esc(STATUS_MARK[v.status] || v.status)} ${esc(v.status)}</span> ${esc(duration(v.durationMs))}`).join(' · ')}</div>`;
             }
         });
         const name = `<details class="row"><summary>${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}</summary>${body}</details>`;
@@ -839,7 +881,7 @@ export function renderHtml(report, history = []) {
     h.push(
         renderFilterBar(
             rows.map(testRow).map((r) => r.attrs),
-            refs.map((r) => r.ref),
+            refs.map((r) => refText(r.ref)),
         ),
     );
     h.push(`<div id="test-tables">`);
@@ -868,7 +910,7 @@ export function renderHtml(report, history = []) {
                 .map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`)
                 .join(' · ');
             h.push(
-                `<h3>${esc(job.ref)} <span class="muted">(<a class="mono" href="${esc(refCommit(job.ref, job.baseCommit))}">${esc(short(job.baseCommit))}</a>${links ? ' · ' + links : ''})</span></h3>`,
+                `<h3>${esc(refText(job.ref))} <span class="muted">(<a class="mono" href="${esc(refCommit(job.ref, job.baseCommit))}">${esc(short(job.baseCommit))}</a>${links ? ' · ' + links : ''})</span></h3>`,
             );
             h.push(
                 table(
@@ -937,7 +979,7 @@ export function renderHtml(report, history = []) {
                 ],
                 report.load.map((r) => [
                     `${esc(r.run)}<div class="diag">${esc(r.note)}</div>`,
-                    esc(r.ref),
+                    refHtml(r.ref),
                     esc(String(r.offered ?? '-')),
                     esc(String(r.achieved ?? '-')),
                     esc(String(r.p95 ?? '-')),
@@ -964,7 +1006,7 @@ export function renderHtml(report, history = []) {
                 ],
                 report.listMethods.map((r) => [
                     `${esc(r.daemon)} <span class="muted">${esc(r.protocol)}</span>`,
-                    esc(r.ref),
+                    refHtml(r.ref),
                     `<span class="${r.callable === r.listed ? 'pass' : 'fail'}">${r.listed}</span>`,
                     `<span class="${r.callable === r.listed ? 'pass' : 'fail'}">${r.callable}</span>`,
                     r.unlistedCallable.length
@@ -1023,7 +1065,7 @@ export function renderHtml(report, history = []) {
                 ],
                 report.fuzz.flatMap((run) =>
                     run.harnesses.map((hz) => [
-                        esc(run.ref),
+                        refHtml(run.ref),
                         `<a class="mono" href="${esc(refCommit(run.ref, run.baseCommit))}">${esc(short(run.baseCommit))}</a>`,
                         `<span class="mono">${esc(hz.name)}</span>`,
                         `${esc(String(hz.seconds))} s`,
@@ -1085,7 +1127,7 @@ function forkRefsText(forks = FORK_REFS) {
                 .filter((f) => f.repo === repo)
                 .map((f) =>
                     f.kind === 'tag'
-                        ? `the newest openccu-lite tag (<code>v*</code>, shown as <code>${esc(f.prefix)}&lt;tag&gt;</code>)`
+                        ? `the newest openccu-lite tag (<code>v*</code>, shown without the v)`
                         : `the head of the branch <code>${esc(f.ref)}</code>`,
                 );
             return `${parts.join(' and ')} of the fork <a href="${esc(web)}">${esc(web.replace('https://github.com/', ''))}</a> (OpenCCU-Base's release with the fixes openccu-lite builds with: picked from upstream, or not upstream yet), `;
@@ -1102,7 +1144,8 @@ export function triggerHtml(trigger) {
     const m = /^(\S+) ([0-9a-f]{7,40})$/.exec(trigger || '');
     if (m && (m[1] === 'OpenCCU-Base' || RELEASE_TAG.test(m[1]) || forkOf(m[1]))) {
         const url = m[1] === 'OpenCCU-Base' ? `${BASE}/commit/${m[2]}` : commitUrl(m[1], m[2]);
-        return `${esc(m[1])} <a class="mono" href="${esc(url)}">${esc(m[2].slice(0, 7))}</a>`;
+        const text = m[1] === 'OpenCCU-Base' ? m[1] : refText(m[1]);
+        return `${esc(text)} <a class="mono" href="${esc(url)}">${esc(m[2].slice(0, 7))}</a>`;
     }
     return esc(trigger);
 }
@@ -1114,7 +1157,7 @@ function coverageLine(entry) {
     }
     const parts = Object.entries(entry.coverage).map(
         ([ref, daemons]) =>
-            `${esc(ref)}: ${Object.entries(daemons)
+            `${esc(refText(ref))}: ${Object.entries(daemons)
                 .map(([d, v]) => `${esc(d)} ${esc(pctText(v))}`)
                 .join(', ')}`,
     );
