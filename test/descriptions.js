@@ -157,6 +157,10 @@ export const DESCRIPTIONS = Object.freeze({
             "rfd's older start-up sequence for the radio module still brings the module online.",
         'rfd in sniffing mode (-s): starts without the device model and still answers RPC':
             "rfd's diagnostic listening mode starts without devices and still answers the remote interface.",
+        '#164 SIGTERM: rfd leaves its main loop and exits 0 - with the pty module and behind the LAN gateway':
+            'Stopped with the signal the init system sends, rfd ends cleanly with exit code 0 instead of being killed: its threads are joined and the radio module or LAN gateway is closed (OpenCCU-Base #164).',
+        '#164 SIGTERM: hs485d behind the wired LAN gateway leaves its main loop and exits 0':
+            'Stopped with the signal the init system sends, hs485d ends cleanly with exit code 0 instead of being killed (OpenCCU-Base #164).',
         'hs485d restart: every wired type comes back from its file with the same address, type, version and channels':
             'One device of every wired type is discovered, hs485d is restarted, and every device must come back unchanged.',
         'hs485d reads extra descriptions from /etc/config/hs485types: a type only described there is discovered as that type':

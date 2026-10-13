@@ -5,6 +5,8 @@
 #
 # Usage: scripts/run-tests.sh [options]
 #   --ref <ref>          OpenCCU-Base branch, tag or commit (default 3.89.11)
+#   --repo <url>         the OpenCCU-Base repository to fetch it from (default OpenCCU/OpenCCU-Base; a fork to test a fix
+#                        before it is upstream - the known-broken list is derived from that repository's history)
 #   --variants <list>    comma-separated: release, asan, coverage (default release,asan,coverage)
 #   --known-broken <l>   OpenCCU-Base issues known unfixed in the ref (default: derived, scripts/resolve-refs.mjs)
 #   --fuzz <seconds>     also run the fuzz harnesses for that long each (default 0 = skip)
@@ -14,6 +16,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 REF=3.89.11
+REPO=https://github.com/OpenCCU/OpenCCU-Base.git
 VARIANTS=release,asan,coverage
 KNOWN=
 FUZZ=0
@@ -21,6 +24,7 @@ BUILD=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --ref) REF=$2; shift 2 ;;
+    --repo) REPO=$2; shift 2 ;;
     --variants) VARIANTS=$2; shift 2 ;;
     --known-broken) KNOWN=$2; shift 2 ;;
     --fuzz) FUZZ=$2; shift 2 ;;
@@ -30,7 +34,7 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -z "${KNOWN}" ]; then
   # derived from the fixes' merge commits and the findings (test/metadata.js), as in CI
-  KNOWN=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}") || { echo "cannot derive the known-broken list for ${REF} (pass --known-broken)" >&2; exit 2; }
+  KNOWN=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}" --repo "${REPO}") || { echo "cannot derive the known-broken list for ${REF} (pass --known-broken)" >&2; exit 2; }
 fi
 
 # one lock for every checkout of this repository: the worktrees share the docker daemon and the image tags, so the lock
@@ -42,13 +46,13 @@ LOCK=${LOCK:-${HERE}/.docker.lock}
 tag="hm-radio-simulator:${REF//\//-}"
 mkdir -p "${HERE}/results"
 log="${HERE}/results/run-$(date +%Y%m%dT%H%M%S).log"
-echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; log ${log}"
+echo "ref ${REF} (${REPO}), variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; log ${log}"
 
 (
   flock 9
   if [ "${BUILD}" = 1 ]; then
     docker build -f "${HERE}/docker/Dockerfile" --target test \
-      --build-arg "BASE_REF=${REF}" --build-arg "KNOWN_BROKEN=${KNOWN}" -t "${tag}" "${HERE}" 2>&1 | tee -a "${log}"
+      --build-arg "BASE_REPO=${REPO}" --build-arg "BASE_REF=${REF}" --build-arg "KNOWN_BROKEN=${KNOWN}" -t "${tag}" "${HERE}" 2>&1 | tee -a "${log}"
     test "${PIPESTATUS[0]}" -eq 0
   fi
   status=0
@@ -56,20 +60,19 @@ echo "ref ${REF}, variants ${VARIANTS}, known broken '${KNOWN}', fuzz ${FUZZ}s; 
   for variant in "${variants[@]}"; do
     echo "=== daemon suite, ${variant}" | tee -a "${log}"
     rm -rf "${HERE}/results/${variant}"
-    docker run --rm --init --cap-add SYS_NICE -e "HMRS_VARIANT=${variant}" -v "${HERE}/results:/results" "${tag}" npm run test:daemon 2>&1 | tee -a "${log}"
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+    # not a bare pipeline: with set -e and pipefail a red variant would end the script before the next variant and the report
+    if ! docker run --rm --init --cap-add SYS_NICE -e "HMRS_VARIANT=${variant}" -v "${HERE}/results:/results" "${tag}" npm run test:daemon 2>&1 | tee -a "${log}"; then status=1; fi
   done
   if [ "${FUZZ}" != 0 ]; then
     if [ "${BUILD}" = 1 ]; then
-      docker build -f "${HERE}/docker/Dockerfile" --target fuzz --build-arg "BASE_REF=${REF}" -t "${tag}-fuzz" "${HERE}" 2>&1 | tee -a "${log}"
+      docker build -f "${HERE}/docker/Dockerfile" --target fuzz --build-arg "BASE_REPO=${REPO}" --build-arg "BASE_REF=${REF}" -t "${tag}-fuzz" "${HERE}" 2>&1 | tee -a "${log}"
       test "${PIPESTATUS[0]}" -eq 0
     fi
     echo "=== fuzz, ${FUZZ}s per harness" | tee -a "${log}"
     expect=0
     case ",${KNOWN}," in *,140,*) expect=1 ;; esac
-    harnesses=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}" --harnesses || true)
-    docker run --rm -e "FUZZ_SECONDS=${FUZZ}" -e "FUZZ_EXPECT_FINDINGS=${expect}" -e "FUZZ_KNOWN_HARNESSES=${harnesses}" -v "${HERE}/results/fuzz:/results" "${tag}-fuzz" 2>&1 | tee -a "${log}"
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then status=1; fi
+    harnesses=$(node "${HERE}/scripts/resolve-refs.mjs" --known "${REF}" --repo "${REPO}" --harnesses || true)
+    if ! docker run --rm -e "FUZZ_SECONDS=${FUZZ}" -e "FUZZ_EXPECT_FINDINGS=${expect}" -e "FUZZ_KNOWN_HARNESSES=${harnesses}" -v "${HERE}/results/fuzz:/results" "${tag}-fuzz" 2>&1 | tee -a "${log}"; then status=1; fi
   fi
   echo "=== report" | tee -a "${log}"
   node "${HERE}/scripts/report.mjs" collect --out "${HERE}/results/site" --repo-sha "$(git -C "${HERE}" rev-parse HEAD 2>/dev/null || true)" \

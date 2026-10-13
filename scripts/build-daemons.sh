@@ -11,8 +11,8 @@
 #   asan      AddressSanitizer and UndefinedBehaviorSanitizer, debug info, -O1 (gcc)
 #   coverage  clang's source-based coverage (-fprofile-instr-generate -fcoverage-mapping), -O0, in continuous mode
 #             (-mllvm -runtime-counter-relocation with a %c in LLVM_PROFILE_FILE): the counters live in an mmapped
-#             .profraw per process and object, so a daemon stopped with SIGTERM - neither rfd nor hs485d handles it -
-#             loses nothing; llvm-profdata merges them, llvm-cov exports, see scripts/coverage.sh
+#             .profraw per process and object, so a daemon stopped with SIGTERM - before OpenCCU-Base #164's fix neither
+#             rfd nor hs485d handled it - loses nothing; llvm-profdata merges them, llvm-cov exports, see scripts/coverage.sh
 #
 set -euo pipefail
 

@@ -158,9 +158,9 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
 running the same suite: the report shows, per OpenCCU-Base ref, lines, functions and branches for the daemons' own
 sources and for each library as its own row, the per-file percentages, and links the data for download (an lcov
 tracefile and llvm-cov's JSON - file paths and counts, no source text; with an OpenCCU-Base checkout at that commit,
-`genhtml --prefix /openccu-base coverage.info` renders the annotated view). The daemons have no SIGTERM handler and
-would lose their profile when the suite stops them, so the variant uses clang's continuous mode, where the counters
-live in an mmapped file. clang was chosen because rfd and hs485d build and pass the suite with it unchanged; the
+`genhtml --prefix /openccu-base coverage.info` renders the annotated view). Before OpenCCU-Base #164's fix the daemons had no
+SIGTERM handler and would lose their profile when the suite stops them, so the variant uses clang's continuous mode,
+where the counters live in an mmapped file. clang was chosen because rfd and hs485d build and pass the suite with it unchanged; the
 release and ASan variants stay on gcc.
 
 **The differential:** the release jobs keep the answers of the sweeps (`results/<variant>/sweep/*.json`, short

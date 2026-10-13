@@ -6,11 +6,13 @@
  * of every wired type and the extra description directory /etc/config/hs485types.
  *
  * rfd is stopped through its `exit` RPC method (always compiled in, rfd.cpp): the main loop ends and exit(0) runs, the
- * clean shutdown a coverage build needs. hs485d has neither `exit` nor a SIGTERM handler; it writes a device's file
- * when the device changes, so a SIGTERM loses nothing here.
+ * clean shutdown a coverage build needs. hs485d has no `exit`; it writes a device's file when the device changes, so a
+ * SIGTERM loses nothing here. The SIGTERM tests (OpenCCU-Base #164): before the fix neither daemon handled the signal
+ * and died by its default action; with it the handler ends the main loop and the same shutdown path runs.
  *
- * Timing assumptions: rfd ends within 15 s of `exit` (its main loop returns after the current dispatch, the
- * interface threads are joined); a daemon that refuses to start does so within 20 s.
+ * Timing assumptions: rfd ends within 15 s of `exit` or SIGTERM (its main loop returns after the current dispatch,
+ * the interface threads are cancelled and joined; measured 8-32 ms with 337 devices), hs485d within 15 s of SIGTERM;
+ * a daemon that refuses to start does so within 20 s.
  */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +33,7 @@ import {
 } from '../helpers/daemon.js';
 import {startReceiver, freePort} from '../helpers/rpc.js';
 import {announcement, allTypes, usesStringUint} from '../helpers/sweep.js';
-import {isKnownBroken} from '../helpers/known.js';
+import {isKnownBroken, regression} from '../helpers/known.js';
 import {RadioModule} from '../../lib/module.js';
 import {createPtyModule} from '../../lib/pty.js';
 import {loadDeviceDescription, sysinfoSatisfying} from '../../lib/rftypes.js';
@@ -434,6 +436,51 @@ test('rfd in sniffing mode (-s): starts without the device model and still answe
     });
 });
 
+/**
+ * Sends SIGTERM and waits for the end: with #164's fix the handler ends the main loop and the shutdown path exits 0;
+ * before it the process dies by the signal (exit.signal 'SIGTERM').
+ */
+async function terminate(t, daemon, what) {
+    const at = Date.now();
+    daemon.proc.kill('SIGTERM');
+    const exit = await exitWithin(daemon, 15000);
+    t.diagnostic(`${what}: SIGTERM -> ${JSON.stringify(exit)} after ${Date.now() - at} ms`);
+    assert.ok(exit, `${daemon.name} did not end within 15 s of SIGTERM\n${daemon.tail(20)}`);
+    assert.equal(exit.signal, null, 'not killed by the signal: the handler ends the main loop');
+    assert.equal(exit.code, 0, 'exit(0) through the shutdown path');
+    assert.deepEqual(daemon.sanitizerReports(), []);
+}
+
+test(
+    '#164 SIGTERM: rfd leaves its main loop and exits 0 - with the pty module and behind the LAN gateway',
+    options(regression('no-sigterm')),
+    async (t) => {
+        const rfd = await startQuietRfd();
+        await withDaemon(rfd, async () => {
+            await addSwitch(rfd, 'SWPTERM001', 0x4f3001);
+            // the device file is written by a 0 ms timer between two dispatches of the main loop, so it is on disk
+            // right after the call; what the handler adds is the clean end: threads joined, the module closed, exit 0
+            const file = path.join(rfd.workdir, 'devices', 'SWPTERM001.dev');
+            const until = Date.now() + 5000;
+            while (!fs.existsSync(file) && Date.now() < until) {
+                await sleep(50);
+            }
+            assert.ok(fs.existsSync(file), 'the device file exists');
+            await terminate(t, rfd, 'rfd on the pty module');
+        });
+        const behindLgw = await startRfd({lgwFront: {serial: 'SIM0000002', key: 'TestLanKey-1234'}});
+        await withDaemon(behindLgw, async () => {
+            const lgw = behindLgw.lgw;
+            const gone = new Promise((resolve) => lgw.once('clientGone', resolve));
+            await terminate(t, behindLgw, 'rfd behind the encrypted LAN gateway');
+            await Promise.race([gone, sleep(5000)]);
+            t.diagnostic(
+                `gateway after the exit: bidcos client ${lgw.connections.bidcos ? 'still there' : 'gone'}, keepalive client ${lgw.connections.keepalive ? 'still there' : 'gone'}`,
+            );
+        });
+    },
+);
+
 /** Every hs485types type with a condition as a wired device, as in the type sweep. */
 function wiredDevices() {
     const devices = [];
@@ -487,6 +534,18 @@ test(
             );
             assert.deepEqual({missing, extra}, {missing: [], extra: []});
             assert.deepEqual(second.sanitizerReports(), []);
+        });
+    },
+);
+
+test(
+    '#164 SIGTERM: hs485d behind the wired LAN gateway leaves its main loop and exits 0',
+    options(regression('no-sigterm')),
+    async (t) => {
+        const hs485d = await startHs485d({lgwFront: {serial: 'SIMWLGW001'}});
+        await withDaemon(hs485d, async () => {
+            assert.ok(Array.isArray(await hs485d.call('listDevices')));
+            await terminate(t, hs485d, 'hs485d behind the wired gateway');
         });
     },
 );

@@ -368,9 +368,9 @@ Dazu kommt die **Code-Abdeckung** von rfd und hs485d: Eine dritte Build-Variante
 Coverage, `-O0`) läuft dieselbe Suite; der Bericht zeigt je OpenCCU-Base-Version Zeilen, Funktionen und Zweige für die
 Daemons selbst und jede Bibliothek als eigene Zeile sowie je Datei die Prozente, und verlinkt die Daten zum Herunterladen
 (lcov-Tracefile und llvm-cov-JSON, nur Dateipfade und Zähler, kein Quelltext: mit einem OpenCCU-Base-Checkout auf dem
-Commit rendert `genhtml --prefix /openccu-base coverage.info` die annotierte Ansicht). Die Daemons haben keinen
-SIGTERM-Handler und würden ihr Profil beim Stoppen verlieren; die Variante nutzt deshalb clangs Continuous Mode, in
-dem die Zähler in einer eingeblendeten Datei liegen.
+Commit rendert `genhtml --prefix /openccu-base coverage.info` die annotierte Ansicht). Vor dem Fix zu OpenCCU-Base #164 hatten
+die Daemons keinen SIGTERM-Handler und würden ihr Profil beim Stoppen verlieren; die Variante nutzt deshalb clangs
+Continuous Mode, in dem die Zähler in einer eingeblendeten Datei liegen.
 
 **Das Differential:** Die Release-Jobs halten die Antworten der Durchläufe fest (`results/<variante>/sweep/*.json`,
 kurze Zusammenfassungen: die Schlüssel eines Structs, die Länge eines Arrays und sein erstes Element, Code und Text
