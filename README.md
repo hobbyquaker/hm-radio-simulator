@@ -197,7 +197,7 @@ Die Daemons laufen in zwei Varianten: als normaler Build und mit AddressSanitize
 kommt eine dritte, `coverage`, für die Code-Abdeckung (siehe _Testbericht_). Ein
 Regressionstest für einen Fehler, dessen Fix in der gewählten OpenCCU-Base-Version noch fehlt, läuft als `todo`.
 Der Lauf zeigt dann, was passiert, ohne rot zu werden. Welche Tests das je Version sind, wird nicht von Hand gepflegt:
-`scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist. Gegen
+`scripts/resolve-refs.mjs` prüft für jeden Upstream-Fix, ob sein Merge-Commit in der Version enthalten ist: als Vorfahre oder, auf einem Fork-Zweig, übernommen (eine Zeile `cherry picked from commit <sha>`, sonst dieselbe Patch-ID). Ein Fix, den es nur im Fork gibt, zählt mit seinem Commit im Fork, bis upstream ihn übernimmt; dann kommt nur der Merge-Commit dazu. Gegen
 `3.89.9` und `3.89.11` betrifft das #138 und #140
 sowie zwölf Funde dieser Suite ohne Issue bisher. `double-join`: Unter AddressSanitizer bricht rfd beim Abmelden eines
 Event-Empfängers (`init(url, '')`) ab, weil der Thread des Dispatchers nach einem expliziten Stop im Destruktor ein
@@ -342,8 +342,7 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet drei OpenCCU-Base-Versionen nebeneinander: die beiden neuesten
-Release-Tags (heute `3.89.9` und `3.89.11`) und den aktuellen Stand von `main`. Sie werden bei jedem Lauf neu bestimmt
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander: die beiden neuesten Release-Tags (heute `3.89.9` und `3.89.11`), den aktuellen Stand von `main` und den Zweig `lite-3.89.11` des Forks [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base). Aus diesem Zweig baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Tag `3.89.11` mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests, etwa zu #164, #165, #170 und #171). So zeigt der Bericht, was dieser Build behebt und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt, der Zweig wie `main` auf seinen neuesten Commit
 (`scripts/resolve-refs.mjs`: Tags der Form `X.Y.Z`, nach Version sortiert); kommt ein neues Tag dazu, fällt das älteste
 heraus. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
 
@@ -351,8 +350,7 @@ heraus. Jede Version läuft in den Varianten normal, ASan und coverage, und jede
 
 Jeder CI-Lauf schreibt eine Markdown-Übersicht in seine Zusammenfassung auf GitHub (je Job, und für den ganzen Lauf im
 Job "test report"). Der Lauf auf `main` veröffentlicht dazu einen HTML-Bericht auf GitHub Pages:
-**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die drei OpenCCU-Base-Versionen nebeneinander (älteres
-Tag, neueres Tag, `main`, je mit verlinktem Commit), dazu die Fuzzing-Läufe und ein Verlauf der letzten 20 Läufe
+**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die vier OpenCCU-Base-Stände nebeneinander (älteres Tag, neueres Tag, `lite-3.89.11`, `main`, je mit verlinktem Commit; die Commits des Zweigs im Fork), dazu die Fuzzing-Läufe und ein Verlauf der letzten 20 Läufe
 (`runs/<id>/`). Je Version gibt es **eine** Ergebnisspalte: Stimmen die Varianten (normal, ASan, coverage) überein,
 steht dort ihr gemeinsames Ergebnis; weichen sie ab, das schlechteste mit einem kleinen Chip für die Variante (`A`
 ASan, `C` coverage, `R` normal), Tooltip und Aufklappbereich zeigen jede Variante. Die coverage-Variante zählt nur, wo
@@ -374,7 +372,7 @@ man ihn:
   die Daemons am Commit vor dem Fix und am Merge-Commit und lässt dort nur die Tests mit der Nummer des Fixes laufen,
   normal und mit ASan (Races und Lebensdauerfehler am Commit davor bis zu fünfmal unter ASan). **proven**: Der Test
   scheitert vor dem Fix und besteht mit ihm; **not proven**: Er besteht auch vor dem Fix, erreicht also nicht, was der
-  Fix ändert; **inconclusive**: Er scheitert auf beiden. Das Ergebnis steht je Test im Feld `proof` von `report.json`,
+  Fix ändert; **inconclusive**: Er scheitert auf beiden. Ein Fix, den es nur im Fork gibt, wird am Fork-Commit und am Commit davor geprüft, unter der Nummer seines Issues. Das Ergebnis steht je Test im Feld `proof` von `report.json`,
   der ganze Nachweis in `proof.json`. Er kostet zwei Image-Builds je Fix; die CI führt ihn deshalb wöchentlich, auf
   Anforderung (`workflow_dispatch` mit `prove`) und bei einem Push aus, der die Fix-Liste oder einen Regressionstest
   ändert; dazwischen behält der Bericht den letzten. Lokal: `node scripts/prove.mjs local [--fixes 9,16]`;
@@ -402,10 +400,7 @@ entsteht aus den Artefakten des Laufs (`scripts/report.mjs`), lokal mit `npm run
 ## Wenn sich OpenCCU-Base bewegt
 
 Ein Push in ein fremdes Repository kann unseren Workflow nicht auslösen. Deshalb fragt der Workflow
-`upstream-watch.yml` alle 15 Minuten den Stand von OpenCCU-Base `main` ab, merkt sich den zuletzt geprüften Commit auf
-dem Branch `upstream-state` (nur dieser Workflow schreibt ihn) und lässt bei einem neuen Commit die Suite genau dafür
-laufen - über den CI-Workflow als wiederverwendbaren Workflow, mit den beiden neuesten Tags daneben wie sonst auch. Der Lauf erscheint
-im Bericht und im Verlauf mit "triggered by OpenCCU-Base `<sha>`" und verlinktem Commit. Mehrere Commits innerhalb
+`upstream-watch.yml` alle 15 Minuten den Stand von OpenCCU-Base `main` und des Fork-Zweigs `lite-3.89.11` ab, merkt sich die zuletzt geprüften Commits auf dem Branch `upstream-state` (nur dieser Workflow schreibt ihn) und lässt bei einem neuen Commit die Suite genau dafür laufen - über den CI-Workflow als wiederverwendbaren Workflow, mit den beiden neuesten Tags daneben wie sonst auch. Der Lauf erscheint im Bericht und im Verlauf mit "triggered by OpenCCU-Base `<sha>`" (oder "lite-3.89.11 `<sha>`", wenn sich nur der Zweig bewegt hat) und verlinktem Commit. Mehrere Commits innerhalb
 eines Intervalls prüft er als ihren neuesten Stand; der Commit auf dem Zustandsbranch zählt zugleich als Aktivität, so
 dass GitHub den Zeitplan nicht abschaltet. Ein roter Lauf hinterlässt eine Warnung im Lauf; ein Issue dazu öffnet er
 nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force` prüft den aktuellen Stand erneut.

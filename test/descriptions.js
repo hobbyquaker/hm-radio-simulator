@@ -129,10 +129,10 @@ export const DESCRIPTIONS = Object.freeze({
             'The same thirteen kinds of misbehaving receiver over XML-RPC; rfd must keep serving everything else.',
         'rfd: init with a receiver that answers listDevices with a huge or an invalid list - the daemon survives and answers':
             'A registering program answers with an enormous or nonsensical device list; rfd must survive and keep answering.',
-        'rfd: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding)':
+        'rfd: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding, #170)':
             'A program that registers and then never answers may stall rfd for the callback timeout at most; before OpenCCU-Base #170 the whole daemon waited for it for good.',
-        'rfd: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding)':
-            'Each unanswered device announcement should not leave a thread behind; today every one does, for good.',
+        'rfd: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding, #171)':
+            'Each unanswered device announcement must not leave a thread behind; before OpenCCU-Base #171 every one did, for good.',
         'rfd: a client re-registering in a tight loop, two receivers with one id, a receiver URL that leads nowhere':
             'Odd but legal client behaviour - registering again and again, a shared id, an address nobody listens on - must not upset rfd.',
         'hs485d, binrpc callbacks: a receiver that misbehaves on events (close, close-partial, vanish, no-answer, no-read, http-500, fault, garbage, truncated, wrong-type, huge, trickle, twice) holds up no other receiver, no RPC, no radio, and leaks nothing':
@@ -141,10 +141,10 @@ export const DESCRIPTIONS = Object.freeze({
             'The same thirteen kinds of misbehaving receiver over XML-RPC; hs485d must keep serving everything else.',
         'hs485d: init with a receiver that answers listDevices with a huge or an invalid list - the daemon survives and answers':
             'A registering program answers with an enormous or nonsensical device list; hs485d must survive and keep answering.',
-        'hs485d: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding)':
+        'hs485d: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding, #170)':
             'A program that registers and then never answers may stall hs485d for the callback timeout at most; before OpenCCU-Base #170 the whole daemon waited for it for good.',
-        'hs485d: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding)':
-            'Each unanswered device announcement should not leave a thread behind; today every one does, for good.',
+        'hs485d: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding, #171)':
+            'Each unanswered device announcement must not leave a thread behind; before OpenCCU-Base #171 every one did, for good.',
         'hs485d: a client re-registering in a tight loop, two receivers with one id, a receiver URL that leads nowhere':
             'Odd but legal client behaviour must not upset hs485d.',
     },

@@ -2,8 +2,9 @@
 /**
  * The proof of the regression tests: a regression test only shows something if it fails without its fix. For every
  * upstream fix in test/metadata.js (UPSTREAM_FIXES) this builds the daemons at the fix's parent (`<merge commit>^`) and
- * at the merge commit, runs only the tests whose top-level name carries the fix's number (`#<n>`), release and ASan,
- * and records the outcome:
+ * at the merge commit - for a fix that exists on the fork only (a finding's `fork`, keyed by its issue number) at the
+ * fork commit's parent and the fork commit, fetched from the fork -, runs only the tests whose top-level name carries
+ * the fix's number (`#<n>`), release and ASan, and records the outcome:
  *
  *   proven        at least one test fails on the parent and passes on the merge commit (in every variant)
  *   not-proven    every test passes on the parent too: the test does not reach what the fix changed
@@ -37,12 +38,35 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import {UPSTREAM_FIXES} from '../test/metadata.js';
-import {knownBroken} from './refs.mjs';
+import {UPSTREAM_FIXES, FINDINGS, issueNumber} from '../test/metadata.js';
+import {knownBroken, forkFixes, UPSTREAM_REPO, webUrl} from './refs.mjs';
+import {openHistory} from './history.mjs';
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DEFAULT_REPO = 'https://github.com/OpenCCU/OpenCCU-Base.git';
 export const PROOF_VARIANTS = Object.freeze(['release', 'asan']);
+
+/**
+ * The fixes the proof covers, by number: the upstream pull requests (UPSTREAM_FIXES) and the fixes of findings that
+ * exist on the fork (or went upstream later), under their issue number (scripts/refs.mjs forkFixes). Each with the
+ * commit whose parent and itself the proof builds, and the repository to fetch both from.
+ * @returns {Record<number, {title: string, commit: string, repo: string, finding?: string, proofRepeat?: number}>}
+ */
+export function proofFixes(upstream = UPSTREAM_FIXES, findings = undefined) {
+    const all = {};
+    for (const [number, fix] of Object.entries(upstream)) {
+        all[number] = {...fix, repo: UPSTREAM_REPO};
+    }
+    for (const fix of forkFixes(findings)) {
+        all[fix.issue] = {
+            title: fix.title,
+            commit: fix.commit,
+            repo: fix.repo,
+            finding: fix.finding,
+            ...(fix.proofRepeat ? {proofRepeat: fix.proofRepeat} : {}),
+        };
+    }
+    return all;
+}
 
 /** The name pattern that selects a fix's tests: `#9` but not `#90`. */
 export function proofPattern(fix) {
@@ -55,13 +79,15 @@ export function proofPattern(fix) {
 /**
  * @param {{fixes?: number[], parentOf: (sha: string) => string, contains: (commit: string, sha: string) => boolean}} o
  */
-export function planJobs({fixes, parentOf, contains}, all = UPSTREAM_FIXES) {
+export function planJobs({fixes, parentOf, contains, findings = FINDINGS}, all = proofFixes()) {
+    // the known-broken lists: the pull requests by number, the fork fixes by their findings' names (as the suite's)
+    const pullRequests = Object.fromEntries(Object.entries(all).filter(([, f]) => !f.finding));
     const numbers = (fixes && fixes.length ? fixes : Object.keys(all).map(Number)).sort((a, b) => a - b);
     const jobs = [];
     for (const fix of numbers) {
         const entry = all[fix];
         if (!entry) {
-            throw new Error(`#${fix} is not in UPSTREAM_FIXES`);
+            throw new Error(`#${fix} is neither in UPSTREAM_FIXES nor a finding's fork fix`);
         }
         for (const side of ['parent', 'merge']) {
             const sha = side === 'merge' ? entry.commit : parentOf(entry.commit);
@@ -69,8 +95,9 @@ export function planJobs({fixes, parentOf, contains}, all = UPSTREAM_FIXES) {
                 fix,
                 side,
                 sha,
+                repo: entry.repo || UPSTREAM_REPO,
                 merge: entry.commit,
-                known_broken: knownBroken((commit) => contains(commit, sha), all).join(','),
+                known_broken: knownBroken((commit) => contains(commit, sha), pullRequests, findings).join(','),
                 pattern: proofPattern(fix),
                 repeat: side === 'parent' ? entry.proofRepeat || 1 : 1,
             });
@@ -79,18 +106,17 @@ export function planJobs({fixes, parentOf, contains}, all = UPSTREAM_FIXES) {
     return jobs;
 }
 
-function plan({repo = DEFAULT_REPO, fixes} = {}) {
-    // the history without file contents, as scripts/resolve-refs.mjs
-    const dir = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || '/tmp'), 'openccu-base-proof-'));
+function plan({repo = UPSTREAM_REPO, fixes} = {}) {
+    // the history without file contents, with the fork's branches (scripts/history.mjs, as scripts/resolve-refs.mjs)
+    const history = openHistory({upstream: repo});
     try {
-        execFileSync('git', ['clone', '--quiet', '--bare', '--filter=tree:0', repo, dir], {stdio: 'inherit'});
-        const git = (...args) =>
-            execFileSync('git', ['-C', dir, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
-        const contains = (commit, sha) =>
-            spawnSync('git', ['-C', dir, 'merge-base', '--is-ancestor', commit, sha], {stdio: 'ignore'}).status === 0;
-        return planJobs({fixes, parentOf: (sha) => git('rev-parse', `${sha}^1`), contains});
+        return planJobs({
+            fixes,
+            parentOf: history.parentOf,
+            contains: (commit, sha) => Boolean(history.contains(commit, sha)),
+        });
     } finally {
-        fs.rmSync(dir, {recursive: true, force: true});
+        history.close();
     }
 }
 
@@ -212,11 +238,14 @@ function outcomes(run) {
  * @param {object|undefined} parent the parent's proof-run.json
  * @param {object|undefined} merge the merge commit's proof-run.json
  */
-export function judgeFix(fix, parent, merge, all = UPSTREAM_FIXES) {
+export function judgeFix(fix, parent, merge, all = proofFixes()) {
     const entry = {
         fix: Number(fix),
         title: all[fix] ? all[fix].title : '',
         merge: all[fix] ? all[fix].commit : merge && merge.sha,
+        // a fork fix: the issue's finding, and the fork the commits are in (the report links them there)
+        ...(all[fix] && all[fix].finding ? {finding: all[fix].finding} : {}),
+        ...(all[fix] && all[fix].repo && all[fix].repo !== UPSTREAM_REPO ? {repo: webUrl(all[fix].repo)} : {}),
         parent: parent ? parent.sha : null,
         date: [parent, merge]
             .filter(Boolean)
@@ -277,7 +306,7 @@ export function judgeFix(fix, parent, merge, all = UPSTREAM_FIXES) {
  * @param {object[]} runs proof-run.json records
  * @param {object|null} previous the previous proof.json
  */
-export function collectProof(runs, previous = null, all = UPSTREAM_FIXES) {
+export function collectProof(runs, previous = null, all = proofFixes()) {
     const bySide = new Map();
     for (const r of runs) {
         bySide.set(`${r.fix}/${r.side}`, r);
@@ -285,7 +314,7 @@ export function collectProof(runs, previous = null, all = UPSTREAM_FIXES) {
     const fixes = {};
     for (const [number, entry] of Object.entries((previous && previous.fixes) || {})) {
         if (all[number]) {
-            fixes[number] = entry; // a fix taken out of UPSTREAM_FIXES leaves the proof too
+            fixes[number] = entry; // a fix taken out of the list leaves the proof too
         }
     }
     for (const fix of new Set(runs.map((r) => r.fix))) {
@@ -308,10 +337,16 @@ export function proofForTest(test, proof) {
     }
     let found = null;
     for (const ref of test.refs || []) {
-        if (ref.kind !== 'pr') {
+        // a pull request (an upstream fix), or a finding's issue (a fix on the fork, keyed by the issue number)
+        const fix =
+            ref.kind === 'pr'
+                ? Number(ref.label.replace(/^.*#/, ''))
+                : ref.kind === 'issue'
+                  ? issueNumber(ref.url)
+                  : null;
+        if (!fix) {
             continue;
         }
-        const fix = Number(ref.label.replace(/^.*#/, ''));
         const entry = proof.fixes[fix];
         if (!entry) {
             continue;
@@ -319,7 +354,14 @@ export function proofForTest(test, proof) {
         const t = (entry.tests || []).find(
             (x) => x.file === test.file && x.nesting === test.nesting && x.name === test.name,
         );
-        const about = {fix, parent: entry.parent, merge: entry.merge, date: entry.date};
+        const about = {
+            fix,
+            parent: entry.parent,
+            merge: entry.merge,
+            date: entry.date,
+            ...(entry.repo ? {repo: entry.repo} : {}),
+            ...(entry.finding ? {finding: entry.finding} : {}),
+        };
         if (t && t.proves) {
             return {status: 'proven', ...about};
         }
@@ -501,6 +543,8 @@ function main(argv) {
                     path.join(HERE, 'docker/Dockerfile'),
                     '--target',
                     'test',
+                    '--build-arg',
+                    `BASE_REPO=${job.repo}`,
                     '--build-arg',
                     `BASE_REF=${job.sha}`,
                     '--build-arg',

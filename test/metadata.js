@@ -13,6 +13,9 @@
  */
 
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
+/** The fork that carries fixes before they are upstream (openccu-lite builds from its branch lite-3.89.11). */
+export const FORK_REPO = 'https://github.com/hobbyquaker/OpenCCU-Base.git';
+const FORK = FORK_REPO.replace(/\.git$/, '');
 const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob/main/upstream-reports';
 
 /**
@@ -100,7 +103,18 @@ export const UPSTREAM_COMMITS = Object.freeze({
  * Findings of this suite, each with its issue draft in upstream-reports/ (not reported yet; the maintainer decides).
  * When an issue exists, put its URL into `issue` and the draft's status line.
  * `fuzzHarness`: the libFuzzer harness that finds it (its findings are then known, not new, on refs without the fix).
- * @type {Record<string, {title: string, draft: string, issue: string|null, fuzzHarness?: string, fixedBy?: string}>}
+ *
+ * A fix decides where the finding is known broken (scripts/refs.mjs knownBroken): a ref that contains the fix - as an
+ * ancestor, or picked onto it (`cherry picked from commit <sha>` or the same patch id, scripts/history.mjs) - runs the
+ * finding's tests for real.
+ *   `fork`     the fix on the fork FORK_REPO before it is upstream: `commit` is the commit on the fix branch `branch`
+ *              (the pull request candidate); the fork's branches pick it with `cherry-pick -x`
+ *   `fixedBy`  the upstream commit that fixes it - for a fork fix, add the merge commit when upstream merges the pull
+ *              request; nothing else changes
+ * A finding with a fork fix and an issue joins the proof under its issue number (scripts/prove.mjs): its tests' names
+ * carry `#<issue>`.
+ * @type {Record<string, {title: string, draft: string, issue: string|null, fuzzHarness?: string, fixedBy?: string,
+ *   fork?: {commit: string, branch: string}, proofRepeat?: number}>}
  */
 export const FINDINGS = Object.freeze({
     'double-join': {
@@ -117,7 +131,7 @@ export const FINDINGS = Object.freeze({
         title: 'rfd does not restore the per-channel AES policy (AUTHENTICATION_ON) when it republishes devices after a coprocessor re-init',
         draft: '005-aes-policy-after-reinit.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/165',
-        fixedBy: '800f1312692b18ff93f02d41ec89b667c97d82eb',
+        fork: {commit: '800f1312692b18ff93f02d41ec89b667c97d82eb', branch: 'fix/165-aes-republish'},
     },
     'wired-maintenance': {
         title: 'hs485d: a newly discovered wired device gets plain channels - its maintenance channel (UNREACH, STICKY_UNREACH, CONFIG_PENDING) works only after a restart',
@@ -142,12 +156,14 @@ export const FINDINGS = Object.freeze({
     'init-blocks': {
         title: 'rfd and hs485d: init with a receiver that does not answer freezes the whole daemon - the init callbacks run without a timeout on the main loop',
         draft: '010-init-blocks-main-loop.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/170',
+        fork: {commit: '751cd79f787261ca06d9a3b87b244f8f13bc10ae', branch: 'fix/170-init-timeout'},
     },
     'async-callback-threads': {
         title: 'rfd and hs485d: every unanswered newDevices/deleteDevices/replaceDevice leaves a thread and a socket behind for good',
         draft: '011-async-callback-threads.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/171',
+        fork: {commit: '05af7256bbdf154a697c3d878454becc84c41bd3', branch: 'fix/171-async-timeout'},
     },
     'dutycycle-upper-bound': {
         title: 'rfd reads past its duty-cycle threshold map when the module reports 100 % (BidcosInterface::GetDutyCycleUpperBound)',
@@ -206,13 +222,25 @@ export const FINDINGS = Object.freeze({
         title: 'rfd and hs485d do not handle SIGTERM: a pending save is lost on stop',
         draft: '004-no-sigterm-handling.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/164',
-        fixedBy: 'e04c4a1b72f340c836cc0f4ed686bab752fbb159',
+        fork: {commit: 'e04c4a1b72f340c836cc0f4ed686bab752fbb159', branch: 'fix/164-sigterm'},
     },
 });
 
 /**
  * @typedef {{label: string, url: string, kind: 'pr'|'commit'|'issue'|'draft'}} Ref
  */
+
+/** The number of an issue URL (`…/issues/164` -> 164), or null. */
+export function issueNumber(url) {
+    const m = /\/issues\/(\d+)$/.exec(url || '');
+    return m ? Number(m[1]) : null;
+}
+
+/** The finding whose issue has this number, or null. */
+export function findingOfIssue(number) {
+    const hit = Object.entries(FINDINGS).find(([, f]) => issueNumber(f.issue) === Number(number));
+    return hit ? hit[0] : null;
+}
 
 /**
  * @param {number} number an OpenCCU-Base pull request number
@@ -243,7 +271,17 @@ export function refsForCommit(short) {
 export function refsForFinding(name) {
     const finding = FINDINGS[name];
     if (finding && finding.issue) {
-        return [{label: `${name} (issue)`, url: finding.issue, kind: 'issue'}];
+        const refs = [{label: `${name} (issue)`, url: finding.issue, kind: 'issue'}];
+        if (finding.fixedBy) {
+            refs.push({label: finding.fixedBy.slice(0, 7), url: `${BASE}/commit/${finding.fixedBy}`, kind: 'commit'});
+        } else if (finding.fork) {
+            refs.push({
+                label: `fork ${finding.fork.commit.slice(0, 7)}`,
+                url: `${FORK}/commit/${finding.fork.commit}`,
+                kind: 'commit',
+            });
+        }
+        return refs;
     }
     if (finding) {
         return [{label: `${name} (draft)`, url: `${UPSTREAM_REPORTS}/${finding.draft}`, kind: 'draft'}];
@@ -266,7 +304,9 @@ export function describeTest(name, result = {}) {
         const number = Number(m[1]);
         if (!seen.has(number)) {
             seen.add(number);
-            refs.push(...refsForPullRequest(number));
+            // an issue number of a finding (a fix on the fork, "#164 SIGTERM: ...") links the issue, not a pull request
+            const finding = findingOfIssue(number);
+            refs.push(...(finding ? refsForFinding(finding) : refsForPullRequest(number)));
         }
     }
     for (const m of name.matchAll(/\b([0-9a-f]{8})\b/g)) {
@@ -278,7 +318,9 @@ export function describeTest(name, result = {}) {
     let kind = 'behaviour';
     for (const finding of Object.keys(FINDINGS)) {
         if (name.includes(finding)) {
-            refs.push(...refsForFinding(finding));
+            if (!refs.some((r) => r.label.startsWith(`${finding} `))) {
+                refs.push(...refsForFinding(finding));
+            }
             kind = 'known-bug';
         }
     }

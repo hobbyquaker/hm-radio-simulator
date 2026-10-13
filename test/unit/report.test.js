@@ -13,6 +13,7 @@ import {
     missingDescriptions,
     proofMark,
     proofText,
+    triggerHtml,
 } from '../../scripts/report.mjs';
 import {combine, groupByRef} from '../../scripts/combine.mjs';
 import {describe} from '../descriptions.js';
@@ -327,6 +328,34 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
     assert.match(html, /<div class="big fail">2\/4<\/div><div class="label">fixes proven/);
     assert.match(proofMark({status: 'not-proven', fix: 115}), /class="proof not-proven"[^>]*>✗ not proven/);
     assert.match(proofText({status: 'inconclusive', fix: 116}), /inconclusive/);
+    // a fork fix: the issue, and the commits in the fork
+    const fork = proofText({
+        status: 'proven',
+        fix: 164,
+        parent: 'c'.repeat(40),
+        merge: 'd'.repeat(40),
+        repo: 'https://github.com/hobbyquaker/OpenCCU-Base',
+    });
+    assert.ok(fork.includes('href="https://github.com/OpenCCU/OpenCCU-Base/issues/164"'), fork);
+    assert.ok(
+        fork.includes(
+            `fork commit <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'d'.repeat(40)}"`,
+        ),
+    );
+    assert.ok(
+        fork.includes(
+            `parent <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'c'.repeat(40)}"`,
+        ),
+    );
+});
+
+test('a fork branch column links its commits in the fork; a fork trigger is linked there too', () => {
+    assert.equal(
+        triggerHtml(`lite-3.89.11 ${'e'.repeat(40)}`),
+        `lite-3.89.11 <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
+    );
+    assert.match(triggerHtml('OpenCCU-Base 1234567'), /OpenCCU\/OpenCCU-Base\/commit\/1234567/);
+    assert.equal(triggerHtml('push <b>'), 'push &lt;b&gt;');
 });
 
 test('the filter bar (task 37): hidden without JavaScript, chips with counts, rows carry what the filter matches', () => {
@@ -356,4 +385,22 @@ test('the filter bar (task 37): hidden without JavaScript, chips with counts, ro
         /<tr data-row="" data-result="todo pass" data-daemon="hs485d" data-kind="regression" data-differs="no" data-proof="" data-text="#138 on hs485d[^"]*" data-r0="todo" data-r1="pass">/,
     );
     assert.match(html, /<section class="test-file"><h3 class="mono">test\/daemon\/rfd-pty-module\.test\.js<\/h3>/);
+});
+
+test("describeTest: a finding's issue number in the name links the issue and the fork commit, not a pull request", () => {
+    const {kind, refs} = describeTest(
+        '#164 SIGTERM: hs485d behind the wired LAN gateway leaves its main loop and exits 0',
+    );
+    assert.equal(kind, 'regression');
+    assert.deepEqual(
+        refs.map((r) => [r.kind, r.url]),
+        [
+            ['issue', 'https://github.com/OpenCCU/OpenCCU-Base/issues/164'],
+            ['commit', 'https://github.com/hobbyquaker/OpenCCU-Base/commit/e04c4a1b72f340c836cc0f4ed686bab752fbb159'],
+        ],
+    );
+    // the finding's name and its number in one name: one set of links
+    const both = describeTest('rfd: init ... (the init-blocks finding, #170)');
+    assert.equal(both.kind, 'known-bug');
+    assert.equal(both.refs.filter((r) => r.kind === 'issue').length, 1);
 });

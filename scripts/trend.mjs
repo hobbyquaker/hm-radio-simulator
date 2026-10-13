@@ -10,6 +10,7 @@
  */
 
 import {groupByRef, combine} from './combine.mjs';
+import {commitUrl} from './refs.mjs';
 
 /** Which daemon a test belongs to: hs485d when its file or name says so, else rfd. */
 export function daemonOf(test) {
@@ -209,13 +210,16 @@ export function renderTrendPanel(report, history) {
                 cell(series(history, ref, ['coverage', k]), 'coverage', {unit: ' %', ref, title: label}),
             )
             .join('');
-        return `<section class="trend-card"><header><span class="tr-ref">${esc(ref)}</span> <a class="mono muted" href="https://github.com/OpenCCU/OpenCCU-Base/commit/${esc(baseCommit)}">${esc(baseCommit.slice(0, 7))}</a><span class="muted tr-since">${runs > 1 ? `${runs} runs since ${esc(since)}` : 'first run of this ref'}</span></header><div class="tr-row"><span class="tr-name">rfd</span>${part('rfd')}</div><div class="tr-row"><span class="tr-name">hs485d</span>${part('hs485d')}</div><div class="tr-row"><span class="tr-name">coverage</span>${cov}</div></section>`;
+        return `<section class="trend-card"><header><span class="tr-ref">${esc(ref)}</span> <a class="mono muted" href="${esc(commitUrl(ref, baseCommit))}">${esc(baseCommit.slice(0, 7))}</a><span class="muted tr-since">${runs > 1 ? `${runs} runs since ${esc(since)}` : 'first run of this ref'}</span></header><div class="tr-row"><span class="tr-name">rfd</span>${part('rfd')}</div><div class="tr-row"><span class="tr-name">hs485d</span>${part('hs485d')}</div><div class="tr-row"><span class="tr-name">coverage</span>${cov}</div></section>`;
     });
-    return `<div class="trend" aria-label="trend per OpenCCU-Base ref">${cards.join('')}</div><p class="muted trend-note">Per ref: the latest run's results per daemon (a test counts with its worst variant) and the line coverage, with the change against the previous run of that ref (▲/▼, = unchanged; green better, red worse) and a sparkline over the kept runs (hover a point for its date and commits). A gap is a run without that value.</p>`;
+    return `<div class="trend${cards.length === 4 ? ' n4' : ''}" aria-label="trend per OpenCCU-Base ref">${cards.join('')}</div><p class="muted trend-note">Per ref: the latest run's results per daemon (a test counts with its worst variant) and the line coverage, with the change against the previous run of that ref (▲/▼, = unchanged; green better, red worse) and a sparkline over the kept runs (hover a point for its date and commits). A gap is a run without that value.</p>`;
 }
 
 export const TREND_CSS = `
 .trend { display: grid; grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr)); gap: .75rem; margin: 1rem 0 .25rem; }
+/* four refs: two by two where three would leave one alone, all four in a row on very wide screens */
+@media (min-width: 52rem) { .trend.n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 110rem) { .trend.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .trend-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .6rem .8rem; }
 .trend-card header { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; margin-bottom: .3rem; }
 .tr-ref { font-weight: 700; font-size: 1.05rem; } .tr-since { margin-left: auto; font-size: .8rem; }

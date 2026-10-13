@@ -46,8 +46,9 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
 
-  # which OpenCCU-Base refs this run tests: the two newest release tags and main's head (or the upstream watch's
-  # commit), each with its known-broken list derived from the fixes' merge commits (scripts/resolve-refs.mjs)
+  # which OpenCCU-Base refs this run tests: the two newest release tags, main's head (or the upstream watch's commit)
+  # and the head of openccu-lite's fork branch lite-3.89.11 (scripts/refs.mjs FORK_REFS), each with its known-broken
+  # list derived from the fixes' commits - ancestors, or picked onto a fork branch (scripts/resolve-refs.mjs)
   refs:
     name: OpenCCU-Base refs
     runs-on: ubuntu-latest
@@ -112,6 +113,7 @@ jobs:
           load: true
           tags: hm-radio-simulator:test
           build-args: |
+            BASE_REPO=${{ matrix.base_repo }}
             BASE_REF=${{ matrix.build_ref }}
             BASE_LABEL=${{ matrix.base_ref }}
             KNOWN_BROKEN=${{ matrix.known_broken }}
@@ -151,6 +153,7 @@ jobs:
           load: true
           tags: hm-radio-simulator:fuzz
           build-args: |
+            BASE_REPO=${{ matrix.base_repo }}
             BASE_REF=${{ matrix.build_ref }}
             BASE_LABEL=${{ matrix.base_ref }}
           cache-from: type=gha,scope=base-${{ matrix.base_ref }}
@@ -189,7 +192,8 @@ jobs:
       - run: node scripts/report.mjs check artifacts
 
   # the proof of the regression tests: each fix's tests on its merge commit's parent (they must fail) and on the merge
-  # commit (they must pass), release and ASan; the report job judges the runs (scripts/prove.mjs)
+  # commit (they must pass), release and ASan - a fix that exists on the fork only on the fork commit's parent and the
+  # fork commit, fetched from the fork; the report job judges the runs (scripts/prove.mjs)
   prove:
     name: 'proof (OpenCCU-Base #${{ matrix.fix }}, ${{ matrix.side }})'
     needs: refs
@@ -217,6 +221,7 @@ jobs:
           load: true
           tags: hm-radio-simulator:proof
           build-args: |
+            BASE_REPO=${{ matrix.repo }}
             BASE_REF=${{ matrix.sha }}
             BASE_LABEL=#${{ matrix.fix }} ${{ matrix.side }}
             DAEMON_VARIANTS=release asan

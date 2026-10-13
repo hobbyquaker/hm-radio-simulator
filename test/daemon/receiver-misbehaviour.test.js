@@ -274,7 +274,7 @@ for (const flavour of FLAVOURS) {
     );
 
     test(
-        `${flavour.name}: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding)`,
+        `${flavour.name}: init with a receiver that never answers stalls the daemon at most for the callback timeout, then it recovers by itself (the init-blocks finding, #170)`,
         {...skipWithoutDaemons, ...regression('init-blocks'), timeout: 300000},
         async (t) => {
             // HSSManager::PlatformInit -> XmlRpcCallSync("system.listMethods") on the main loop: without a timeout the
@@ -335,7 +335,7 @@ for (const flavour of FLAVOURS) {
     );
 
     test(
-        `${flavour.name}: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding)`,
+        `${flavour.name}: a receiver that never answers newDevices leaves no thread behind per init (the async-callback-threads finding, #171)`,
         {...skipWithoutDaemons, ...regression('async-callback-threads'), timeout: 300000},
         async (t) => {
             // newDevices goes through AsyncXmlRpcSender: a detached thread per call, with no client timeout before

@@ -4,8 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import {UPSTREAM_FIXES} from '../metadata.js';
+import {UPSTREAM_FIXES, FORK_REPO} from '../metadata.js';
+import {forkFixes, UPSTREAM_REPO} from '../../scripts/refs.mjs';
 import {
+    proofFixes,
     planJobs,
     proofRelevant,
     proofPattern,
@@ -31,6 +33,37 @@ test('every upstream fix has a daemon test that carries its number and uses regr
             `a test with regression(${fix}): without it the test fails instead of todo on refs without the fix`,
         );
     }
+    // a fix on the fork: the issue number in a test's name, regression(<the finding>) on the test
+    for (const fix of forkFixes()) {
+        assert.match(sources, new RegExp(proofPattern(fix.issue)), `a test name with #${fix.issue}`);
+        assert.match(
+            sources,
+            new RegExp(`regression\\(([^)]*[ ,])?'${fix.finding}'`),
+            `a test with regression('${fix.finding}') for #${fix.issue}`,
+        );
+    }
+});
+
+test('the proof covers the upstream fixes and the fork fixes, each with the repository its commits are in', () => {
+    const all = proofFixes();
+    for (const number of Object.keys(UPSTREAM_FIXES)) {
+        assert.equal(all[number].repo, UPSTREAM_REPO);
+    }
+    for (const issue of [164, 165, 170, 171]) {
+        assert.equal(all[issue].repo, FORK_REPO, `#${issue} from the fork`);
+        assert.ok(all[issue].finding);
+    }
+    // a fork fix's pair is the fork commit's parent and the fork commit, both fetched from the fork
+    const findings = {f: {title: 't', issue: 'https://x/issues/200', fork: {commit: 'fk'}}};
+    const fixes = proofFixes({}, findings);
+    const jobs = planJobs({parentOf: (sha) => `${sha}^`, contains: (commit, sha) => commit === sha, findings}, fixes);
+    assert.deepEqual(
+        jobs.map((j) => [j.fix, j.side, j.sha, j.repo, j.known_broken, j.pattern]),
+        [
+            [200, 'parent', 'fk^', FORK_REPO, 'f', '#200(?!\\d)'],
+            [200, 'merge', 'fk', FORK_REPO, '', '#200(?!\\d)'],
+        ],
+    );
 });
 
 test('the name pattern selects #9 but not #90', () => {
@@ -186,6 +219,28 @@ test('proofForTest: the proof field of a report test', () => {
     assert.equal(proofForTest({...t('c'), refs}, proof), null);
     assert.equal(proofForTest({...t('a'), refs: []}, proof), null);
     assert.equal(proofForTest({...t('a'), refs}, null), null);
+
+    // a fork fix: the test refers to the finding's issue; the proof's entry names the fork
+    const forkFix = {200: {title: 'f', commit: 'merge-sha', repo: FORK_REPO, finding: 'f'}};
+    const forkProof = collectProof(
+        [
+            {...run('parent', {release: {runs: 1, tests: [t('a', 'fail')]}}), fix: 200},
+            {...run('merge', {release: {runs: 1, tests: [t('a', 'pass')]}}), fix: 200},
+        ],
+        null,
+        forkFix,
+    );
+    assert.equal(forkProof.fixes[200].repo, 'https://github.com/hobbyquaker/OpenCCU-Base');
+    const issueRefs = [{kind: 'issue', label: 'f (issue)', url: 'https://github.com/OpenCCU/OpenCCU-Base/issues/200'}];
+    assert.deepEqual(proofForTest({...t('a'), refs: issueRefs}, forkProof), {
+        status: 'proven',
+        fix: 200,
+        parent: 'parent-sha',
+        merge: 'merge-sha',
+        date: '2026-10-11T12:00:00Z',
+        repo: 'https://github.com/hobbyquaker/OpenCCU-Base',
+        finding: 'f',
+    });
 });
 
 test('proofRelevant: the fix list, the proof machinery, or a changed line with a fix number or regression(<n>)', () => {

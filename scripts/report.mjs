@@ -35,11 +35,13 @@ import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
 import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
 import {renderFilterBar, FILTER_SCRIPT, FILTER_CSS} from './filter.mjs';
 import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs';
-import {compareRefs} from './refs.mjs';
+import {compareRefs, commitUrl, FORK_REFS} from './refs.mjs';
 import {proofForTest} from './prove.mjs';
 
 const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
+/** A commit of a report column, linked in the repository the column was built from (a fork branch: the fork). */
+const refCommit = (ref, sha) => commitUrl(ref, sha);
 
 // ---------------------------------------------------------------------------------------------------------------
 // collecting
@@ -293,7 +295,7 @@ export function renderSummaryMarkdown(report) {
         lines.push('| --- | --- | ---: | ---: | ---: | ---: |');
         for (const {ref, counts: c} of refCounts(rows, refs)) {
             lines.push(
-                `| ${ref.ref} ([${short(ref.baseCommit)}](${BASE}/commit/${ref.baseCommit})) | ${ref.jobs.map((j) => `${j.variant} ${seconds(j.durationMs)}`).join(' · ')} | ${c.pass} | ${c.fail} | ${c.todo} | ${c.skip} |`,
+                `| ${ref.ref} ([${short(ref.baseCommit)}](${refCommit(ref.ref, ref.baseCommit)})) | ${ref.jobs.map((j) => `${j.variant} ${seconds(j.durationMs)}`).join(' · ')} | ${c.pass} | ${c.fail} | ${c.todo} | ${c.skip} |`,
             );
         }
         lines.push('');
@@ -392,7 +394,7 @@ export function renderSummaryMarkdown(report) {
         lines.push(`### Differential: ${escapeMd(section.title)}`);
         lines.push('');
         lines.push(
-            `OpenCCU-Base [${short(section.from.baseCommit)}](${BASE}/commit/${section.from.baseCommit}) → [${short(section.to.baseCommit)}](${BASE}/commit/${section.to.baseCommit}): ${d.changed} changed, ${d.added} added, ${d.removed} removed, ${d.equal} equal answers of the RPC and device-type sweeps${d.ignored ? ` (${d.ignored} ignored by design)` : ''}.`,
+            `OpenCCU-Base [${short(section.from.baseCommit)}](${refCommit(section.from.ref, section.from.baseCommit)}) → [${short(section.to.baseCommit)}](${refCommit(section.to.ref, section.to.baseCommit)}): ${d.changed} changed, ${d.added} added, ${d.removed} removed, ${d.equal} equal answers of the RPC and device-type sweeps${d.ignored ? ` (${d.ignored} ignored by design)` : ''}.`,
         );
         if (d.items.length) {
             lines.push('');
@@ -416,7 +418,7 @@ export function renderSummaryMarkdown(report) {
         for (const run of report.fuzz) {
             for (const h of run.harnesses) {
                 lines.push(
-                    `| ${run.ref} ([${short(run.baseCommit)}](${BASE}/commit/${run.baseCommit})) | ${h.name} | ${h.seconds} s | ${h.execs ?? '?'} | ${h.findings.length ? h.findings.map((f) => f.type).join(', ') + (h.known ? ` (known finding ${h.known})` : run.expected ? ' (expected on this ref)' : '') : 'none'} |`,
+                    `| ${run.ref} ([${short(run.baseCommit)}](${refCommit(run.ref, run.baseCommit)})) | ${h.name} | ${h.seconds} s | ${h.execs ?? '?'} | ${h.findings.length ? h.findings.map((f) => f.type).join(', ') + (h.known ? ` (known finding ${h.known})` : run.expected ? ' (expected on this ref)' : '') : 'none'} |`,
                 );
             }
         }
@@ -587,9 +589,15 @@ export function proofMark(proof) {
 /** The proof in words, with the fix and both commits linked, for the row's collapsible. */
 export function proofText(proof) {
     const p = PROOF[proof.status] || {label: proof.status, title: ''};
-    const commit = (sha) => (sha ? `<a class="mono" href="${BASE}/commit/${esc(sha)}">${esc(short(sha))}</a>` : '?');
-    const fix = proof.fix ? `<a href="${BASE}/pull/${esc(proof.fix)}">#${esc(proof.fix)}</a>` : 'the fix';
-    return `Proof: <span class="proof ${esc(proof.status)}">${esc(p.label)}</span> - ${p.title}: ${fix}, parent ${commit(proof.parent)}, merge ${commit(proof.merge)}${proof.date ? ` (${esc(String(proof.date).slice(0, 10))})` : ''}.`;
+    // a fork fix (proof.repo): the issue, and both commits in the fork - the fix commit and its parent
+    const repo = proof.repo || BASE;
+    const commit = (sha) =>
+        sha ? `<a class="mono" href="${esc(repo)}/commit/${esc(sha)}">${esc(short(sha))}</a>` : '?';
+    const fix = proof.fix
+        ? `<a href="${BASE}/${proof.repo ? 'issues' : 'pull'}/${esc(proof.fix)}">#${esc(proof.fix)}</a>`
+        : 'the fix';
+    const merge = proof.repo ? `fork commit ${commit(proof.merge)}` : `merge ${commit(proof.merge)}`;
+    return `Proof: <span class="proof ${esc(proof.status)}">${esc(p.label)}</span> - ${p.title}: ${fix}, parent ${commit(proof.parent)}, ${merge}${proof.date ? ` (${esc(String(proof.date).slice(0, 10))})` : ''}.`;
 }
 
 /** The proof summary of a report (report.proof, task 30): counts per status over the fixes. */
@@ -708,7 +716,7 @@ export function renderHtml(report, history = []) {
 
     // Jobs: one row per ref - commit, the variants with their durations, the combined counts
     h.push(
-        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side, oldest first: the two newest release tags and the head of main, chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix's merge commit. The counts combine the variants: a test counts with its worst result.</p>`,
+        `<h2>Jobs</h2><p class="muted">The OpenCCU-Base refs side by side: the two newest release tags, ${forkRefsText()}and the head of main, chosen anew on every run (scripts/resolve-refs.mjs). A test is todo on a ref that lacks its fix: neither its merge commit nor a pick of it (<code>cherry picked from</code>, or the same patch). The counts combine the variants: a test counts with its worst result.</p>`,
     );
     h.push(
         table(
@@ -733,7 +741,7 @@ export function renderHtml(report, history = []) {
                 const body = `<ul class="plain">${perVariant}</ul>${known.length ? `<div class="diag">known broken: ${esc(known.join(', '))}</div>` : ''}`;
                 return [
                     `<details class="row"><summary>${summary}<span class="phone-only mono"> ${esc(short(ref.baseCommit))}</span></summary>${body}</details>`,
-                    `<a class="mono" href="${BASE}/commit/${esc(ref.baseCommit)}">${esc(short(ref.baseCommit))}</a>`,
+                    `<a class="mono" href="${esc(refCommit(ref.ref, ref.baseCommit))}">${esc(short(ref.baseCommit))}</a>`,
                     `<span class="variants">${ref.jobs.map((j) => `<span class="vd" title="${esc(j.variant)}: ${esc(seconds(j.durationMs))}">${esc(VARIANT_CHIP[j.variant] || j.variant)} ${esc(seconds(j.durationMs))}</span>`).join(' ')}</span>`,
                     `<span class="pass">${c.pass}</span>`,
                     `<span class="fail">${c.fail}</span>`,
@@ -747,14 +755,14 @@ export function renderHtml(report, history = []) {
     // Tests: one line per test at load; the explanation, diagnostics and per-variant results behind a collapsible
     const differingRows = rows.filter((row) => refs.some((ref) => (combine(row.results, ref) || {}).differs));
     h.push(
-        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (todo everywhere); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A <span class="todo">todo</span> is a test on a ref that predates the fix. ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
+        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (todo everywhere, except on a fork branch that carries its fix); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A <span class="todo">todo</span> is a test on a ref that predates the fix. ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
     );
     const testHead = [
         {label: 'test'},
         {label: 'kind', cls: 'k'},
         {label: 'links', cls: 'l'},
         ...refs.map((ref) => ({
-            label: `${esc(ref.ref)} <a class="mono muted" href="${BASE}/commit/${esc(ref.baseCommit)}">${esc(short(ref.baseCommit))}</a>`,
+            label: `${esc(ref.ref)} <a class="mono muted" href="${esc(refCommit(ref.ref, ref.baseCommit))}">${esc(short(ref.baseCommit))}</a>`,
             cls: 'r',
             raw: true,
         })),
@@ -860,7 +868,7 @@ export function renderHtml(report, history = []) {
                 .map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`)
                 .join(' · ');
             h.push(
-                `<h3>${esc(job.ref)} <span class="muted">(<a class="mono" href="${BASE}/commit/${esc(job.baseCommit)}">${esc(short(job.baseCommit))}</a>${links ? ' · ' + links : ''})</span></h3>`,
+                `<h3>${esc(job.ref)} <span class="muted">(<a class="mono" href="${esc(refCommit(job.ref, job.baseCommit))}">${esc(short(job.baseCommit))}</a>${links ? ' · ' + links : ''})</span></h3>`,
             );
             h.push(
                 table(
@@ -976,7 +984,7 @@ export function renderHtml(report, history = []) {
         for (const section of report.differential) {
             const d = section.diff;
             h.push(
-                `<h3>${esc(section.title)}: <a class="mono" href="${BASE}/commit/${esc(section.from.baseCommit)}">${esc(short(section.from.baseCommit))}</a> → <a class="mono" href="${BASE}/commit/${esc(section.to.baseCommit)}">${esc(short(section.to.baseCommit))}</a></h3>`,
+                `<h3>${esc(section.title)}: <a class="mono" href="${esc(refCommit(section.from.ref, section.from.baseCommit))}">${esc(short(section.from.baseCommit))}</a> → <a class="mono" href="${esc(refCommit(section.to.ref, section.to.baseCommit))}">${esc(short(section.to.baseCommit))}</a></h3>`,
             );
             h.push(
                 `<p>${d.changed} changed, ${d.added} added, ${d.removed} removed, ${d.equal} equal${d.ignored ? `, ${d.ignored} ignored by design` : ''}.</p>`,
@@ -1016,7 +1024,7 @@ export function renderHtml(report, history = []) {
                 report.fuzz.flatMap((run) =>
                     run.harnesses.map((hz) => [
                         esc(run.ref),
-                        `<a class="mono" href="${BASE}/commit/${esc(run.baseCommit)}">${esc(short(run.baseCommit))}</a>`,
+                        `<a class="mono" href="${esc(refCommit(run.ref, run.baseCommit))}">${esc(short(run.baseCommit))}</a>`,
                         `<span class="mono">${esc(hz.name)}</span>`,
                         `${esc(String(hz.seconds))} s`,
                         esc(String(hz.execs ?? '?')),
@@ -1064,11 +1072,25 @@ export function renderHtml(report, history = []) {
     return h.join('\n') + '\n';
 }
 
-/** "OpenCCU-Base <sha>" with the commit linked, any other trigger text as it is. */
-function triggerHtml(trigger) {
-    const m = /^OpenCCU-Base ([0-9a-f]{7,40})$/.exec(trigger);
-    if (m) {
-        return `OpenCCU-Base <a class="mono" href="${BASE}/commit/${esc(m[1])}">${esc(m[1].slice(0, 7))}</a>`;
+/** The fork branches in words, for the Jobs paragraph: "the head of the branch lite-3.89.11 of the fork ... (...), ". */
+function forkRefsText(forks = FORK_REFS) {
+    return forks
+        .map((f) => {
+            const repo = f.repo.replace(/\.git$/, '');
+            return `the head of the branch ${esc(f.ref)} of the fork <a href="${esc(repo)}">${esc(repo.replace('https://github.com/', ''))}</a> (${esc(f.base)} with the fixes openccu-lite builds with: picked from upstream, or not upstream yet), `;
+        })
+        .join('');
+}
+
+/**
+ * "OpenCCU-Base <sha>" (upstream main moved) or "<fork label> <sha>" (a fork branch moved, the upstream watch) with
+ * the commit linked, any other trigger text as it is.
+ */
+export function triggerHtml(trigger) {
+    const m = /^(\S+) ([0-9a-f]{7,40})$/.exec(trigger || '');
+    if (m && (m[1] === 'OpenCCU-Base' || FORK_REFS.some((f) => f.label === m[1]))) {
+        const url = m[1] === 'OpenCCU-Base' ? `${BASE}/commit/${m[2]}` : commitUrl(m[1], m[2]);
+        return `${esc(m[1])} <a class="mono" href="${esc(url)}">${esc(m[2].slice(0, 7))}</a>`;
     }
     return esc(trigger);
 }
