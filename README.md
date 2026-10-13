@@ -456,7 +456,7 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
   währenddessen, der Keepalive-Thread, Hello ohne Seriennummer, die Statusdatei, auf TCP-Segmente verteilte Frames,
   Sockets über 1024
 - ✅ **AES-CBC-MAC-Telegramme (#4)** auf einem Kanal mit `aes_cbc` (eine Kopie der `rftypes`, OpenCCU-Base liefert keinen) und das korrigierte `LONG_ACT_TYPE`-Register des HM-OU-CFM-TW (#63)
-- 🕵️ **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
+- ✅ **Ältere Fixes festhalten:** Adress- und Seriennummernformate von hs485d, Dateien ohne Punkt, ungewöhnliche Antworten
   an libXmlRpc, der 49-Tage-Überlauf der Uhr (libfaketime)
 - ✅ **Testbericht kompakter:** eine Ergebnisspalte je OpenCCU-Base-Stand; normal, ASan und Coverage nur dort einzeln,
   wo sie sich unterscheiden; jede Zeile einzeilig, Details und eine kurze Erklärung des Tests zum Aufklappen
@@ -466,8 +466,8 @@ nicht, solange der Maintainer das nicht möchte. `workflow_dispatch` mit `force`
 - ☑️ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ✅ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
 - ☑️ **Eine ThreadSanitizer-Variante** des Images
-- 🕵️ **RSSI im ACK:** das Modul schickt den RSSI-Wert im Sendestatus vorzeichenbehaftet, rfd liest ihn ohne Vorzeichen (`RSSI=-236dB`); Simulator angleichen, Test, Entwurf für OpenCCU-Base
-- 🕵️ **Fehler: ein hängender Test bricht nicht ab:** `hs485d-lgw.test.js` lief 20 Stunden; jeder Daemon-Test bekommt ein Timeout
+- ✅ **RSSI im ACK:** das Modul schickt den RSSI-Wert im Sendestatus vorzeichenbehaftet, rfd liest ihn ohne Vorzeichen (`RSSI=-236dB`); Simulator angleichen, Test, Entwurf für OpenCCU-Base
+- ✅ **Fehler: ein hängender Test bricht nicht ab:** `hs485d-lgw.test.js` lief 20 Stunden; jeder Daemon-Test bekommt ein Timeout
 - 🏗️ **Eine vierte Spalte für openccu-lite:** der OpenCCU-Base-Zweig `lite-3.89.11` des Forks [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) (3.89.11 mit übernommenen Fixes) neben 3.89.9, 3.89.11 und `main`; übernommene Fixes werden an `cherry picked from` erkannt
 - ✅ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
 - ✅ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
