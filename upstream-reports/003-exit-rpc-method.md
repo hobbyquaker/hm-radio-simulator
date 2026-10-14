@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/163
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: -
+relevance: edge # rare edge case: practically never by accident: no known client sends exit; whoever reaches the RPC port can do worse anyway
 ---
 
 # The RPC method `exit` is always compiled in: any client that reaches rfd's port can stop it

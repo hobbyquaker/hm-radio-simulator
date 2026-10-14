@@ -14,6 +14,7 @@ import {
     proofMark,
     proofText,
     triggerHtml,
+    relevanceChip,
 } from '../../scripts/report.mjs';
 import {combine, groupByRef} from '../../scripts/combine.mjs';
 import {describe} from '../descriptions.js';
@@ -405,7 +406,7 @@ test('the filter bar (task 37): hidden without JavaScript, chips with counts, ro
     // a row carries its results per ref, daemon, kind and the searchable text
     assert.match(
         html,
-        /<tr data-row="" data-result="todo pass" data-daemon="hs485d" data-kind="regression" data-differs="no" data-proof="" data-text="#138 on hs485d[^"]*" data-r0="todo" data-r1="pass">/,
+        /<tr data-row="" data-result="todo pass" data-daemon="hs485d" data-kind="regression" data-relevance="" data-differs="no" data-proof="" data-text="#138 on hs485d[^"]*" data-r0="todo" data-r1="pass">/,
     );
     assert.match(html, /<section class="test-file"><h3 class="mono">test\/daemon\/rfd-pty-module\.test\.js<\/h3>/);
 });
@@ -426,4 +427,52 @@ test("describeTest: a finding's issue number in the name links the issue and the
     const both = describeTest('rfd: init ... (the init-blocks finding, #170)');
     assert.equal(both.kind, 'known-bug');
     assert.equal(both.refs.filter((r) => r.kind === 'issue').length, 1);
+});
+
+test("a finding's field relevance (task 42): a label before the name, the reason in the row, a filter chip, the legend", () => {
+    const results = collectResults([FIXTURE]);
+    const job = results.jobs[0];
+    const base = job.tests[0];
+    for (const [name, todo] of [
+        ['rfd: the ACK RSSI of a switch (the ack-rssi-sign finding)', 'the ack-rssi-sign finding is not fixed'],
+        ['hs485d: a long config line hangs it (the propertymap-long-line finding)', ''],
+        ['hs485d: a hex file without data (the hexfile-no-data finding)', ''],
+    ]) {
+        const {kind, refs, relevance} = describeTest(name, {todo});
+        job.tests.push({...base, name, status: 'todo', todo, kind, refs, relevance, proof: undefined});
+    }
+    const report = buildReport(results, {generatedAt: '2026-10-14T20:00:00.000Z'});
+    const tests = report.jobs[0].tests;
+    assert.equal(tests.find((t) => t.name.includes('ack-rssi-sign')).relevance.relevance, 'field');
+    assert.equal(tests[0].relevance, undefined, 'a test of no finding has no relevance in report.json');
+    const html = renderHtml(report, []);
+    // the label before the name, the reason as its title
+    assert.match(
+        html,
+        /<summary><span class="rel rel-field" title="field relevance: hits users - certain: [^"]*">hits users<\/span>rfd: the ACK RSSI/,
+    );
+    assert.match(html, /<span class="rel rel-edge" title="[^"]*">rare edge case<\/span>hs485d: a long config line/);
+    // the reason in the open row
+    assert.match(html, /<div class="diag">Field relevance \(ack-rssi-sign\): <span class="rel rel-field"/);
+    // the rows carry the class, the filter offers it with counts
+    assert.match(html, /data-kind="known-bug" data-relevance="field"/);
+    const count = (token) => {
+        const m = new RegExp(`value="${token}" data-group="relevance"> [^<]+ <span class="fcount">(\\d+)</span>`).exec(
+            html,
+        );
+        return m ? Number(m[1]) : 0;
+    };
+    assert.equal(count('field'), 1);
+    assert.equal(count('edge'), 2);
+    assert.equal(count('rare'), 0, 'no rare finding among the rows: no chip');
+    assert.match(html, /<legend>field relevance<\/legend>/);
+    assert.match(html, /if \(group === 'relevance'\) return d\.relevance === token;/);
+    // the explanation names all three classes
+    for (const label of ['hits users', 'rare', 'rare edge case']) {
+        assert.ok(html.includes(`">${label}</span> `), label);
+    }
+    // the summary marks the known-broken tests
+    assert.match(renderSummaryMarkdown(report), /ack-rssi-sign finding\) \[hits users\] - /);
+    assert.equal(relevanceChip(null), '');
+    assert.equal(relevanceChip({relevance: 'nonsense'}), '');
 });

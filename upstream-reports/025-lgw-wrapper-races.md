@@ -3,6 +3,7 @@ status: reported (the hs485d part only, rewritten): https://github.com/OpenCCU/O
 component: rfd, hs485d
 refs: [main (030dba7)]
 suite: lgw-wrapper-races
+relevance: rare # rare: the hs485d part (#195): rare per installation, but possible on every installation with an HMW-LGW - a missed keepalive while a send is under way; the rfd part is harmless
 ---
 
 # LGWPortWrapper (rfd and hs485d): the last-communication timestamp, the keepalive stop flags and the reconnect state are plain variables shared between threads

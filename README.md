@@ -402,7 +402,7 @@ ASan, `C` coverage, `R` normal), Tooltip und Aufklappbereich zeigen jede Variant
 sie von der normalen abweicht. Jede Testzeile ist beim Laden eine Zeile; aufgeklappt zeigt sie zuerst in ein, zwei
 Sätzen, was der Test prüft (`test/descriptions.js` - ein Test ohne Beschreibung lässt den CI-Job "every test has a
 description" scheitern), dann die Diagnosen. Ein Link führt zu den Zeilen, in denen die Varianten abweichen. Über den Tests liegt
-eine **Filterleiste** (Ergebnis, abweichende Varianten, Daemon, Art, Beweis, Ergebnis auf einem Stand, Textsuche über
+eine **Filterleiste** (Ergebnis, abweichende Varianten, Daemon, Art, Feldrelevanz, Beweis, Ergebnis auf einem Stand, Textsuche über
 Name, Datei und Beschreibung, jeweils mit Anzahl); der Filter steht im Link (`#f=fail,rfd&q=lgw`), so lässt sich eine
 Ansicht teilen. Ohne JavaScript bleibt die Leiste verborgen und alle Zeilen sichtbar. Ganz oben steht
 ein **Trend** je Version: bestanden, bekannt bzw. todo, fehlgeschlagen und übersprungen für rfd und hs485d und die Zeilenabdeckung
@@ -423,6 +423,17 @@ man ihn:
   ändert; dazwischen behält der Bericht den letzten. Lokal: `node scripts/prove.mjs local [--fixes 9,16]`;
 - **known bug** - ein Fund dieser Suite ohne Fix upstream (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`, `ack-rssi-sign`, `devices-lock-wait`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
+- **Feldrelevanz** - die Tests eines Funds tragen vor ihrem Namen eine Einordnung, wie wahrscheinlich eine gewöhnliche
+  Installation im normalen Betrieb auf ihn trifft. Sie stammt aus einer Recherche vom 2026-10-14 zu jedem Fund: was ihn
+  auslöst, wie oft das im Betrieb vorkommt, was dann passiert und ob es Berichte aus dem Feld gibt.
+  **hits users** (trifft Nutzer): gewöhnliche Installationen laufen im normalen Betrieb hinein (`ack-rssi-sign`,
+  `wired-maintenance`); **rare** (selten): echt, braucht aber einen ungewöhnlichen Aufbau oder ein Zusammentreffen
+  (`devices-lock-wait`, `system-command-slot`, `json-substr`, der hs485d-Teil von `lgw-wrapper-races`); **rare edge
+  case** (seltener Grenzfall): im normalen Betrieb praktisch nie - eine kaputte Eingabe, ein fehlerhafter Client, nur
+  unter einem Sanitizer, oder harmlos, wo es passiert (alle übrigen). Der Grund steht im Tooltip und in der
+  aufgeklappten Zeile, die Klasse in `test/metadata.js` (`FINDINGS[…].relevance`) und im Vorspann des Entwurfs
+  (`relevance:`). Funde, die schon vor der Recherche auf dem Fork behoben waren (`read-eof`, `no-sigterm`,
+  `aes-republish`, `init-blocks`, `async-callback-threads`, `flush-drops-events`), sind nicht eingeordnet;
 - **behaviour** - ein gemessenes Verhalten der Daemons; **fuzz** - die geseedeten Fuzzing-Tests der Suite.
 
 Dazu kommt die **Code-Abdeckung** von rfd und hs485d: Eine dritte Build-Variante `coverage` (clang, Source-based

@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/169
 component: rfd, hs485d
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: replace-callback
+relevance: edge # rare edge case: rare: a device replacement while a logic layer is offline; ReGa, which runs the replacement, is online
 ---
 
 # A logic layer that was not connected when a device was replaced learns it as deleted

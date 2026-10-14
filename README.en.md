@@ -154,7 +154,7 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
   variant counts only where it differs from release. Every test row is one line at load; opened, it first says in one
   or two sentences what the test does (`test/descriptions.js` - a test without a description fails the CI job "every
   test has a description"), then the diagnostics. A link leads to the rows where the variants differ. Above the tests, a **filter bar** (result, variants differ,
-  daemon, kind, proof, the result on one ref, a text search over name, file and description, each with its count);
+  daemon, kind, field relevance, proof, the result on one ref, a text search over name, file and description, each with its count);
   the filter is part of the link (`#f=fail,rfd&q=lgw`), so a view can be shared. Without JavaScript the bar stays
   hidden and every row visible. At the top, a **trend** card per ref: pass, known or todo, fail and
   skip for rfd and hs485d and the line coverage (per daemon and in total), each with its change against the previous
@@ -173,6 +173,16 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
   report keeps the last one. Locally: `node scripts/prove.mjs local [--fixes 9,16]`;
 - **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`, `ack-rssi-sign`, `devices-lock-wait`), linking to the issue or,
   until there is one, to the findings above;
+- **field relevance** - the tests of a finding carry a label before their name: how likely an ordinary installation
+  runs into the finding under normal operation. It comes from a study of each finding on 2026-10-14: what triggers
+  it, how often that happens in operation, what it does when it hits, and whether there are reports from the field.
+  **hits users**: ordinary installations run into it under normal operation (`ack-rssi-sign`, `wired-maintenance`);
+  **rare**: real, but it takes an uncommon setup or a coincidence (`devices-lock-wait`, `system-command-slot`,
+  `json-substr`, the hs485d part of `lgw-wrapper-races`); **rare edge case**: practically never under normal operation
+  \- a broken input, a buggy client, only under a sanitizer, or harmless where it happens (all the others). The reason
+  is in the tooltip and the opened row, the class in `test/metadata.js` (`FINDINGS[…].relevance`) and in the draft's
+  front matter (`relevance:`). Findings fixed on the fork before the study (`read-eof`, `no-sigterm`, `aes-republish`,
+  `init-blocks`, `async-callback-threads`, `flush-drops-events`) are not classified;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
 
 **Code coverage** of rfd and hs485d comes from a third build variant, `coverage` (clang source-based coverage, `-O0`),

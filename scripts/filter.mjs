@@ -1,6 +1,6 @@
 /**
- * The filter bar over the test results (task 37): chips for the result, "variants differ", the daemon, the kind, the
- * regression proof and the result on one ref, plus a text search over name, file and description. Within a group the
+ * The filter bar over the test results (task 37): chips for the result, "variants differ", the daemon, the kind, a
+ * finding's field relevance (test/metadata.js RELEVANCE), the regression proof and the result on one ref, plus a text search over name, file and description. Within a group the
  * chips are alternatives (OR), across groups all must hold (AND). The state lives in the URL hash
  * (`#f=fail,rfd&q=lgw`), so a filtered view can be linked.
  *
@@ -9,6 +9,8 @@
  * toggles `hidden` on rows and on file sections without a visible row. The table of differing rows (#differing) is not
  * filtered.
  */
+
+import {RELEVANCE} from '../test/metadata.js';
 
 const esc = (text) =>
     String(text ?? '')
@@ -38,6 +40,9 @@ export function chipDefinitions(refs, todoWords = []) {
         ['fuzz', 'fuzz'],
     ]) {
         chips.push(['kind', k, label, (a) => a['data-kind'] === k]);
+    }
+    for (const [r, {label}] of Object.entries(RELEVANCE)) {
+        chips.push(['relevance', r, label, (a) => a['data-relevance'] === r]);
     }
     for (const [p, label] of [
         ['proven', 'proven'],
@@ -79,7 +84,14 @@ export function renderFilterBar(rows, refs, todoWords = []) {
                 `<label class="fchip"><input type="checkbox" value="${esc(token)}" data-group="${esc(group)}"> ${esc(label)} <span class="fcount">${count}</span></label>`,
             );
     }
-    const names = {result: 'result', differs: '', daemon: 'daemon', kind: 'kind', proof: 'proof'};
+    const names = {
+        result: 'result',
+        differs: '',
+        daemon: 'daemon',
+        kind: 'kind',
+        relevance: 'field relevance',
+        proof: 'proof',
+    };
     const html = [...groups.entries()]
         .map(
             ([group, chips]) =>
@@ -106,6 +118,7 @@ export const FILTER_SCRIPT = `
     if (group === 'differs') return d.differs === 'yes';
     if (group === 'daemon') return d.daemon === token;
     if (group === 'kind') return d.kind === token;
+    if (group === 'relevance') return d.relevance === token;
     if (group === 'proof') return d.proof === token;
     var m = /^r(\\d+)-(\\w+)$/.exec(token);
     return m ? d['r' + m[1]] === m[2] : true;

@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/179
 component: rfd
 refs: [3.89.11 (3ed652a), main (570566e)]
 suite: system-command-slot
+relevance: rare # rare: rare on a local radio module (during a module restart), occasional on an HM-LGW or with a periodic listBidcosInterfaces poll; self-healing
 ---
 
 # rfd: two coprocessor system commands from two threads share one request slot; one takes the other's answer

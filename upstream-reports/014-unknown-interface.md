@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/174
 component: rfd
 refs: [3.89.11 (3ed652a), main (570566e)]
 suite: unknown-interface
+relevance: edge # rare edge case: practically never: the WebUI offers only existing interfaces
 ---
 
 # rfd: setBidcosInterface accepts an interface that does not exist, reports success and stores it

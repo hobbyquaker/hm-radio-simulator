@@ -3,6 +3,7 @@ status: draft
 component: rfd
 refs: [3.89.11 (3ed652a), main (df07a0e)]
 suite: devices-lock-wait
+relevance: rare # rare: rare on a local radio module (a few ms window per command), more often on an HM-LGW and in event bursts: a 1-2 s stall of rfd's RPC loop, nothing lost
 ---
 
 # The device lock is held while a coprocessor command waits for its answer; the receive thread blocks on it and the answer times out

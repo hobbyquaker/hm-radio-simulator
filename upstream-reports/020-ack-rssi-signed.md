@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/185
 component: rfd
 refs: [3.89.11 (3ed652a), main (ee85651)]
 suite: ack-rssi-sign
+relevance: field # hits users: certain: every ACK of a BidCos-RF device to the central on an RPI-RF-MOD; RSSI_PEER and rssiInfo show impossible values
 ---
 
 # rfd: the RSSI byte in the module's send status (the ACK) is signed; rfd negates it like the event's magnitude

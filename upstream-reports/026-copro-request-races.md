@@ -3,6 +3,7 @@ status: draft
 component: rfd
 refs: [main (030dba7)]
 suite: copro-request-races
+relevance: edge # rare edge case: mostly harmless: the answer is copied under the lock on both sides; at worst a spurious timeout and a retry (the serious variant is #179)
 ---
 
 # The coprocessor request slot is read outside its lock, the response command is copied into it under a race, and handleIncomingResponse locks a mutex it holds

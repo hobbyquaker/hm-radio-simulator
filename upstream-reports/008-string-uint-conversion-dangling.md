@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/168
 component: libhsscomm (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: string-uint-conversion
+relevance: edge # rare edge case: certain for HM-OU-LED16 owners (an uncommon device), but a release build misreads only if the dead stack slot was reused
 ---
 
 # libhsscomm: type_conversion_string_unsigned_integer reads a destroyed temporary string

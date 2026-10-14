@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import {describeTest} from '../test/metadata.js';
+import {describeTest, RELEVANCE} from '../test/metadata.js';
 import {describe} from '../test/descriptions.js';
 import {groupByRef, combine, refCounts, VARIANT_CHIP} from './combine.mjs';
 import {trendOf, renderTrendPanel, TREND_CSS, daemonOf} from './trend.mjs';
@@ -113,8 +113,8 @@ export function collectResults(roots) {
 
 function makeJob(meta, results) {
     const tests = (results.tests || []).map((t) => {
-        const {kind, refs} = describeTest(t.name, t);
-        return {...t, kind, refs, description: describe(t.file, t.name)};
+        const {kind, refs, relevance} = describeTest(t.name, t);
+        return {...t, kind, refs, ...(relevance ? {relevance} : {}), description: describe(t.file, t.name)};
     });
     const counts = {pass: 0, fail: 0, todo: 0, skip: 0};
     for (const t of tests) {
@@ -331,7 +331,8 @@ export function renderSummaryMarkdown(report) {
             lines.push('');
             for (const row of todo) {
                 const first = [...row.results.values()][0];
-                lines.push(`- ⚠️ ${escapeMd(row.name)} - ${where(row, 'todo')}${linksMd(first.refs)}`);
+                const rel = row.relevance ? ` [${RELEVANCE[row.relevance.relevance].label}]` : '';
+                lines.push(`- ⚠️ ${escapeMd(row.name)}${rel} - ${where(row, 'todo')}${linksMd(first.refs)}`);
             }
             lines.push('');
         }
@@ -515,6 +516,10 @@ td.name { overflow-wrap: anywhere; }
 .pass { color: var(--pass); } .fail { color: var(--fail); } .todo { color: var(--todo); } .skip { color: var(--skip); }
 .kind-regression { color: var(--link); } .kind-known-bug { color: var(--todo); } .kind-behaviour { color: var(--muted); }
 .kind-fuzz { color: var(--pass); }
+/* a finding's field relevance (test/metadata.js RELEVANCE): a small label before the test's name */
+.rel { display: inline-block; padding: 0 .4em; margin-right: .35em; border-radius: 4px; border: 1px solid currentColor;
+  font-size: .72em; font-weight: 600; line-height: 1.5; vertical-align: 1px; white-space: nowrap; }
+.rel-field { color: var(--fail); } .rel-rare { color: var(--todo); } .rel-edge { color: var(--muted); border-style: dashed; }
 .sub { padding-left: 1.5rem; color: var(--muted); }
 .diag { color: var(--muted); font-size: .85em; } .err { color: var(--fail); font-size: .85em; }
 .overall-pass { color: var(--pass); } .overall-fail { color: var(--fail); }
@@ -618,6 +623,26 @@ const PROOF = {
     'no-build': {mark: '–', label: 'no build', title: 'the parent or the merge commit did not build'},
 };
 
+/**
+ * A finding's field relevance (describeTest's `relevance`): the label before the test's name, with the reason as its
+ * title.
+ */
+export function relevanceChip(rel) {
+    const r = rel && RELEVANCE[rel.relevance];
+    if (!r) {
+        return '';
+    }
+    const title = `field relevance: ${r.label} - ${rel.note || r.text}`;
+    return `<span class="rel rel-${esc(rel.relevance)}" title="${esc(title)}">${esc(r.label)}</span>`;
+}
+
+/** The field-relevance classes in words, for the explanation above the tests. */
+export function relevanceLegend() {
+    return Object.entries(RELEVANCE)
+        .map(([key, r]) => `${relevanceChip({relevance: key, note: r.text})} ${esc(r.text)}`)
+        .join('; ');
+}
+
 /** A regression test's proof (task 30): a small mark for the kind cell. */
 export function proofMark(proof) {
     const p = PROOF[proof.status] || {mark: '?', label: proof.status, title: ''};
@@ -660,6 +685,7 @@ export function testRows(jobs) {
                     name: t.name,
                     kind: t.kind,
                     refs: t.refs,
+                    relevance: t.relevance || null,
                     results: new Map(),
                 });
             }
@@ -682,6 +708,7 @@ export function renderHtml(report, history = []) {
                     name: t.name,
                     kind: t.kind,
                     refs: t.refs,
+                    relevance: t.relevance || null,
                     results: new Map(),
                 });
             }
@@ -793,7 +820,7 @@ export function renderHtml(report, history = []) {
     // Tests: one line per test at load; the explanation, diagnostics and per-variant results behind a collapsible
     const differingRows = rows.filter((row) => refs.some((ref) => (combine(row.results, ref) || {}).differs));
     h.push(
-        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (known or todo everywhere, except on a fork branch that carries its fix); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. A test on a ref that lacks its fix runs as <span class="todo">known</span> on a tag (a release cannot change any more: the bug is known there) and as <span class="todo">todo</span> on a head (the fix is still to come). ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
+        `<h2 id="tests">Tests</h2><p class="muted">One column per OpenCCU-Base ref; each row opens to what the test does, its diagnostics and the per-variant results. ${legend}. <span class="badge kind-regression">regression</span> pins an upstream fix; <span class="badge kind-known-bug">known bug</span> is a finding of this suite without an upstream fix (known or todo everywhere, except on a fork branch that carries its fix); <span class="badge kind-behaviour">behaviour</span> a measured daemon behaviour; <span class="badge kind-fuzz">fuzz</span> a seeded fuzzing test. The tests of a finding carry its field relevance, from a study of each finding's trigger, how likely it is under normal operation and what it does when it hits: ${relevanceLegend()} (the reason is in the label's tooltip and in the open row; a finding fixed on the fork before that study is not classified). A test on a ref that lacks its fix runs as <span class="todo">known</span> on a tag (a release cannot change any more: the bug is known there) and as <span class="todo">todo</span> on a head (the fix is still to come). ${differingRows.length ? `<a href="#differing">Only the ${differingRows.length} row(s) where the variants differ</a>.` : 'The variants agree in every row.'}</p>`,
     );
     const testHead = [
         {label: 'test'},
@@ -826,6 +853,10 @@ export function renderHtml(report, history = []) {
             }
         }
         let body = `<p class="what">${esc(first.description || 'No description yet.')}</p>`;
+        if (row.relevance) {
+            const r = RELEVANCE[row.relevance.relevance];
+            body += `<div class="diag">Field relevance (${esc(row.relevance.findings.join(', '))}): ${relevanceChip(row.relevance)} ${esc(row.relevance.note || r.text)}.</div>`;
+        }
         const proof = [...row.results.values()].map((r) => r.proof).find(Boolean);
         if (proof) {
             body += `<div class="diag">${proofText(proof)}</div>`;
@@ -842,7 +873,7 @@ export function renderHtml(report, history = []) {
                 body += `<div class="diag">${esc(refText(refs[i].ref))}: ${c.variants.map((v) => `${esc(v.variant)} <span class="${v.status}">${esc(STATUS_MARK[v.status] || v.status)} ${esc(statusWord(v.status, refs[i].ref))}</span> ${esc(duration(v.durationMs))}`).join(' · ')}</div>`;
             }
         });
-        const name = `<details class="row"><summary>${row.nesting > 0 ? '<span class="sub"></span>' : ''}${esc(row.name)}</summary>${body}</details>`;
+        const name = `<details class="row"><summary>${row.nesting > 0 ? '<span class="sub"></span>' : ''}${relevanceChip(row.relevance)}${esc(row.name)}</summary>${body}</details>`;
         const cells = [name, kindBadge + (proof ? ' ' + proofMark(proof) : ''), links.join(' · ')];
         combined.forEach((c, i) => {
             if (!c) {
@@ -868,6 +899,7 @@ export function renderHtml(report, history = []) {
             'data-result': [...new Set(results.map((c) => c.status))].join(' '),
             'data-daemon': daemonOf(row),
             'data-kind': row.kind,
+            'data-relevance': row.relevance ? row.relevance.relevance : '',
             'data-differs': results.some((c) => c.differs) ? 'yes' : 'no',
             'data-proof': proof ? proof.status : '',
             'data-text': `${row.name} ${row.file} ${first.description || ''}`.toLowerCase(),

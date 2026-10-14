@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/167
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: metadata-args
+relevance: edge # rare edge case: practically never: only a buggy client calls the metadata methods with too few arguments
 ---
 
 # rfd: setVolatileMetadata (and getMetadata/setMetadata) with a missing argument read freed memory

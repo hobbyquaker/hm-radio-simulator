@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/172
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: dutycycle-upper-bound
+relevance: edge # rare edge case: 100 % duty cycle does occur, but a release build discards the value read past the end; only ASan aborts
 ---
 
 # rfd reads past its duty-cycle threshold map when the module reports 100 %

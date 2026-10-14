@@ -3,6 +3,7 @@ status: draft
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7), lite (632cf5d)]
 suite: update-nack-ignored
+relevance: edge # rare edge case: practically never: eQ-3's files match their type, a frame corrupted on air gets no answer, and no eQ-3 bootloader is known to NACK an update frame
 ---
 
 # A device's NACK to a firmware update frame counts as delivered: the OTAU ends as a success and the device is rebuilt

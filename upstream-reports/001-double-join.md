@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/161
 component: libelvutils (Actor), rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: double-join
+relevance: edge # rare edge case: the trigger (a client deregistering) is common, the effect practically never: a release build ignores the second join, only ASan aborts
 ---
 
 # `Actor::Stop()` joins the dispatcher thread a second time; under ASan rfd aborts on `init(url, "")`

@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/177
 component: libelvutils, rfd, hs485d
 refs: [3.89.9 (5b47e37), 3.89.11 (3ed652a), main (570566e)]
 suite: propertymap-long-line
+relevance: edge # rare edge case: practically never: the generated configuration lines are short; only a hand-written line of 256+ characters
 ---
 
 # PropertyMap::ReadFromFile loops for ever on a line longer than 255 characters

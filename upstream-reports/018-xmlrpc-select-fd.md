@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/178
 component: libXmlRpc (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (570566e)]
 suite: xmlrpc-select-fd
+relevance: edge # rare edge case: practically never: the open-file limit of 1024 keeps the descriptors below 1024
 ---
 
 # libXmlRpc: the RPC server stops answering once its sockets have descriptors of 1024 or more (select() with fd_set)

@@ -3,6 +3,7 @@ status: draft
 component: libUnifiedLanComm, rfd, hs485d
 refs: [main (030dba7)]
 suite: ulc-data-races
+relevance: edge # rare edge case: happens on every LAN gateway connect, but harmless: the flags are word-size and polled, the receive thread is joined; at worst a state change 100 ms late
 ---
 
 # libUnifiedLanComm: the connection state, the receive thread's stop and the hello handling race between the receive thread and the caller

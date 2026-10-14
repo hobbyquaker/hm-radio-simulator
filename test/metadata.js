@@ -108,6 +108,30 @@ export const UPSTREAM_COMMITS = Object.freeze({
 });
 
 /**
+ * The field-relevance classes of a finding (FINDINGS[x].relevance), most relevant first: whether a user of an ordinary
+ * installation runs into it under normal operation. The report shows `label` as a chip on the finding's tests, the
+ * README the German `de`.
+ * @type {Record<'field'|'rare'|'edge', {label: string, de: string, text: string}>}
+ */
+export const RELEVANCE = Object.freeze({
+    field: {
+        label: 'hits users',
+        de: 'trifft Nutzer',
+        text: 'ordinary installations run into it under normal operation',
+    },
+    rare: {
+        label: 'rare',
+        de: 'selten',
+        text: 'real, but it takes an uncommon setup or a coincidence',
+    },
+    edge: {
+        label: 'rare edge case',
+        de: 'seltener Grenzfall',
+        text: 'practically never under normal operation: a broken input, a buggy client or a sanitizer build, or harmless where it happens',
+    },
+});
+
+/**
  * Findings of this suite, each with its issue draft in upstream-reports/ (not reported yet; the maintainer decides).
  * When an issue exists, put its URL into `issue` and the draft's status line.
  * `fuzzHarness`: the libFuzzer harness that finds it (its findings are then known, not new, on refs without the fix).
@@ -121,16 +145,24 @@ export const UPSTREAM_COMMITS = Object.freeze({
  *              request; nothing else changes
  * A finding with a fork fix and an issue joins the proof under its issue number (scripts/prove.mjs): its tests' names
  * carry `#<issue>`.
+ * `relevance`: how likely a user meets the finding under normal operation (RELEVANCE: `field`, `rare` or `edge`), from
+ * the field-relevance research of 2026-10-14; `relevanceNote` says why, in a sentence. A finding the research did not
+ * cover (it left out those already fixed on the fork) has neither and stays unclassified. The draft's front matter
+ * carries the same class (`relevance:`; test/unit/metadata.test.js keeps the two in step).
  * `signatures`: a data race ThreadSanitizer reports (the tsan variant): regular expressions over the SUMMARY lines of
  * its reports. On a ref known to lack the fix, Daemon.sanitizerReports() leaves reports out whose summaries all match a
  * known finding's signatures (knownSanitizerReports() has them), so the tests that insist on "no sanitizer report"
  * keep passing under tsan until a new race appears - which then fails them, as it should.
  * @type {Record<string, {title: string, draft: string, issue: string|null, fuzzHarness?: string, fixedBy?: string,
- *   fork?: {commit: string, branch: string}, proofRepeat?: number, signatures?: RegExp[]}>}
+ *   fork?: {commit: string, branch: string}, proofRepeat?: number, signatures?: RegExp[],
+ *   relevance?: 'field'|'rare'|'edge', relevanceNote?: string}>}
  */
 export const FINDINGS = Object.freeze({
     'ulc-data-races': {
         title: "libUnifiedLanComm: the connection state, the receive thread's stop and the hello handling race between the receive thread and the caller (ThreadSanitizer; rfd's HM-LGW and hs485d's HMW-LGW path)",
+        relevance: 'edge',
+        relevanceNote:
+            'happens on every LAN gateway connect, but harmless: the flags are word-size and polled, the receive thread is joined; at worst a state change 100 ms late',
         draft: '024-ulc-data-races.md',
         issue: null,
         signatures: [
@@ -140,11 +172,17 @@ export const FINDINGS = Object.freeze({
     },
     'devices-lock-wait': {
         title: "rfd: BidcosInterfaceConcentrator holds its device lock while a coprocessor command waits for the module's answer; the receive thread blocks on that lock for every frame to the central, so the answer times out (1 s per command; a sysinfo from a paired device re-adds it)",
+        relevance: 'rare',
+        relevanceNote:
+            "rare on a local radio module (a few ms window per command), more often on an HM-LGW and in event bursts: a 1-2 s stall of rfd's RPC loop, nothing lost",
         draft: '027-devices-lock-wait.md',
         issue: null,
     },
     'copro-request-races': {
         title: 'rfd: the coprocessor request slot (CCU2CommController RequestInfo, the command copied into it) is written by the serial receive thread and read by the waiting caller outside the lock, and handleIncomingResponse locks a mutex twice (ThreadSanitizer; the area of the system-command-slot finding, #179)',
+        relevance: 'edge',
+        relevanceNote:
+            'mostly harmless: the answer is copied under the lock on both sides; at worst a spurious timeout and a retry (the serious variant is #179)',
         draft: '026-copro-request-races.md',
         issue: null,
         signatures: [
@@ -154,12 +192,18 @@ export const FINDINGS = Object.freeze({
     },
     'lgw-wrapper-races': {
         title: "rfd's and hs485d's LGWPortWrapper: the last-communication timestamp, the keepalive thread's stop flag and the reconnect state are plain variables written by one thread and read by another (ThreadSanitizer)",
+        relevance: 'rare',
+        relevanceNote:
+            'the hs485d part (#195): rare per installation, but possible on every installation with an HMW-LGW - a missed keepalive while a send is under way; the rfd part is harmless',
         draft: '025-lgw-wrapper-races.md',
         issue: null,
         signatures: [/LGWPortWrapper::(ReadData|SendData|reconnect|\w*KeepAlive\w*)\(/],
     },
     'double-join': {
         title: 'rfd aborts under ASan on init(url, ""): the receiver dispatcher thread is joined twice (libelvutils Actor::Stop())',
+        relevance: 'edge',
+        relevanceNote:
+            'the trigger (a client deregistering) is common, the effect practically never: a release build ignores the second join, only ASan aborts',
         draft: '001-double-join.md',
         issue: null,
     },
@@ -177,21 +221,32 @@ export const FINDINGS = Object.freeze({
     },
     'wired-maintenance': {
         title: 'hs485d: a newly discovered wired device gets plain channels - its maintenance channel (UNREACH, STICKY_UNREACH, CONFIG_PENDING) works only after a restart',
+        relevance: 'field',
+        relevanceNote:
+            'plausible on every wired installation: from learning a device until the next restart of hs485d (often months) its bus failure raises no UNREACH',
         draft: '006-wired-maintenance-channel.md',
         issue: null,
     },
     'metadata-args': {
         title: 'rfd: setVolatileMetadata (and getMetadata/setMetadata) with a missing argument read freed memory - the second index reallocates the parameter array under the first string',
+        relevance: 'edge',
+        relevanceNote: 'practically never: only a buggy client calls the metadata methods with too few arguments',
         draft: '007-metadata-missing-argument.md',
         issue: null,
     },
     'string-uint-conversion': {
         title: 'libhsscomm: type_conversion_string_unsigned_integer reads a destroyed temporary string (HM-OU-LED16 channel set-up)',
+        relevance: 'edge',
+        relevanceNote:
+            'certain for HM-OU-LED16 owners (an uncommon device), but a release build misreads only if the dead stack slot was reused',
         draft: '008-string-uint-conversion-dangling.md',
         issue: null,
     },
     'replace-callback': {
         title: 'rfd and hs485d: a receiver that registers after a device was replaced gets deleteDevices instead of replaceDevice (rfd IsDeviceReplaced() always false; hs485d stores the new serial in the history)',
+        relevance: 'edge',
+        relevanceNote:
+            'rare: a device replacement while a logic layer is offline; ReGa, which runs the replacement, is online',
         draft: '009-replace-callback.md',
         issue: null,
     },
@@ -209,6 +264,9 @@ export const FINDINGS = Object.freeze({
     },
     'dutycycle-upper-bound': {
         title: 'rfd reads past its duty-cycle threshold map when the module reports 100 % (BidcosInterface::GetDutyCycleUpperBound)',
+        relevance: 'edge',
+        relevanceNote:
+            '100 % duty cycle does occur, but a release build discards the value read past the end; only ASan aborts',
         draft: '012-dutycycle-upper-bound.md',
         issue: null,
     },
@@ -221,59 +279,89 @@ export const FINDINGS = Object.freeze({
     },
     'unknown-interface': {
         title: 'rfd: setBidcosInterface accepts an interface that does not exist, reports success and stores it',
+        relevance: 'edge',
+        relevanceNote: 'practically never: the WebUI offers only existing interfaces',
         draft: '014-unknown-interface.md',
         issue: null,
     },
     'json-substr': {
         title: 'rfd terminates on setValue with a malformed JSON value for a parameter with write dependencies (JSONObject throws std::out_of_range)',
+        relevance: 'rare',
+        relevanceNote:
+            'rare: needs an HM-LC-RGBW-WM and a script or client that sends malformed JSON - then rfd aborts, on every repetition',
         draft: '015-json-substr.md',
         issue: null,
         fuzzHarness: 'fuzz_json',
     },
     'hexfile-no-data': {
         title: 'libelvutils Hexfile::Read erases from begin() to begin() - 1 for a hex file without a data record (hs485d firmware files)',
+        relevance: 'edge',
+        relevanceNote: 'practically never: the wired firmware files are on the read-only root file system',
         draft: '016-hexfile-no-data.md',
         issue: null,
         fuzzHarness: 'fuzz_hexfile',
     },
     'propertymap-long-line': {
         title: 'libelvutils PropertyMap::ReadFromFile loops for ever on a line longer than 255 characters (rfd and hs485d hang at start-up)',
+        relevance: 'edge',
+        relevanceNote:
+            'practically never: the generated configuration lines are short; only a hand-written line of 256+ characters',
         draft: '017-propertymap-long-line.md',
         issue: null,
         fuzzHarness: 'fuzz_propertymap',
     },
     'xmlrpc-select-fd': {
         title: 'libXmlRpc: the RPC server stops answering once its sockets have descriptors of 1024 or more (select() with fd_set)',
+        relevance: 'edge',
+        relevanceNote: 'practically never: the open-file limit of 1024 keeps the descriptors below 1024',
         draft: '018-xmlrpc-select-fd.md',
         issue: null,
     },
     'system-command-slot': {
         title: "rfd: two coprocessor system commands from two threads share one request slot; one takes the other's answer",
+        relevance: 'rare',
+        relevanceNote:
+            'rare on a local radio module (during a module restart), occasional on an HM-LGW or with a periodic listBidcosInterfaces poll; self-healing',
         draft: '019-system-command-slot.md',
         issue: null,
     },
     'ack-rssi-sign': {
         title: "rfd: the RSSI byte in the module's send status (the ACK) is signed; rfd negates it like the event's magnitude",
+        relevance: 'field',
+        relevanceNote:
+            'certain: every ACK of a BidCos-RF device to the central on an RPI-RF-MOD; RSSI_PEER and rssiInfo show impossible values',
         draft: '020-ack-rssi-signed.md',
         issue: null,
     },
     'update-nack-ignored': {
         title: "rfd: a device's NACK to a firmware update frame counts as delivered - the update ends as a success and the device is rebuilt with the new version (BidcosInterfaceConcentrator::SendUpdataFrame never checks the response)",
+        relevance: 'edge',
+        relevanceNote:
+            "practically never: eQ-3's files match their type, a frame corrupted on air gets no answer, and no eQ-3 bootloader is known to NACK an update frame",
         draft: '021-update-nack-ignored.md',
         issue: null,
     },
     'info-blank-line': {
         title: 'rfd terminates on a blank line in a user firmware info file: RFFirmwareManager::TrimLine runs its unsigned loop index below zero (std::out_of_range, uncaught)',
+        relevance: 'edge',
+        relevanceNote:
+            "practically never: none of the 64 info files in eQ-3's current bundles has a blank line; only a hand-edited or third-party file (then rfd aborts at every start)",
         draft: '022-info-blank-line.md',
         issue: null,
     },
     'bootloader-pagesize-zero': {
         title: "hs485d dies with SIGFPE when a wired device's bootloader answers the page-size request with 0 (HS485Device::WriteFlash divides by it)",
+        relevance: 'edge',
+        relevanceNote:
+            'practically never: real HMW bootloaders report their flash page size; it needs a broken or non-eQ-3 bootloader',
         draft: '023-bootloader-pagesize-zero.md',
         issue: null,
     },
     'exit-rpc': {
         title: 'the RPC method exit is always compiled into rfd: any client can stop it',
+        relevance: 'edge',
+        relevanceNote:
+            'practically never by accident: no known client sends exit; whoever reaches the RPC port can do worse anyway',
         draft: '003-exit-rpc-method.md',
         issue: null,
     },
@@ -349,14 +437,46 @@ export function refsForFinding(name) {
 }
 
 /**
- * The references and the kind of a test, from its name.
+ * The field relevance of a set of findings: the most relevant class among them (RELEVANCE's order), with the notes of
+ * the findings of that class, or null when none of them is classified.
+ * @param {Iterable<string>} names finding names
+ * @returns {{relevance: 'field'|'rare'|'edge', note: string, findings: string[]}|null}
+ */
+export function relevanceOf(names) {
+    const order = Object.keys(RELEVANCE);
+    let best = null;
+    for (const name of new Set(names)) {
+        const finding = FINDINGS[name];
+        if (!finding || !finding.relevance) {
+            continue;
+        }
+        const rank = order.indexOf(finding.relevance);
+        if (!best || rank < best.rank) {
+            best = {rank, relevance: finding.relevance, findings: [name]};
+        } else if (rank === best.rank) {
+            best.findings.push(name);
+        }
+    }
+    if (!best) {
+        return null;
+    }
+    const note = best.findings.map((n) => FINDINGS[n].relevanceNote || '').filter(Boolean);
+    return {relevance: best.relevance, note: note.join('; '), findings: best.findings};
+}
+
+/**
+ * The references, the kind and the field relevance of a test, from its name. `relevance` is the class of the findings
+ * the test refers to (relevanceOf), or null - for every test that is not about a finding, and for a finding that is not
+ * classified.
  * @param {string} name the test's name as node:test reports it
  * @param {{todo?: boolean|string}} [result]
- * @returns {{kind: 'regression'|'known-bug'|'behaviour'|'fuzz', refs: Ref[]}}
+ * @returns {{kind: 'regression'|'known-bug'|'behaviour'|'fuzz', refs: Ref[],
+ *   relevance: {relevance: 'field'|'rare'|'edge', note: string, findings: string[]}|null}}
  */
 export function describeTest(name, result = {}) {
     const refs = [];
     const seen = new Set();
+    const findings = [];
     // a subtest's own name may carry no number; its todo reason ("OpenCCU-Base #115 is not fixed ...") does
     const todoText = typeof result.todo === 'string' ? result.todo : '';
     for (const m of `${name} ${todoText}`.matchAll(/#(\d+)/g)) {
@@ -365,6 +485,9 @@ export function describeTest(name, result = {}) {
             seen.add(number);
             // an issue number of a finding (a fix on the fork, "#164 SIGTERM: ...") links the issue, not a pull request
             const finding = findingOfIssue(number);
+            if (finding) {
+                findings.push(finding);
+            }
             refs.push(...(finding ? refsForFinding(finding) : refsForPullRequest(number)));
         }
     }
@@ -377,6 +500,7 @@ export function describeTest(name, result = {}) {
     let kind = 'behaviour';
     for (const finding of Object.keys(FINDINGS)) {
         if (name.includes(finding)) {
+            findings.push(finding);
             if (!refs.some((r) => r.label.startsWith(`${finding} `))) {
                 refs.push(...refsForFinding(finding));
             }
@@ -384,6 +508,9 @@ export function describeTest(name, result = {}) {
         }
     }
     for (const finding of Object.keys(FINDINGS)) {
+        if (todoText.includes(`the ${finding} finding`)) {
+            findings.push(finding);
+        }
         if (todoText.includes(`the ${finding} finding`) && !refs.some((r) => r.label.startsWith(finding))) {
             refs.push(...refsForFinding(finding));
             kind = 'known-bug';
@@ -395,5 +522,5 @@ export function describeTest(name, result = {}) {
     if (kind === 'behaviour' && /fuzz/i.test(name)) {
         kind = 'fuzz';
     }
-    return {kind, refs};
+    return {kind, refs, relevance: relevanceOf(findings)};
 }

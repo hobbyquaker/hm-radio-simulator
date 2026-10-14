@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/166
 component: hs485d
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: wired-maintenance
+relevance: field # hits users: plausible on every wired installation: from learning a device until the next restart of hs485d (often months) its bus failure raises no UNREACH
 ---
 
 # hs485d: a newly discovered wired device has no working maintenance channel until hs485d restarts

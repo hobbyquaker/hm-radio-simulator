@@ -3,6 +3,7 @@ status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/175
 component: rfd
 refs: [3.89.9 (5b47e37), 3.89.11 (3ed652a), main (570566e)]
 suite: json-substr
+relevance: rare # rare: rare: needs an HM-LC-RGBW-WM and a script or client that sends malformed JSON - then rfd aborts, on every repetition
 ---
 
 # rfd terminates on setValue with a malformed JSON value for a parameter with write dependencies

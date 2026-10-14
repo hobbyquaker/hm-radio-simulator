@@ -3,6 +3,7 @@ status: draft
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7), lite (632cf5d)]
 suite: info-blank-line
+relevance: edge # rare edge case: practically never: none of the 64 info files in eQ-3's current bundles has a blank line; only a hand-edited or third-party file (then rfd aborts at every start)
 ---
 
 # rfd terminates on a blank line in a user firmware `info` file (RFFirmwareManager::TrimLine)

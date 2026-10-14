@@ -14,8 +14,13 @@ status: draft # oder: reported: <URL des Issues>   oder: fixed upstream: <Commit
 component: rfd # rfd, hs485d, libelvutils, ...
 refs: [3.89.11, main] # die geprüften OpenCCU-Base-Stände
 suite: double-join # der Name, unter dem die Suite den Fund als todo führt (wenn es einen Test gibt)
+relevance: edge # field (trifft Nutzer), rare (selten) oder edge (seltener Grenzfall), mit dem Grund als Kommentar
 ---
 ```
+
+`relevance:` ist die Feldrelevanz aus der Recherche vom 2026-10-14 (Auslöser, Wahrscheinlichkeit im normalen Betrieb,
+Folgen), dieselbe Klasse wie `relevance` in `test/metadata.js` (`FINDINGS`); ein Unit-Test hält beide gleich. Funde,
+die schon vor der Recherche auf dem Fork behoben waren, sind nicht eingeordnet und haben die Zeile nicht.
 
 Jeder Entwurf hält sich an das, was sich beobachten lässt: was passiert, wie man es mit der Suite oder einem kleinen
 Client nachstellt, was zu erwarten wäre, die Ursache soweit sie im **öffentlichen** Quelltext von OpenCCU-Base

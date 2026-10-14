@@ -3,6 +3,7 @@ status: draft
 component: hs485d
 refs: [3.89.11 (3ed652a), main (030dba7), lite (632cf5d)]
 suite: bootloader-pagesize-zero
+relevance: edge # rare edge case: practically never: real HMW bootloaders report their flash page size; it needs a broken or non-eQ-3 bootloader
 ---
 
 # hs485d dies with SIGFPE when a wired device's bootloader answers the page-size request with 0
