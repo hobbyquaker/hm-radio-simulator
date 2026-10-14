@@ -196,8 +196,19 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'the hs485d part (#195): rare per installation, but possible on every installation with an HMW-LGW - a missed keepalive while a send is under way; the rfd part is harmless',
         draft: '025-lgw-wrapper-races.md',
-        issue: null,
+        // the hs485d part reported as #195; its fix is the finding lgw-reconnect-uaf (this one keeps the races of rfd's
+        // wrapper, which stay known on the fork)
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/195',
         signatures: [/LGWPortWrapper::(ReadData|SendData|reconnect|\w*KeepAlive\w*)\(/],
+    },
+    'lgw-reconnect-uaf': {
+        title: 'hs485d: LGWPortWrapper::reconnect() deletes the gateway controller and its encryption object while SendData() may still use them (the #12 use-after-free, fixed only in rfd by #16)',
+        relevance: 'rare',
+        relevanceNote:
+            'rare per installation, but possible on every installation with an HMW-LGW - a missed keepalive while a send is under way',
+        draft: '025-lgw-wrapper-races.md',
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/195',
+        fork: {commit: '6504c8f3044dd55c29e34696e2bfdb60349dd394', branch: 'fix/195-lgw-reconnect'},
     },
     'double-join': {
         title: 'rfd aborts under ASan on init(url, ""): the receiver dispatcher thread is joined twice (libelvutils Actor::Stop())',
@@ -225,7 +236,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'plausible on every wired installation: from learning a device until the next restart of hs485d (often months) its bus failure raises no UNREACH',
         draft: '006-wired-maintenance-channel.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/166',
+        fork: {commit: '386f36a0838dede0084957fcab6924ba05b5a5fd', branch: 'fix/166-wired-maintenance'},
     },
     'metadata-args': {
         title: 'rfd: setVolatileMetadata (and getMetadata/setMetadata) with a missing argument read freed memory - the second index reallocates the parameter array under the first string',
@@ -331,7 +343,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'certain: every ACK of a BidCos-RF device to the central on an RPI-RF-MOD; RSSI_PEER and rssiInfo show impossible values',
         draft: '020-ack-rssi-signed.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/185',
+        fork: {commit: '6e87b0c1412ad358693f072ea6d52aa591ab24b9', branch: 'fix/185-ack-rssi-sign'},
     },
     'update-nack-ignored': {
         title: "rfd: a device's NACK to a firmware update frame counts as delivered - the update ends as a success and the device is rebuilt with the new version (BidcosInterfaceConcentrator::SendUpdataFrame never checks the response)",

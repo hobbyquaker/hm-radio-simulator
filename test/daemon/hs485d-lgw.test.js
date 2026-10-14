@@ -327,7 +327,7 @@ test(
 );
 
 test(
-    'a silent device: the send fails (a 01, two tries), the set faults; the maintenance channel of a discovered device (wired-maintenance)',
+    '#166 a silent device: the send fails (a 01, two tries), the set faults; the maintenance channel of a discovered device (wired-maintenance)',
     options(),
     async (t) => {
         const sw = makeSwitch();
@@ -383,11 +383,13 @@ test(
                 'UNREACH and STICKY_UNREACH events after the failed write',
                 regression('wired-maintenance'),
                 () => {
+                    // hs485d sends the maintenance events with the raw internal value, an integer 1/0 - as for a
+                    // device loaded from its file (the restart test below)
                     assert.ok(
-                        maintenanceEvents(from).includes('UNREACH=true'),
+                        maintenanceEvents(from).includes('UNREACH=1'),
                         maintenanceEvents(from).join(', ') || 'none',
                     );
-                    assert.ok(maintenanceEvents(from).includes('STICKY_UNREACH=true'));
+                    assert.ok(maintenanceEvents(from).includes('STICKY_UNREACH=1'));
                 },
             );
             // the device returns: after two failures hs485d drops sends to it until its fail counter resets
@@ -451,6 +453,86 @@ test(
                 lanDevice.requests.some((r) => r.opcode === 'n' && r.answered),
                 'the runtime IP request was answered',
             );
+        })
+            .finally(cleanup)
+            .finally(() => lanDevice.close());
+    },
+);
+
+test(
+    '#195 AES: a set while hs485d reconnects to the gateway - nothing uses the deleted controller, the device is served again afterwards',
+    options(regression('lgw-reconnect-uaf')),
+    async (t) => {
+        const sw = makeSwitch();
+        const {hs485d, receiver, lgw, cleanup} = await setup(t, [sw], {key: 'WiredLanKey-42'});
+        const lanDevice = await createEq3LanDevice({
+            type: 'eQ3-HMW-LGW',
+            serial: 'SIMWLGW001',
+            ip: lgw.host,
+            services: [[1, lgw.port]],
+        });
+        await withDaemon(hs485d, async () => {
+            await discover(hs485d, receiver);
+            // LGWPortWrapper::reconnect() deletes the old controller and then waits in connect() for the gateway's
+            // hello (UnifiedLanCommController::waitForState, 10 x 200 ms = 2 s); before #195's fix pEncryption still
+            // pointed into the deleted controller then. The gateway holds its hello back 1200 ms (chosen, inside the
+            // 2 s), and a set goes out at once in that window.
+            const helloDelayMs = 1200;
+            const accept = lgw.accept.bind(lgw);
+            const reconnecting = new Promise((resolve) => {
+                lgw.accept = (socket) => {
+                    lgw.accept = accept;
+                    resolve(Date.now());
+                    setTimeout(() => accept(socket), helloDelayMs);
+                };
+            });
+            lgw.answerKeepalive = false;
+            let timer;
+            const at = await Promise.race([
+                reconnecting,
+                new Promise((resolve, reject) => {
+                    timer = setTimeout(() => reject(new Error('no reconnect within 60 s')), 60000);
+                }),
+            ]).finally(() => clearTimeout(timer));
+            lgw.answerKeepalive = true;
+            const outcome = await hs485d.call('setValue', [SW3, 'STATE', true], {timeout: 30000}).then(
+                (result) => ({result}),
+                (error) => ({error: error.message}),
+            );
+            t.diagnostic(
+                `the set during the reconnect returned ${Date.now() - at} ms after the new connection: ${JSON.stringify(outcome).slice(0, 120)}`,
+            );
+            await waitUntil(
+                () => hs485d.grep(/Reconnected/).length >= 1 || !hs485d.alive,
+                15000,
+                'the Reconnected log line',
+            );
+            assert.ok(hs485d.alive, `hs485d died: ${JSON.stringify(hs485d.exit)}`);
+            assert.equal(
+                hs485d.sanitizerReports().length,
+                0,
+                hs485d
+                    .sanitizerReports()
+                    .map((r) => r.text)
+                    .join('\n'),
+            );
+            // the failed set may count against the device (fail counter); a set every 2 s shows when it is served
+            const back = Date.now();
+            let value = false;
+            await waitUntil(
+                async () => {
+                    const from = receiver.received.length;
+                    value = !value;
+                    await hs485d.call('setValue', [SW3, 'STATE', value], {timeout: 30000}).catch(() => null);
+                    await sleep(1500);
+                    return receiver.received
+                        .slice(from)
+                        .some((r) => r.method === 'event' && r.params[1] === SW3 && r.params[2] === 'STATE');
+                },
+                40000,
+                'a set after the reconnect',
+            );
+            t.diagnostic(`the device was served again ${Date.now() - back} ms after the reconnect`);
         })
             .finally(cleanup)
             .finally(() => lanDevice.close());

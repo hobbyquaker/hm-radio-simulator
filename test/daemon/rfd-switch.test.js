@@ -168,7 +168,7 @@ test('a status report from the device becomes an event; rfd acknowledges it', op
 });
 
 test(
-    "the ACK's RSSI: the module reports the status frame's RSSI as a signed byte; rfd shows it in RSSI_PEER and rssiInfo (ack-rssi-sign)",
+    "#185 the ACK's RSSI: the module reports the status frame's RSSI as a signed byte; rfd shows it in RSSI_PEER and rssiInfo (ack-rssi-sign)",
     options(),
     async (t) => {
         // measured on an RPI-RF-MOD: the send status (TELEGRAM_SENT_RECVD_ACK) carries the RSSI of the device's

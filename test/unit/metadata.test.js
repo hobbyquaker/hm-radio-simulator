@@ -27,6 +27,7 @@ const RESEARCH = {
     'ack-rssi-sign': 'field', // #185: every ACK on an RPI-RF-MOD
     'wired-maintenance': 'field', // #166: every wired installation, until hs485d's next restart
     'lgw-wrapper-races': 'rare', // #195, the hs485d part; the rfd part is harmless
+    'lgw-reconnect-uaf': 'rare', // #195: the hs485d part's use-after-free, its own finding for the fork fix
     'devices-lock-wait': 'rare', // 027
     'system-command-slot': 'rare', // #179
     'json-substr': 'rare', // #175

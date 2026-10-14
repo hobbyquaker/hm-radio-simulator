@@ -47,10 +47,12 @@ export const DESCRIPTIONS = Object.freeze({
             "The device's maintenance channel answers the question whether the device is unreachable.",
         'UNREACH and STICKY_UNREACH events after the failed write':
             'After a write to a silent device fails, the receiver is told that the device is unreachable, also in the sticky form a user has to confirm.',
-        'a silent device: the send fails (a 01, two tries), the set faults; the maintenance channel of a discovered device (wired-maintenance)':
+        '#166 a silent device: the send fails (a 01, two tries), the set faults; the maintenance channel of a discovered device (wired-maintenance)':
             'A wired device stops answering: the gateway reports the failure, hs485d tries twice and the set call returns an error.',
         'keepalive timeout: the gateway stops answering K - hs485d finds it again over UDP and reconnects':
             'When the gateway stops answering the keepalive, hs485d looks for it on the network again and reconnects.',
+        '#195 AES: a set while hs485d reconnects to the gateway - nothing uses the deleted controller, the device is served again afterwards':
+            'The gateway misses a keepalive and hs485d reconnects; a set arrives while the new connection is still being set up. hs485d must not use the old, already deleted connection for it (a use-after-free before the fix), and must serve the device again once reconnected.',
         'restart: the device file keeps the device, its sysinfo and config; a type byte >= 0x80 survives (#9 shape)':
             'After a restart hs485d loads the device from its file with the same type, version and settings, including type codes above 127.',
     },
@@ -439,7 +441,7 @@ export const DESCRIPTIONS = Object.freeze({
             'Switching on: the command reaches the switch, its confirmation becomes the new state.',
         'a status report from the device becomes an event; rfd acknowledges it':
             'A status report the switch sends on its own becomes an event and is acknowledged.',
-        "the ACK's RSSI: the module reports the status frame's RSSI as a signed byte; rfd shows it in RSSI_PEER and rssiInfo": `${rfd} switches the device and reads the field strength of its acknowledgement. The module sends it as a signed byte, which rfd misreads, so the value is wrong (a finding).`,
+        "#185 the ACK's RSSI: the module reports the status frame's RSSI as a signed byte; rfd shows it in RSSI_PEER and rssiInfo": `${rfd} switches the device and reads the field strength of its acknowledgement. The module sends it as a signed byte, which rfd misread before the fix, so the value was wrong.`,
         "RSSI_PEER is the ACK's RSSI in dBm":
             "The device's RSSI_PEER value must be the acknowledgement's field strength in dBm (negative).",
         "rssiInfo has the ACK's RSSI in dBm":

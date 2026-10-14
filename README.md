@@ -239,7 +239,7 @@ der Coprozessor hinter einem wiederverbundenen LAN-Gateway neu initialisiert, me
 (`ADD_LINK_PEER`) und die Schlüssel neu an, nicht aber die AES-Richtlinie je Kanal (`AUTHENTICATION_ON`); bis rfd
 neu startet oder die Konfiguration des Kanals erneut geschrieben wird, authentifiziert das Modul die Events der
 AES-Kanäle nicht mehr, und rfd verwirft sie (`auth_violate_policy="reject"`) - eine Fernbedienung mit AES verstummt.
-Der vierte, `wired-maintenance`: hs485d baut die Kanäle eines neu gefundenen Wired-Geräts ohne ihre Klasse, der
+Der vierte, `wired-maintenance` (#166, im Fork behoben): hs485d baut die Kanäle eines neu gefundenen Wired-Geräts ohne ihre Klasse, der
 Wartungskanal fehlt also, bis hs485d neu startet und das Gerät aus seiner Datei lädt - `UNREACH`, `STICKY_UNREACH` und
 `CONFIG_PENDING` sind bis dahin "unknown internal value", und keine Servicemeldung kommt. Zwei weitere haben die
 Durchläufe unter AddressSanitizer gefunden: `metadata-args` - `setVolatileMetadata` (ebenso `getMetadata` und
@@ -388,7 +388,7 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) das neueste openccu-lite-Tag (`v*`, heute `v1.0.0-beta.2`) und den aktuellen Stand des Zweigs `lite`. Aus diesem Zweig baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests, etwa zu #164, #165, #170, #171 und #173); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was der letzte openccu-lite-Build und der Zweig beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) das neueste openccu-lite-Tag (`v*`, heute `v1.0.0-beta.2`) und den aktuellen Stand des Zweigs `lite`. Aus diesem Zweig baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests, etwa zu #164, #165, #166, #170, #171, #173, #185 und #195); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was der letzte openccu-lite-Build und der Zweig beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
 (`scripts/resolve-refs.mjs`: upstream Tags der Form `X.Y.Z`, im Fork Tags der Form `vX.Y.Z[-…]`, je nach Version sortiert; die Kopien der Upstream-Tags im Fork zählen nicht); ein neues Tag ersetzt das bisherige, die Zweige zählen mit ihrem neuesten Commit. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
 
 ## Testbericht
@@ -428,7 +428,7 @@ man ihn:
   auslöst, wie oft das im Betrieb vorkommt, was dann passiert und ob es Berichte aus dem Feld gibt.
   **hits users** (trifft Nutzer): gewöhnliche Installationen laufen im normalen Betrieb hinein (`ack-rssi-sign`,
   `wired-maintenance`); **rare** (selten): echt, braucht aber einen ungewöhnlichen Aufbau oder ein Zusammentreffen
-  (`devices-lock-wait`, `system-command-slot`, `json-substr`, der hs485d-Teil von `lgw-wrapper-races`); **rare edge
+  (`devices-lock-wait`, `system-command-slot`, `json-substr`, der hs485d-Teil von `lgw-wrapper-races` und sein Use-after-free `lgw-reconnect-uaf`); **rare edge
   case** (seltener Grenzfall): im normalen Betrieb praktisch nie - eine kaputte Eingabe, ein fehlerhafter Client, nur
   unter einem Sanitizer, oder harmlos, wo es passiert (alle übrigen). Der Grund steht im Tooltip und in der
   aufgeklappten Zeile, die Klasse in `test/metadata.js` (`FINDINGS[…].relevance`) und im Vorspann des Entwurfs

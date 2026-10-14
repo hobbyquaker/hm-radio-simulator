@@ -63,7 +63,7 @@ answers `read()` with 0 (end of file), which #115/#116 do not treat as an error 
 reconnected LAN gateway, rfd re-adds every device (`ADD_LINK_PEER`) and the keys, but not the per-channel AES policy
 (`AUTHENTICATION_ON`); until rfd restarts or the channel's configuration is written again, the module no longer
 authenticates the events of AES channels and rfd rejects them (`auth_violate_policy="reject"`) - a remote with AES
-goes silent. The fourth, `wired-maintenance`: hs485d builds the channels of a newly discovered wired device without
+goes silent. The fourth, `wired-maintenance` (#166, fixed on the fork): hs485d builds the channels of a newly discovered wired device without
 their class, so its maintenance channel does not exist until hs485d restarts and loads the device from its file -
 `UNREACH`, `STICKY_UNREACH` and `CONFIG_PENDING` read as "unknown internal value" and no service event fires. The
 sweeps found two more under AddressSanitizer: `metadata-args` - `setVolatileMetadata` (and `getMetadata`/`setMetadata`)
@@ -137,7 +137,7 @@ Environment inside the image: `HMRS_VARIANT` (`release`, `asan`), `HMRS_KNOWN_BR
 (the frame fuzzer's seed, logged by every run), `HMRS_FUZZ_FRAMES` (default 400). Results: `results/<variant>/junit.xml`,
 the daemons' logs and sanitizer reports under `results/<variant>/work/`, fuzz artifacts under `results/fuzz/artifacts/`.
 
-CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite tag (`v*`, today `v1.0.0-beta.2`) and the head of the branch `lite`. [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #170, #171 and #173), and every openccu-lite build tags the commit it built with its version. So the report shows what the last openccu-lite build and the branch fix that upstream does not yet. The refs are chosen anew on every run
+CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite tag (`v*`, today `v1.0.0-beta.2`) and the head of the branch `lite`. [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #166, #170, #171, #173, #185 and #195), and every openccu-lite build tags the commit it built with its version. So the report shows what the last openccu-lite build and the branch fix that upstream does not yet. The refs are chosen anew on every run
 (`scripts/resolve-refs.mjs`: upstream tags of the form `X.Y.Z`, fork tags of the form `vX.Y.Z[-…]`, each ordered by version; the fork's copies of upstream's tags do not count); a new tag replaces the previous one, the branches count at their head. Each ref
 gets the daemon suite in the release, ASan and coverage variants and 60 s of each fuzz harness (findings fail the job,
 except on a ref without #140's fixes, where they are expected and only reported). The docker layers are cached per ref.
@@ -178,7 +178,7 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
   it, how often that happens in operation, what it does when it hits, and whether there are reports from the field.
   **hits users**: ordinary installations run into it under normal operation (`ack-rssi-sign`, `wired-maintenance`);
   **rare**: real, but it takes an uncommon setup or a coincidence (`devices-lock-wait`, `system-command-slot`,
-  `json-substr`, the hs485d part of `lgw-wrapper-races`); **rare edge case**: practically never under normal operation
+  `json-substr`, the hs485d part of `lgw-wrapper-races` and its use-after-free `lgw-reconnect-uaf`); **rare edge case**: practically never under normal operation
   \- a broken input, a buggy client, only under a sanitizer, or harmless where it happens (all the others). The reason
   is in the tooltip and the opened row, the class in `test/metadata.js` (`FINDINGS[…].relevance`) and in the draft's
   front matter (`relevance:`). Findings fixed on the fork before the study (`read-eof`, `no-sigterm`, `aes-republish`,
