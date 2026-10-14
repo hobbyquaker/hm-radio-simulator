@@ -76,6 +76,10 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'libXmlRpc: bound-check the length fields of the BIN-RPC deserializer',
         commit: '478d18477b42a35bf4fddaa4a2e8e22b6db6d00a',
     },
+    189: {
+        title: 'libXmlRpc: fix stack overflow (SIGSEGV) on deeply nested values (limit the nesting depth to 64)',
+        commit: 'd744b433ce08afe93bcbddeb429b88affc0c6f07',
+    },
 });
 
 /**

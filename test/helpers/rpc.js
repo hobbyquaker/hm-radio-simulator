@@ -6,6 +6,8 @@
 import net from 'node:net';
 import {createRequire} from 'node:module';
 
+import {BT, u32} from '../../lib/binrpc-raw.js';
+
 const require = createRequire(import.meta.url);
 const binrpc = require('binrpc');
 const xmlrpc = require('homematic-xmlrpc');
@@ -130,6 +132,52 @@ export function sendRawXml(port, xml, options) {
         'ascii',
     );
     return sendRaw(port, Buffer.concat([head, body]), options);
+}
+
+/**
+ * A raw XML-RPC request whose single parameter is an array or struct nested `depth` levels deep around one integer.
+ * libXmlRpc parses arrays and structs recursively; before OpenCCU-Base #189 a deep enough value (e.g. 100000 levels)
+ * exhausted the server thread's stack and crashed the process with SIGSEGV. The request body is well formed, only
+ * deeply nested.
+ * @param {number} depth
+ * @param {'array'|'struct'} kind
+ * @param {string} [method]
+ * @returns {string}
+ */
+export function deeplyNestedXml(depth, kind, method = 'getInstallMode') {
+    const open = kind === 'struct' ? '<value><struct><member><name>a</name>' : '<value><array><data>';
+    const close = kind === 'struct' ? '</member></struct></value>' : '</data></array></value>';
+    return (
+        '<?xml version="1.0"?><methodCall><methodName>' +
+        method +
+        '</methodName><params><param>' +
+        open.repeat(depth) +
+        '<value><int>1</int></value>' +
+        close.repeat(depth) +
+        '</param></params></methodCall>'
+    );
+}
+
+/**
+ * The same deeply nested value as a raw BIN-RPC request. @see deeplyNestedXml
+ * @param {number} depth
+ * @param {'array'|'struct'} kind
+ * @param {string} [method]
+ * @returns {Buffer}
+ */
+export function deeplyNestedBinRpc(depth, kind, method = 'getInstallMode') {
+    const one =
+        kind === 'struct'
+            ? Buffer.concat([u32(BT.STRUCT), u32(1), u32(1), Buffer.from('a', 'latin1')])
+            : Buffer.concat([u32(BT.ARRAY), u32(1)]);
+    const parts = [];
+    for (let i = 0; i < depth; i++) {
+        parts.push(one);
+    }
+    parts.push(Buffer.concat([u32(BT.INT), u32(1)]));
+    const m = Buffer.from(method, 'latin1');
+    const body = Buffer.concat([u32(m.length), m, u32(1), ...parts]);
+    return Buffer.concat([Buffer.from('Bin', 'ascii'), Buffer.from([0x00]), u32(body.length), body]);
 }
 
 /**

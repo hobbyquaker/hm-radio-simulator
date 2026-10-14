@@ -1,12 +1,13 @@
 /**
  * The RPC surface under hostile input: the classes OpenCCU-Base fixed in #138 (nested system.multicall recursion),
- * #140 (BIN-RPC deserializer bounds) and #27 (a receiver that goes away). Concept cases 9, 10, 11.
+ * #140 (BIN-RPC deserializer bounds), #189 (deeply nested values) and #27 (a receiver that goes away). Concept
+ * cases 9, 10, 11.
  */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 
 import {startRfd, withDaemon, skipWithoutDaemons} from '../helpers/daemon.js';
-import {startReceiver, sendRaw, sendRawXml} from '../helpers/rpc.js';
+import {startReceiver, sendRaw, sendRawXml, deeplyNestedXml, deeplyNestedBinRpc} from '../helpers/rpc.js';
 import {regression} from '../helpers/known.js';
 import {malformedRequests, encodeRequest} from '../../lib/binrpc-raw.js';
 
@@ -65,6 +66,43 @@ test('#140: malformed BIN-RPC requests get a fault or a closed connection, never
         assert.equal(reports.length, 0, `sanitizer reports:\n${reports.map((r) => r.text).join('\n')}`);
     });
 });
+
+test(
+    '#189: a deeply nested XML-RPC and BIN-RPC value is refused and rfd stays up (no stack overflow)',
+    options(189),
+    async () => {
+        // 3.89.11 parses arrays and structs recursively without a depth limit, so a value nested this deep exhausts
+        // the server thread's stack and rfd dies with SIGSEGV (measured: SIGSEGV at depth 100000 for BIN-RPC arrays
+        // and structs and XML-RPC structs on 3.89.11). #189 limits the nesting to 64 levels and refuses deeper values.
+        const depth = 100000;
+        const cases = [
+            {label: 'BIN-RPC array', send: (port) => sendRaw(port, deeplyNestedBinRpc(depth, 'array'))},
+            {label: 'BIN-RPC struct', send: (port) => sendRaw(port, deeplyNestedBinRpc(depth, 'struct'))},
+            {label: 'XML-RPC array', send: (port) => sendRawXml(port, deeplyNestedXml(depth, 'array'), {maxMs: 30000})},
+            {
+                label: 'XML-RPC struct',
+                send: (port) => sendRawXml(port, deeplyNestedXml(depth, 'struct'), {maxMs: 30000}),
+            },
+        ];
+        const rfd = await startRfd();
+        await withDaemon(rfd, async (daemon) => {
+            for (const {label, send} of cases) {
+                const outcome = await send(daemon.port);
+                assert.ok(daemon.alive, `rfd died on a deeply nested ${label} (${JSON.stringify(daemon.exit)})`);
+                assert.ok(
+                    outcome.response.length > 0 || outcome.closedByPeer || outcome.error,
+                    `${label}: neither an answer nor a close`,
+                );
+                // it must keep serving other clients
+                assert.ok(
+                    Array.isArray(await daemon.call('system.listMethods', [], {timeout: 60000})),
+                    `rfd stopped serving after a deeply nested ${label}`,
+                );
+            }
+            assert.equal(daemon.sanitizerReports().length, 0, 'a sanitizer caught the deep nesting');
+        });
+    },
+);
 
 test(
     'a well-formed raw BIN-RPC request gets a BIN-RPC response',

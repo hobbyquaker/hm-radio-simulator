@@ -61,6 +61,8 @@ export const DESCRIPTIONS = Object.freeze({
             'A deeply nested multicall request, which used to overflow the stack, is refused and hs485d keeps running.',
         '#140 on hs485d: malformed BIN-RPC requests never crash it':
             'Broken binary requests with impossible length fields get an error or a closed connection, never a crash.',
+        '#189 on hs485d: a deeply nested XML-RPC and BIN-RPC value is refused and hs485d stays up (no stack overflow)':
+            'An array or struct nested tens of thousands of levels deep, which used to overflow the stack and crash hs485d, is refused and hs485d keeps serving.',
     },
     'test/daemon/hs485d-sweep.test.js': {
         'method sweep: system.listMethods of hs485d is the dispatcher table of its source':
@@ -368,6 +370,8 @@ export const DESCRIPTIONS = Object.freeze({
             'A deeply nested multicall, which used to overflow the stack, is refused; a long flat one still works.',
         '#140: malformed BIN-RPC requests get a fault or a closed connection, never a crash':
             'Broken binary requests with impossible length fields get an error or a closed connection, never a crash.',
+        '#189: a deeply nested XML-RPC and BIN-RPC value is refused and rfd stays up (no stack overflow)':
+            'An array or struct nested tens of thousands of levels deep, which used to overflow the stack and crash rfd, is refused and rfd keeps serving.',
         'a well-formed raw BIN-RPC request gets a BIN-RPC response':
             'A correct binary request, built by hand, gets a correct answer.',
         'hostile XML-RPC: a deeply nested value tree and a truncated body do not crash or wedge rfd':
