@@ -116,14 +116,61 @@ test(
             const events = receiver.received.slice(from).filter((r) => r.method === 'event').length;
             t.diagnostic(`${iterations} telegrams from the paired switch, ${events} events at the receiver`);
             assert.ok(rfd.alive, `rfd died (seed ${seed}): ${JSON.stringify(rfd.exit)}`);
-            // the device still works afterwards
-            await rfd.call('setValue', [`${SWITCH_SERIAL}:1`, 'STATE', true], {timeout: 30000});
-            assert.equal(sw.behaviour.channel(1).STATE, 200);
+            // the device still works afterwards - within 30 s only without the devices-lock-wait finding: every
+            // sysinfo among the frames makes rfd re-add the device to the module under its device lock, and a frame
+            // for the central in that moment costs a coprocessor timeout (1000 ms) per command; how many depends on
+            // how the frames fall around rfd's commands (0 to 33 s measured), so this part is known where the
+            // finding is
+            await t.test(
+                'the device answers setValue within 30 s afterwards (finding devices-lock-wait)',
+                regression('devices-lock-wait'),
+                async () => {
+                    await rfd.call('setValue', [`${SWITCH_SERIAL}:1`, 'STATE', true], {timeout: 30000});
+                    assert.equal(sw.behaviour.channel(1).STATE, 200);
+                },
+            );
             const reports = rfd.sanitizerReports();
             assert.equal(
                 reports.length,
                 0,
                 `sanitizer reports (seed ${seed}):\n${reports.map((r) => r.text).join('\n')}`,
+            );
+        }).finally(() => receiver.stop());
+    },
+);
+
+test(
+    'a frame for the central while rfd re-adds a paired device after its sysinfo does not cost module timeouts (finding devices-lock-wait)',
+    options(regression('devices-lock-wait')),
+    async (t) => {
+        // rfd answers a sysinfo from a paired device outside install mode by adding the device to the module again
+        // (ADD_LINK_PEER, then its AES policy) and holds its device lock while it waits for the answers; the receive
+        // thread takes the same lock for every frame addressed to the central. Timing assumptions (rfd 3.89.11):
+        // coproCommandTimeout = 1000 ms; the module answers ADD_LINK_PEER after 300 ms here (chosen: a slow answer,
+        // as through multimacd or a LAN gateway, well inside the window), the status telegram comes 100 ms after the
+        // command, so it is read while rfd waits.
+        const {rfd, receiver} = await rfdWithReceiver();
+        await withDaemon(rfd, async () => {
+            const {air, device: sw} = attachSwitch(rfd);
+            await pairDevice(rfd, receiver, air, sw);
+            const module = rfd.module;
+            const adds = module.commands.filter((c) => c.name === 'ADD_LINK_PEER').length;
+            const timeouts = () =>
+                rfd.grep(/waitForCoProcessorResponse\(\): Timeout while waiting for response/).length;
+            const before = timeouts();
+            module.inject('ADD_LINK_PEER', {delayMs: 300});
+            module.sendEvent(sw.sysinfoTelegram(module.rfAddress));
+            await module.waitForCommand('ADD_LINK_PEER', {count: adds + 1, timeout: 5000});
+            await sleep(100);
+            module.sendEvent(sw.statusTelegram(1));
+            await sleep(3000);
+            const lost = timeouts() - before;
+            t.diagnostic(`coprocessor timeouts after the sysinfo: ${lost}`);
+            assert.ok(rfd.alive, `rfd died: ${JSON.stringify(rfd.exit)}`);
+            assert.equal(
+                lost,
+                0,
+                `rfd timed out waiting for the module ${lost} time(s) although the answer came after 300 ms\n${rfd.tail()}`,
             );
         }).finally(() => receiver.stop());
     },

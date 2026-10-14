@@ -103,6 +103,10 @@ export const DESCRIPTIONS = Object.freeze({
     'test/daemon/parsers.test.js': {
         'telegrams from a paired device with mutated content reach the device model and do not crash rfd (seeded)':
             'Hundreds of randomly altered radio telegrams arrive from a paired switch; rfd must process them all and keep working.',
+        'the device answers setValue within 30 s afterwards (finding devices-lock-wait)':
+            'After the altered telegrams the switch must still be switchable within half a minute; today every device info among them can hold rfd up for two seconds.',
+        'a frame for the central while rfd re-adds a paired device after its sysinfo does not cost module timeouts (finding devices-lock-wait)':
+            "A paired switch sends its device info, rfd re-registers it with the radio module, and a status message arrives meanwhile; today rfd misses the module's answers and stalls for seconds.",
         'a malformed JSON value for USER_COLOR (HM-LC-RGBW-WM, a parameter with write dependencies) is refused, rfd lives (finding json-substr)':
             'Setting the colour of an RGBW controller with broken JSON must give an error; today one such call ends rfd.',
         'a configuration line longer than 255 characters: rfd starts (finding propertymap-long-line)':
@@ -331,13 +335,13 @@ export const DESCRIPTIONS = Object.freeze({
     'test/daemon/rfd-load.test.js': {
         'every press reached the receiver (the flush-drops-events finding)':
             'Every remote key press during the load should reach the receiver; today rfd discards some input before each command.',
-        'rfd load: a burst at 50 % of the air maximum to six switches and one channel, a putParamset in it, remote presses meanwhile - every call answered, every event delivered, the last value wins':
+        'rfd load: a burst at 50 % of the air maximum to six switches and one channel, a putParamset in it, remote presses meanwhile - every call answered, every event delivered (#173), the last value wins':
             'Many switching commands at half the radio capacity, with remote presses in between: every call is answered, every event arrives, the last value wins.',
         'rfd load: twenty values to one channel at once over one connection and over XML-RPC - all sent in order, the last one wins':
             'Twenty values for one channel at once are all sent in order, and the last one wins.',
         'rfd load: a sustained run at 50 % of the duty-cycle budget (window scaled to 30 s) - rfd reports the duty cycle the module counts, memory stays flat':
             'A long run at half of the legal airtime: rfd reports the duty cycle the module counts and its memory stays flat.',
-        'rfd load: an overload at 200 % of the air maximum with the module refusing past the duty-cycle limit (window 10 s) - RPC stays responsive, events still arrive, rfd recovers':
+        'rfd load: an overload at 200 % of the air maximum with the module refusing past the duty-cycle limit (window 10 s) - RPC stays responsive, events still arrive (#173), rfd recovers':
             'Twice as many commands as the radio can carry, the module refusing beyond the legal limit: rfd stays responsive and recovers.',
         'rfd takes a reported duty cycle of 100 % without reading past its threshold map (the dutycycle-upper-bound finding)':
             'A module reporting 100 % airtime used must not make rfd read past one of its tables; today it does.',

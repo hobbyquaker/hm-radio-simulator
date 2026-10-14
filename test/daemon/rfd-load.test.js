@@ -152,7 +152,7 @@ async function burst(clients, calls, ratePerSecond) {
 }
 
 test(
-    'rfd load: a burst at 50 % of the air maximum to six switches and one channel, a putParamset in it, remote presses meanwhile - every call answered, every event delivered, the last value wins',
+    'rfd load: a burst at 50 % of the air maximum to six switches and one channel, a putParamset in it, remote presses meanwhile - every call answered, every event delivered (#173), the last value wins',
     {...skipWithoutDaemons, timeout: 600000},
     async (t) => {
         const {rfd, air, receiver, switches, remote, airMax} = await setup(t);
@@ -335,7 +335,7 @@ test(
 );
 
 test(
-    'rfd load: an overload at 200 % of the air maximum with the module refusing past the duty-cycle limit (window 10 s) - RPC stays responsive, events still arrive, rfd recovers',
+    'rfd load: an overload at 200 % of the air maximum with the module refusing past the duty-cycle limit (window 10 s) - RPC stays responsive, events still arrive (#173), rfd recovers',
     {...skipWithoutDaemons, timeout: 600000},
     async (t) => {
         const windowMs = 10000;

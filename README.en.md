@@ -91,7 +91,10 @@ transport of both daemons: the connection state, the receive thread's stop, the 
 remains after their fixes), `lgw-wrapper-races` (the `volatile` members of rfd's and hs485d's `LGWPortWrapper`: the
 timestamp, the keepalive flags, the reconnect) and `copro-request-races` (rfd's coprocessor request slot: the status
 read outside the lock, the response copied under a race, a double lock in `handleIncomingResponse` - the area of
-#179).
+#179). Without the `tcflush` (#173) every telegram reaches rfd on a pty, which showed `devices-lock-wait`: rfd holds its
+device lock while a coprocessor command waits for its answer, and the receive thread waits for the same lock for every
+telegram to the central - the answer stays unread and each command runs into its 1 s timeout (a paired device's
+sysinfo causes two such commands).
 
 ## Running it
 
@@ -134,7 +137,7 @@ Environment inside the image: `HMRS_VARIANT` (`release`, `asan`), `HMRS_KNOWN_BR
 (the frame fuzzer's seed, logged by every run), `HMRS_FUZZ_FRAMES` (default 400). Results: `results/<variant>/junit.xml`,
 the daemons' logs and sanitizer reports under `results/<variant>/work/`, fuzz artifacts under `results/fuzz/artifacts/`.
 
-CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite tag (`v*`, today `v1.0.0-beta.2`) and the head of the branch `lite`. [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #170 and #171), and every openccu-lite build tags the commit it built with its version. So the report shows what the last openccu-lite build and the branch fix that upstream does not yet. The refs are chosen anew on every run
+CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite tag (`v*`, today `v1.0.0-beta.2`) and the head of the branch `lite`. [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #170, #171 and #173), and every openccu-lite build tags the commit it built with its version. So the report shows what the last openccu-lite build and the branch fix that upstream does not yet. The refs are chosen anew on every run
 (`scripts/resolve-refs.mjs`: upstream tags of the form `X.Y.Z`, fork tags of the form `vX.Y.Z[-…]`, each ordered by version; the fork's copies of upstream's tags do not count); a new tag replaces the previous one, the branches count at their head. Each ref
 gets the daemon suite in the release, ASan and coverage variants and 60 s of each fuzz harness (findings fail the job,
 except on a ref without #140's fixes, where they are expected and only reported). The docker layers are cached per ref.
@@ -168,7 +171,7 @@ job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://
   result, and `proof.json` the whole proof. The proof costs two image builds per fix, so CI runs it weekly, on request
   (`workflow_dispatch` with `prove`) and on a push that changes the fix list or a regression test; in between the
   report keeps the last one. Locally: `node scripts/prove.mjs local [--fixes 9,16]`;
-- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`, `ack-rssi-sign`), linking to the issue or,
+- **known bug** - a finding of this suite without an upstream fix (`double-join`, `read-eof`, `aes-republish`, `wired-maintenance`, `metadata-args`, `string-uint-conversion`, `replace-callback`, `init-blocks`, `async-callback-threads`, `dutycycle-upper-bound`, `flush-drops-events`, `unknown-interface`, `json-substr`, `hexfile-no-data`, `propertymap-long-line`, `xmlrpc-select-fd`, `system-command-slot`, `ack-rssi-sign`, `devices-lock-wait`), linking to the issue or,
   until there is one, to the findings above;
 - **behaviour** - a measured daemon behaviour; **fuzz** - the suite's seeded fuzzing tests.
 

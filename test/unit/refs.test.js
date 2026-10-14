@@ -167,7 +167,7 @@ test('a finding with a fork fix is fixed where the fork commit or, later, the up
     );
 });
 
-test("the fork fixes of the suite's own findings: #162, #164, #165, #170 and #171", () => {
+test("the fork fixes of the suite's own findings: #162, #164, #165, #170, #171 and #173", () => {
     assert.deepEqual(
         forkFixes(FINDINGS).map((f) => [f.issue, f.finding]),
         [
@@ -176,6 +176,7 @@ test("the fork fixes of the suite's own findings: #162, #164, #165, #170 and #17
             [165, 'aes-republish'],
             [170, 'init-blocks'],
             [171, 'async-callback-threads'],
+            [173, 'flush-drops-events'],
         ],
     );
     for (const f of forkFixes(FINDINGS)) {

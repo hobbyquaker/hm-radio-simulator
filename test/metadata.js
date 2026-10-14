@@ -138,6 +138,11 @@ export const FINDINGS = Object.freeze({
             /ulc::LanConnection::(disconnect|connect|waitForData|receive|send)\(/,
         ],
     },
+    'devices-lock-wait': {
+        title: "rfd: BidcosInterfaceConcentrator holds its device lock while a coprocessor command waits for the module's answer; the receive thread blocks on that lock for every frame to the central, so the answer times out (1 s per command; a sysinfo from a paired device re-adds it)",
+        draft: '027-devices-lock-wait.md',
+        issue: null,
+    },
     'copro-request-races': {
         title: 'rfd: the coprocessor request slot (CCU2CommController RequestInfo, the command copied into it) is written by the serial receive thread and read by the waiting caller outside the lock, and handleIncomingResponse locks a mutex twice (ThreadSanitizer; the area of the system-command-slot finding, #179)',
         draft: '026-copro-request-races.md',
@@ -210,7 +215,9 @@ export const FINDINGS = Object.freeze({
     'flush-drops-events': {
         title: 'rfd discards unread events from the radio module before every command it sends (tcflush TCIFLUSH in SendData)',
         draft: '013-flush-drops-events.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/173',
+        fork: {commit: 'dc67832cfaff6eaa0f5304bd001c49419125c2a8', branch: 'fix/173-no-tcflush-on-send'},
+        proofRepeat: 5,
     },
     'unknown-interface': {
         title: 'rfd: setBidcosInterface accepts an interface that does not exist, reports success and stores it',
