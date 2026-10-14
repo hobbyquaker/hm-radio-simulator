@@ -56,7 +56,7 @@ derived per ref, not kept by hand: `scripts/resolve-refs.mjs` checks whether eac
 the findings of this suite that have no upstream issue yet. `double-join`: under AddressSanitizer
 rfd aborts when a receiver is deregistered (`init(url, '')`), because the receiver's dispatcher thread is joined a second
 time from the destructor after an explicit stop (libelvutils `Actor::Stop()`); the release build does not notice.
-The second finding without an issue yet is `read-eof`: a pty slave whose master went away
+The second, `read-eof` (#162, fixed on the fork): a pty slave whose master went away
 answers `read()` with 0 (end of file), which #115/#116 do not treat as an error (they handle -1: `ENODEV` from a stale
 `/dev/mmd_bidcos`, `EIO` from an unplugged adapter), so rfd on `main` still spins at 100 % CPU and keeps
 `CONNECTED = true` after the hangup. The third, `aes-republish`: when the coprocessor is re-initialised behind a

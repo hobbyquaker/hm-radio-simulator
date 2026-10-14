@@ -161,7 +161,8 @@ export const FINDINGS = Object.freeze({
     'read-eof': {
         title: 'rfd on main spins at 100 % and keeps CONNECTED after a pty hangup: read() == 0 is not treated as an error (#115/#116)',
         draft: '002-read-eof.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/162',
+        fork: {commit: '03b0570abfb020688f26a13d253464ff13f63c41', branch: 'fix/162-read-eof'},
     },
     'aes-republish': {
         title: 'rfd does not restore the per-channel AES policy (AUTHENTICATION_ON) when it republishes devices after a coprocessor re-init',
