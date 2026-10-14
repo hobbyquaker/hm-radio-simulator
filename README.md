@@ -504,7 +504,7 @@ dem zuletzt veröffentlichten Verlauf aufsetzt und keiner den Eintrag des andere
 - ✅ **Testergebnisse filtern:** nach Ergebnis, Daemon, Art, Stand und Text, als Link teilbar
 - ✅ **Firmware-Update-Abläufe** mit simuliertem Gerät (rfd) und der Hexfile-Pfad (hs485d)
 - ✅ **Weitere Fuzz-Ziele:** Frames eines angelernten Geräts, Frame-, LGW-, XML- und Gerätedatei-Parser
-- 🕵️ **Eine ThreadSanitizer-Variante** des Images
+- ✅ **Eine ThreadSanitizer-Variante** des Images
 - ✅ **RSSI im ACK:** das Modul schickt den RSSI-Wert im Sendestatus vorzeichenbehaftet, rfd liest ihn ohne Vorzeichen (`RSSI=-236dB`); Simulator angleichen, Test, Entwurf für OpenCCU-Base
 - ✅ **Fehler: ein hängender Test bricht nicht ab:** `hs485d-lgw.test.js` lief 20 Stunden; jeder Daemon-Test bekommt ein Timeout
 - ✅ **Eine vierte Spalte für openccu-lite:** der OpenCCU-Base-Zweig `lite-3.89.11` des Forks [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) (3.89.11 mit übernommenen Fixes) neben 3.89.9, 3.89.11 und `main`; übernommene Fixes werden an `cherry picked from` erkannt
