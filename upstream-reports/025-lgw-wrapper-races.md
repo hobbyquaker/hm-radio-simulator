@@ -1,5 +1,5 @@
 ---
-status: draft
+status: reported (the hs485d part only, rewritten): https://github.com/OpenCCU/OpenCCU-Base/issues/195
 component: rfd, hs485d
 refs: [main (030dba7)]
 suite: lgw-wrapper-races
