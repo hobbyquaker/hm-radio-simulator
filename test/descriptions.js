@@ -351,12 +351,12 @@ export const DESCRIPTIONS = Object.freeze({
             'A busy answer from the module is retried and the start completes.',
         'rfd survives the hangup': 'rfd keeps running after its serial line hangs up.',
         'no busy loop after the hangup':
-            'rfd should not use a full CPU core after the hangup; today it does (read-eof).',
+            'rfd should not use a full CPU core after the hangup (read-eof, OpenCCU-Base #162, fixed on the fork).',
         'listBidcosInterfaces reports the interface as not connected':
-            'After the hangup rfd should report the interface as disconnected; today it does not (read-eof).',
+            'After the hangup rfd should report the interface as disconnected (read-eof, OpenCCU-Base #162, fixed on the fork).',
         'module lost: the pty hangs up - rfd stays alive without spinning (#115) and reports CONNECTED false (#116)':
             'The serial line to the radio module hangs up: rfd should stay alive, idle, and report the interface as disconnected.',
-        'module lost: the pty hangs up (read() == 0) - rfd stays alive, without spinning, and reports CONNECTED false (the read-eof finding)':
+        '#162 read-eof: the pty hangs up (read() == 0) - rfd stays alive, without spinning, and reports CONNECTED false':
             'The serial line to the radio module hangs up: rfd should stay alive, idle, and report the interface as disconnected.',
         'module back: a fresh rfd on a reappeared module reaches CONNECTED again':
             'A radio module that comes back is picked up again by a fresh rfd.',
