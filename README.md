@@ -529,6 +529,8 @@ dem zuletzt veröffentlichten Verlauf aufsetzt und keiner den Eintrag des andere
 - 🤷 **Aufteilen in drei Repositories:** der Simulator als eigene Bibliothek, die Testsuite für OpenCCU-Base mit drei Spalten (die zwei neuesten Tags und `main`) und die Variante von openccu-lite mit den vier Spalten wie bisher; erst der Plan
 - ✅ **Ein Wakeup-/Burst-Gerät:** WOKEN_UP, die Wakeup-Warteschlange, Burst, verzögertes Löschen
 - ✅ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
+- 🤷 **Idee: ein simuliertes HmIP-Funkmodul,** damit hmipserver startet: Version über XML-RPC und ein Starttest mit
+  neuer JVM; offen, ob das ohne entschlüsselte Funkkommunikation geht (nur der Start-Dialog mit dem Modul)
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 

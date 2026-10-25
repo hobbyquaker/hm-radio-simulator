@@ -433,6 +433,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | split into three repositories: the simulator as a library of its own, the OpenCCU-Base test suite with three columns (the two newest tags and `main`), and openccu-lite's variant with the four columns as today; the plan first                                                                                             | to be refined |
 | -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                                                                                                                                                                    | done          |
 | -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                                                                                                                                                                    | done          |
+| -     | idea: a simulated HmIP radio module so hmipserver can start (its version over XML-RPC, a start-up test with a new JVM); open whether this works without decrypted radio traffic (only the start-up dialogue with the module)                                                                                                 | to be refined |
 
 ## Credits and licences
 
