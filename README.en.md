@@ -434,6 +434,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | a wakeup/burst device: WOKEN_UP, the wakeup queue, burst, deferred delete                                                                                                                                                                                                                                                    | done          |
 | -     | two interfaces: roaming, RSSI, `setBidcosInterface`, the duty-cycle bands                                                                                                                                                                                                                                                    | done          |
 | -     | idea: a simulated HmIP radio module so hmipserver can start (its version over XML-RPC, a start-up test with a new JVM); open whether this works without decrypted radio traffic (only the start-up dialogue with the module)                                                                                                 | to be refined |
+| -     | value limits from the rftypes: SET_TEMPERATURE of the HM-CC-RT-DN-BoM from 4.5 to 30.5 (#221)                                                                                                                                                                                                                                | in progress   |
 
 ## Credits and licences
 

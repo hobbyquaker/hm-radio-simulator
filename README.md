@@ -531,6 +531,7 @@ dem zuletzt veröffentlichten Verlauf aufsetzt und keiner den Eintrag des andere
 - ✅ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
 - 🤷 **Idee: ein simuliertes HmIP-Funkmodul,** damit hmipserver startet: Version über XML-RPC und ein Starttest mit
   neuer JVM; offen, ob das ohne entschlüsselte Funkkommunikation geht (nur der Start-Dialog mit dem Modul)
+- 🏗️ **Wertgrenzen aus den `rftypes`:** `SET_TEMPERATURE` des HM-CC-RT-DN-BoM von 4,5 bis 30,5 (#221)
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 
