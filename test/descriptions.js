@@ -455,6 +455,14 @@ export const DESCRIPTIONS = Object.freeze({
         'the same events on an XML-RPC receiver (http://): newDevices and STATE after a set':
             'An XML-RPC event receiver gets the same announcements and events.',
     },
+    'test/daemon/rfd-thermostat-limits.test.js': {
+        'HM-CC-RT-DN-BoM: SET_TEMPERATURE and the TEMPERATUR_RC link parameters range from 4.5 to 30.5 (#221)':
+            'A radiator thermostat (HM-CC-RT-DN-BoM) is paired and rfd is asked for the limits of its target temperature. Before fix #221 they were 5.0 to 30.0 °C, so an integration that checks values against them refused the 4.5 (off) and 30.5 (on) the thermostat itself uses; now they are 4.5 to 30.5 °C, as for the HM-CC-RT-DN.',
+        'SET_TEMPERATURE of channel 4 from 4.5 to 30.5':
+            "The thermostat channel's target temperature is described with a minimum of 4.5 and a maximum of 30.5 °C.",
+        'SHORT_ and LONG_TEMPERATUR_RC of channel 6 from 4.5 to 30.5':
+            'The temperatures a remote control sets through a direct link, for a short and a long press, have the same limits of 4.5 to 30.5 °C.',
+    },
     'test/daemon/rfd-two-interfaces.test.js': {
         'two interfaces: both listed and connected, one default, setInterfaceClock reaches both modules':
             'rfd with a radio module and a LAN gateway side by side: both are online and both get the clock.',
