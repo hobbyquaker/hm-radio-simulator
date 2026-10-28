@@ -80,6 +80,10 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'libXmlRpc: fix stack overflow (SIGSEGV) on deeply nested values (limit the nesting depth to 64)',
         commit: 'd744b433ce08afe93bcbddeb429b88affc0c6f07',
     },
+    221: {
+        title: 'groups, rftypes: fix min/max limits for SET_TEMPERATURE in HM-CC-VG-1 and HM-CC-RT-DN-BoM',
+        commit: '87a32d295aa0e86c6432cce7ec83b79786528c46',
+    },
 });
 
 /**

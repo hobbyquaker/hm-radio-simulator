@@ -91,6 +91,11 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
 - **Link-Register aus den `rftypes`:** beim HM-OU-CFM-TW landet `LONG_ACT_TYPE` einer Direktverknüpfung in Register
   0xA4 und `SHORT_ACT_TYPE` bleibt in 0x24 ([#63](https://github.com/OpenCCU/OpenCCU-Base/pull/63); vorher
   überschrieb die lange Aktion die kurze).
+- **Wertgrenzen aus den `rftypes`:** ein angelerntes HM-CC-RT-DN-BoM (`rf_cc_rt_dn_bom.xml`) beschreibt
+  `SET_TEMPERATURE` in Kanal 4 und `SHORT_`/`LONG_TEMPERATUR_RC` in Kanal 6 mit 4,5 bis 30,5 °C wie das HM-CC-RT-DN
+  ([#221](https://github.com/OpenCCU/OpenCCU-Base/pull/221); vorher 5,0 bis 30,0). Die andere Hälfte von #221, die
+  Heizungsgruppe HM-CC-VG-1 in `groupdefinitions.xml` des HMServers, wird nicht getestet: der HMServer gehört nicht
+  zur Suite.
 - **Geräte, die schlafen:** ein Wakeup-Gerät (HM-PB-2-WM55, `CONFIG,WAKEUP`), ein Gerät mit Lazy Config (HM-RC-4-2),
   ein Bewegungsmelder (HM-Sec-MDIR) und ein Burst-Gerät (HM-LC-Sw1-Ba-PCB, `BURST`). Ein Paramset für ein schlafendes
   Wakeup-Gerät versucht rfd einmal sofort, dann bleibt es offen (`CONFIG_PENDING`), und rfd bittet das Modul, das
@@ -531,7 +536,7 @@ dem zuletzt veröffentlichten Verlauf aufsetzt und keiner den Eintrag des andere
 - ✅ **Zwei Interfaces:** Roaming, RSSI, `setBidcosInterface`, die Duty-Cycle-Stufen
 - 🤷 **Idee: ein simuliertes HmIP-Funkmodul,** damit hmipserver startet: Version über XML-RPC und ein Starttest mit
   neuer JVM; offen, ob das ohne entschlüsselte Funkkommunikation geht (nur der Start-Dialog mit dem Modul)
-- 🏗️ **Wertgrenzen aus den `rftypes`:** `SET_TEMPERATURE` des HM-CC-RT-DN-BoM von 4,5 bis 30,5 (#221)
+- ✅ **Wertgrenzen aus den `rftypes`:** `SET_TEMPERATURE` des HM-CC-RT-DN-BoM von 4,5 bis 30,5 (#221)
 
 ✅ erledigt · 🕵️ gebaut, in Prüfung · 🏗️ in Arbeit · 📥 eingereiht · ☑️ bereit zur Umsetzung · 🤷 noch zu klären · 💤 später
 
