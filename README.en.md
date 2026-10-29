@@ -438,6 +438,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | value limits from the rftypes: SET_TEMPERATURE of the HM-CC-RT-DN-BoM from 4.5 to 30.5 (#221)                                                                                                                                                                                                                                | done          |
 | -     | bug: rfd without the `exit` method: since OpenCCU-Base #258 the RPC method `exit` exists only with `DEBUG_SHUTDOWN`; the restart tests, coverage and the method sweep need another clean stop                                                                                                                                | ready         |
 | -     | report: the fork's columns become its newest release tag (no `-dev`, `-beta`, `-rc`; today `v1.0.0`) and its newest pre-release tag (today `v1.1.0-dev.5`) instead of the newest tag and the branch `lite`                                                                                                                   | ready         |
+| -     | more coverage: a few new tests with the best ratio of newly covered lines to effort                                                                                                                                                                                                                                          | queued        |
 
 ## Credits and licences
 
