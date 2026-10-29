@@ -5,9 +5,11 @@
  * socket, a taken port, two interfaces, the legacy coprocessor initialisation, sniffing mode; for hs485d the restart
  * of every wired type and the extra description directory /etc/config/hs485types.
  *
- * rfd is stopped through its `exit` RPC method (always compiled in, rfd.cpp): the main loop ends and exit(0) runs, the
- * clean shutdown a coverage build needs. hs485d has no `exit`; it writes a device's file when the device changes, so a
- * SIGTERM loses nothing here. The SIGTERM tests (OpenCCU-Base #164): before the fix neither daemon handled the signal
+ * rfd is stopped cleanly with Daemon.stopClean(): its `exit` RPC method where rfd lists it, SIGTERM where it does not
+ * (OpenCCU-Base #258 compiles `exit` only with DEBUG_SHUTDOWN). Either way the main loop ends and exit(0) runs - except
+ * on a ref with neither `exit` nor #164's handler, where the signal kills rfd; rfd writes its device, handler and key
+ * files when they change, so the restarts lose nothing by that. hs485d has no `exit`; it writes a device's file when
+ * the device changes, so a SIGTERM loses nothing here either. The SIGTERM tests (OpenCCU-Base #164): before the fix neither daemon handled the signal
  * and died by its default action; with it the handler ends the main loop and the same shutdown path runs.
  *
  * Timing assumptions: rfd ends within 15 s of `exit` or SIGTERM (its main loop returns after the current dispatch,
@@ -69,7 +71,7 @@ async function addSwitch(rfd, serial, address) {
 }
 
 test(
-    'rfd restart: one device of every rftypes type, stopped through exit, comes back from its file with the same address, type, version and channels',
+    'rfd restart: one device of every rftypes type, stopped cleanly (exit, or SIGTERM where rfd has no exit), comes back from its file with the same address, type, version and channels',
     options({timeout: 900000}),
     async (t) => {
         const first = await startQuietRfd();
@@ -92,10 +94,18 @@ test(
             }
             before = await snapshot(first);
             const at = Date.now();
-            const exit = await first.exitViaRpc();
-            t.diagnostic(`exit after ${added} devices: ${JSON.stringify(exit)} in ${Date.now() - at} ms`);
-            assert.ok(exit, `rfd did not end within 15 s of exit\n${first.tail(20)}`);
-            assert.equal(exit.code, 0, 'exit(0)');
+            const exit = await first.stopClean();
+            t.diagnostic(`stop after ${added} devices: ${JSON.stringify(exit)} in ${Date.now() - at} ms`);
+            assert.ok(exit, `rfd did not end within 15 s of exit or SIGTERM\n${first.tail(20)}`);
+            if (exit.how === 'SIGTERM' && isKnownBroken('no-sigterm')) {
+                // #258 without #164 (upstream main): no exit method and no handler - the signal kills rfd; the device
+                // files were written when the devices were added, so the restart below still tests them
+                t.diagnostic('no exit method and no SIGTERM handler on this ref: rfd died by the signal (no-sigterm)');
+                assert.equal(exit.signal, 'SIGTERM', 'killed by the signal, not crashed');
+            } else {
+                assert.equal(exit.signal, null, 'not killed');
+                assert.equal(exit.code, 0, 'exit(0)');
+            }
             assert.deepEqual(first.sanitizerReports(), []);
         });
         const files = fs.readdirSync(path.join(dir, 'devices')).filter((f) => f.endsWith('.dev'));
@@ -130,7 +140,7 @@ test(
             await addSwitch(first, 'SWPBAK0001', 0x4f2002);
             await addSwitch(first, 'SWPCHN0001', 0x4f2003);
             await addSwitch(first, 'SWPGOOD001', 0x4f2004);
-            assert.ok(await first.exitViaRpc(), 'rfd ended');
+            assert.ok(await first.stopClean(), 'rfd ended');
         });
         const read = (name) => fs.readFileSync(path.join(devices, `${name}.dev`), 'latin1');
         const truncated = read('SWPBAD0001');
@@ -194,7 +204,7 @@ test(
                 await first.call('init', [receiver.url, 'persist']);
                 await receiver.waitFor('newDevices', 15000);
                 assert.ok(fs.readFileSync(path.join(dir, 'rfd.handlers'), 'utf8').includes(receiver.url));
-                assert.ok(await first.exitViaRpc(), 'rfd ended');
+                assert.ok(await first.stopClean(), 'rfd ended');
             });
             const from = receiver.received.length;
             const second = await startRfd({dir});
@@ -244,7 +254,7 @@ test(
             );
             assert.match(keys(), /Current Index\s*=\s*2/, 'the index moved on');
             assert.match(keys(), /Key 2\s*=\s*[0-9A-Fa-f]{32}/, 'the new key is stored');
-            assert.ok(await first.exitViaRpc(), 'rfd ended');
+            assert.ok(await first.stopClean(), 'rfd ended');
         });
         const second = await startQuietRfd({dir});
         await withDaemon(second, async () => {

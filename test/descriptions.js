@@ -81,6 +81,7 @@ export const DESCRIPTIONS = Object.freeze({
             'hs485d must be able to call every method it lists, and nothing it does not list (binary protocol).',
         'hs485d over xmlrpc: every listed method is callable, no unlisted name is (system.methodHelp and direct calls)':
             'hs485d must be able to call every method it lists, and nothing it does not list (XML-RPC).',
+        '#258 (#163): rfd has no exit method - not listed, system.methodHelp does not know it, a call over BIN-RPC and XML-RPC is refused as unknown, rfd stays up': `${rfd} used to offer a method "exit" that let any client stop it without authentication. Since the fix it must not exist: not listed, unknown when asked, and a call is refused while rfd keeps running.`,
     },
     'test/daemon/older-fixes.test.js': {
         'hs485d: a wired device without a serial is named ELV and its address in hex, before and after a restart':
@@ -172,7 +173,7 @@ export const DESCRIPTIONS = Object.freeze({
             'Odd but legal client behaviour must not upset hs485d.',
     },
     'test/daemon/restart-config.test.js': {
-        'rfd restart: one device of every rftypes type, stopped through exit, comes back from its file with the same address, type, version and channels':
+        'rfd restart: one device of every rftypes type, stopped cleanly (exit, or SIGTERM where rfd has no exit), comes back from its file with the same address, type, version and channels':
             'One device of every radio type is created, rfd is stopped and started again, and every device must come back unchanged from its file.',
         'rfd restart: a truncated file, a garbage file, an empty file, a directory named X.dev, leftover .bak/.new copies and a file missing a channel - rfd starts and keeps the good devices':
             'Damaged and stray files in the device directory must not stop rfd from starting with the good devices.',

@@ -166,8 +166,8 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   hängender Empfänger bremst nur sich selbst (die anderen bekommen ihre Events nach rund 20 ms, RPC antwortet sofort).
   Servicemeldungen werden einem später angemeldeten Empfänger nachgeschickt; ein `replaceDevice` erreicht alle
   angemeldeten Empfänger.
-- **Neustart, Gerätedateien und Konfiguration:** je ein Gerät jedes `rftypes`-Typs, rfd über seine RPC-Methode
-  `exit` sauber beendet (exit(0) in Millisekunden) und neu gestartet - alle Adressen, Typen, Versionen und Kanäle sind
+- **Neustart, Gerätedateien und Konfiguration:** je ein Gerät jedes `rftypes`-Typs, rfd sauber beendet (über
+  seine RPC-Methode `exit`, wo es sie hat, sonst mit SIGTERM; exit(0) in Millisekunden) und neu gestartet - alle Adressen, Typen, Versionen und Kanäle sind
   wieder da (dazu die Team-Geräte der Rauchmelder, die erst das Laden aus der Datei anlegt); dasselbe für jeden
   `hs485types`-Typ. Eine halbierte Gerätedatei wird verworfen, Müll und leere Dateien übergangen, übrig gebliebene
   `.bak`/`.new`-Kopien ignoriert, ein fehlender Kanal neu angelegt. `BidCoS-Address = 0` (der erste Start eines neuen

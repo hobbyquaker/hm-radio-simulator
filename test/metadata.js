@@ -84,6 +84,10 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'groups, rftypes: fix min/max limits for SET_TEMPERATURE in HM-CC-VG-1 and HM-CC-RT-DN-BoM',
         commit: '87a32d295aa0e86c6432cce7ec83b79786528c46',
     },
+    258: {
+        title: 'rfd: compile the exit RPC method only with DEBUG_SHUTDOWN (the exit-rpc finding, #163)',
+        commit: '4f606c6edc53d4b9be85c359a5d8abdcf49e18fe',
+    },
 });
 
 /**
@@ -380,7 +384,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'practically never by accident: no known client sends exit; whoever reaches the RPC port can do worse anyway',
         draft: '003-exit-rpc-method.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/163',
+        fixedBy: '4f606c6edc53d4b9be85c359a5d8abdcf49e18fe',
     },
     'no-sigterm': {
         title: 'rfd and hs485d do not handle SIGTERM: a pending save is lost on stop',

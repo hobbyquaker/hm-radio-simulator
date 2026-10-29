@@ -141,7 +141,7 @@ test('CBC-MAC: the counter survives a restart (aes_cbc_cnt in the device file)',
         assert.ok(await arrives(receiver, true, from), 'the signed event before the restart');
         dir = rfd.workdir;
         central = device.central;
-        await rfd.exitViaRpc();
+        await rfd.stopClean();
     }).finally(() => receiver.stop());
 
     const file = fs.readdirSync(path.join(dir, 'devices')).find((f) => f.includes(SWITCH_SERIAL));

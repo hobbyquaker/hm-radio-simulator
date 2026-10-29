@@ -6,7 +6,14 @@
  * `system.*` methods are not part of it. The method sweep compares `system.listMethods` against this table, so a
  * method added or removed upstream shows up as a failing test with the name in it.
  *
- * Usage: method-table.mjs [--all] <source file>... > table.json   (--all: every name defined, registered or not)
+ * The table honours the preprocessor conditionals around a class (`#ifdef`, `#ifndef`, `#if 0`/`#if 1`, `#else`,
+ * `#endif`) for the defines of the build: OpenCCU-Base #258 put rfd's `exit` under `#ifdef DEBUG_SHUTDOWN`, which the
+ * build does not define, so `exit` is in the table only where it is compiled in. Undefined: everything not passed with
+ * `-D` (so `WIN32` too); any other `#if` expression counts as true.
+ *
+ * Usage: method-table.mjs [--all] [-D NAME]... <source file>... > table.json
+ *   --all  every name defined, registered or not, whatever the conditionals say (the listMethods test's candidates)
+ *   -D     a macro the build defines
  */
 
 import fs from 'node:fs';
@@ -16,6 +23,51 @@ import {fileURLToPath} from 'node:url';
 /** Drops `//` line comments and block comments, keeping string literals intact enough for the patterns below. */
 export function stripComments(text) {
     return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"])\/\/.*$/gm, '$1');
+}
+
+/**
+ * The source with the lines of the inactive preprocessor branches blanked (the line count stays), for `defines`.
+ * @param {string} text
+ * @param {Iterable<string>} [defines]
+ */
+export function preprocess(text, defines = []) {
+    const defined = new Set(defines);
+    /** @type {{active: boolean, taken: boolean}[]} */
+    const stack = [];
+    const active = () => stack.every((f) => f.active);
+    return text
+        .split('\n')
+        .map((line) => {
+            // the sources have CRLF line ends in places, and `.` does not match \r
+            const d = /^\s*#\s*(ifdef|ifndef|if|else|elif|endif)\b\s*(.*)$/.exec(line.replace(/\r$/, ''));
+            if (!d) {
+                return active() ? line : '';
+            }
+            const [, kind, rest] = d;
+            const arg = rest.replace(/\/\/.*$|\/\*.*$/, '').trim();
+            if (kind === 'ifdef' || kind === 'ifndef' || kind === 'if') {
+                let on = true;
+                if (kind === 'ifdef') {
+                    on = defined.has(arg);
+                } else if (kind === 'ifndef') {
+                    on = !defined.has(arg);
+                } else if (/^0+$/.test(arg)) {
+                    on = false;
+                }
+                stack.push({active: on, taken: on});
+            } else if (kind === 'else' || kind === 'elif') {
+                const top = stack[stack.length - 1];
+                if (top) {
+                    // an #elif expression is not evaluated: it counts as true when no branch was taken yet
+                    top.active = !top.taken;
+                    top.taken = true;
+                }
+            } else {
+                stack.pop();
+            }
+            return '';
+        })
+        .join('\n');
 }
 
 /**
@@ -36,13 +88,14 @@ export function allMethodNames(sources) {
 
 /**
  * @param {string[]} sources the contents of the daemon's source files (XmlRpcMethods.cpp and the main file)
+ * @param {Iterable<string>} [defines] the macros the build defines (preprocess)
  * @returns {string[]} the method names, sorted
  */
-export function methodTable(sources) {
+export function methodTable(sources, defines = []) {
     const nameOf = new Map();
     const instantiated = new Set();
     for (const raw of sources) {
-        const text = stripComments(raw);
+        const text = preprocess(stripComments(raw), defines);
         // class XmlRpcMethodFoo : public XmlRpcServerMethod { ... XmlRpcServerMethod("foo", s) ...
         const classRe = /class\s+(\w+)\s*:\s*public\s+XmlRpcServerMethod\b/g;
         let m;
@@ -74,14 +127,22 @@ export function methodTable(sources) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    const all = process.argv[2] === '--all';
-    const files = process.argv.slice(all ? 3 : 2);
-    if (files.length === 0) {
-        console.error('usage: method-table.mjs <source file>...');
+    const args = process.argv.slice(2);
+    const all = args[0] === '--all';
+    if (all) {
+        args.shift();
+    }
+    const defines = [];
+    while (args[0] === '-D' || /^-D\w/.test(args[0] || '')) {
+        defines.push(args[0] === '-D' ? args.splice(0, 2)[1] : args.shift().slice(2));
+    }
+    const files = args;
+    if (files.length === 0 || defines.some((d) => !d)) {
+        console.error('usage: method-table.mjs [--all] [-D NAME]... <source file>...');
         process.exit(2);
     }
     const sources = files.map((f) => fs.readFileSync(f, 'latin1'));
-    const table = all ? allMethodNames(sources) : methodTable(sources);
+    const table = all ? allMethodNames(sources) : methodTable(sources, defines);
     if (table.length === 0) {
         console.error(`method-table: no methods found in ${files.join(' ')}`);
         process.exit(1);

@@ -288,13 +288,27 @@ export class Daemon {
     }
 
     /**
-     * Stops rfd the clean way, through its `exit` RPC method (rfd.cpp: the main loop ends, exit(0) runs the atexit
-     * handlers - a coverage build writes its data), and waits for the process to end.
-     * @returns {Promise<{code: number|null, signal: string|null, at: number}|null>} null when it did not end in time
+     * Stops rfd the clean way and waits for the process to end: through its `exit` RPC method where rfd lists it
+     * (rfd.cpp: the main loop ends, exit(0) runs the atexit handlers), otherwise with SIGTERM. OpenCCU-Base #258 compiles
+     * `exit` only with DEBUG_SHUTDOWN (upstream 4f606c6e; the fork's v1.1.0-dev.5); there #164's handler ends the main
+     * loop on SIGTERM and the same shutdown path runs. On a ref with neither (upstream main until #164 is merged) SIGTERM
+     * kills rfd by its default action: the result says so (`signal: 'SIGTERM'`), and the callers that insist on exit 0
+     * accept it only where the no-sigterm finding is known broken (restart-config.test.js). rfd writes its device, handler
+     * and key files when they change (a 0 ms timer), not at the stop, so a restart test loses nothing by it; the coverage
+     * variant runs in continuous mode and keeps its counters either way (scripts/build-daemons.sh).
+     * @returns {Promise<{code: number|null, signal: string|null, at: number, how: 'exit'|'SIGTERM'}|null>} null when
+     *   it did not end in time
      */
-    async exitViaRpc(timeout = 15000) {
-        await this.call('exit', [], {timeout: 5000}).catch(() => {});
-        return Promise.race([this.exited, sleep(timeout).then(() => null)]);
+    async stopClean(timeout = 15000) {
+        const methods = await this.call('system.listMethods', [], {timeout: 5000}).catch(() => []);
+        const how = Array.isArray(methods) && methods.includes('exit') ? 'exit' : 'SIGTERM';
+        if (how === 'exit') {
+            await this.call('exit', [], {timeout: 5000}).catch(() => {});
+        } else {
+            this.proc.kill('SIGTERM');
+        }
+        const result = await Promise.race([this.exited, sleep(timeout).then(() => null)]);
+        return result && {...result, how};
     }
 
     /** Stops the daemon, closes the RPC client (its reconnect timer would keep the test process alive) and the pty. */

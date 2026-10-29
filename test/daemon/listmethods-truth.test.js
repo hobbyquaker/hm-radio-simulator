@@ -24,6 +24,7 @@ import assert from 'node:assert/strict';
 
 import {startRfd, startHs485d, withDaemon, skipWithoutDaemons} from '../helpers/daemon.js';
 import {readMethodTable, writeRecord, summarize} from '../helpers/sweep.js';
+import {regression} from '../helpers/known.js';
 
 /** Listed names that are called with no arguments: they only read. */
 const HARMLESS = new Set([
@@ -208,3 +209,32 @@ for (const flavour of FLAVOURS) {
         );
     }
 }
+
+test(
+    '#258 (#163): rfd has no exit method - not listed, system.methodHelp does not know it, a call over BIN-RPC and XML-RPC is refused as unknown, rfd stays up',
+    {...skipWithoutDaemons, timeout: 120000, ...regression(258)},
+    async (t) => {
+        // timing: rfd answers each call within the client's 10 s (ask()); `exit` would end the main loop after its own
+        // dispatch, so the listDevices after it is the check that rfd is still serving
+        const rfd = await startRfd();
+        await withDaemon(rfd, async () => {
+            const listed = await rfd.call('system.listMethods');
+            assert.ok(!listed.includes('exit'), 'exit is not in system.listMethods');
+            const answers = {};
+            for (const [proto, client] of [
+                ['binrpc', rfd.rpc],
+                ['xmlrpc', rfd.xmlrpc],
+            ]) {
+                const help = await ask(client, 'system.methodHelp', ['exit']);
+                // called only after methodHelp said unknown: on a ref that has the method it would stop rfd
+                assert.match(help, /Unknown method name/i, `${proto}: system.methodHelp does not know exit`);
+                const call = await ask(client, 'exit', []);
+                answers[proto] = call;
+                assert.match(call, UNKNOWN, `${proto}: exit is refused as unknown`);
+            }
+            assert.ok(Array.isArray(await rfd.call('listDevices')), 'rfd still answers');
+            assert.ok(rfd.alive, `rfd still runs: ${JSON.stringify(rfd.exit)}`);
+            t.diagnostic(`exit: ${JSON.stringify(answers)}`);
+        });
+    },
+);

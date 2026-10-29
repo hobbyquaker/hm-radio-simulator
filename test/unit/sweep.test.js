@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {methodTable, stripComments} from '../../scripts/method-table.mjs';
+import {methodTable, stripComments, preprocess} from '../../scripts/method-table.mjs';
 import {flatten, diffSweeps, buildDifferential} from '../../scripts/differential.mjs';
 import {collectResults, buildReport, renderSummaryMarkdown, renderHtml, writeSite} from '../../scripts/report.mjs';
 import {summarize, argsLabel} from '../helpers/sweep.js';
@@ -47,6 +47,42 @@ test('method-table: the instantiated methods of InitXmlRpcMethods and the global
     assert.deepEqual(methodTable([SOURCE, MAIN]), ['exit', 'init', 'listDevices']);
     assert.equal(stripComments('a // b\nc /* d */ e'), 'a \nc  e');
     assert.equal(stripComments('"xmlrpc_bin://host"'), '"xmlrpc_bin://host"');
+});
+
+test('method-table: the preprocessor conditionals - exit under #ifdef DEBUG_SHUTDOWN only where the build defines it (OpenCCU-Base #258)', () => {
+    const guarded = `#ifdef DEBUG_SHUTDOWN\r\n${MAIN}#endif\r\n`;
+    assert.deepEqual(methodTable([SOURCE, guarded]), ['init', 'listDevices'], 'not defined: not compiled in');
+    assert.deepEqual(methodTable([SOURCE, guarded], ['DEBUG_SHUTDOWN']), ['exit', 'init', 'listDevices']);
+    assert.deepEqual(methodTable([SOURCE, `//#ifdef DEBUG_SHUTDOWN\n${MAIN}//#endif\n`]), [
+        'exit',
+        'init',
+        'listDevices',
+    ]);
+    const text = [
+        'a',
+        '#ifdef WIN32',
+        'b',
+        '#else',
+        'c',
+        '#endif',
+        '#ifndef WIN32',
+        'd',
+        '#endif',
+        '#if 0',
+        'e',
+        '#elif X',
+        'f',
+        '#endif',
+        '#if SOMETHING',
+        'g',
+        '#ifdef X',
+        'h',
+        '#endif',
+        '#endif',
+    ].join('\n');
+    assert.deepEqual(preprocess(text).split('\n').filter(Boolean), ['a', 'c', 'd', 'f', 'g']);
+    assert.deepEqual(preprocess(text, ['WIN32', 'X']).split('\n').filter(Boolean), ['a', 'b', 'f', 'g', 'h']);
+    assert.equal(preprocess(text).split('\n').length, text.split('\n').length, 'the line count stays');
 });
 
 test('sysinfoSatisfying: every condition of the type holds in the announcement (rfd and wired shapes)', () => {
