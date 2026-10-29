@@ -366,9 +366,11 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
 
 test('a fork column links its commits in the fork; a fork or tag trigger is linked where the commit is', () => {
     assert.equal(
-        triggerHtml(`lite ${'e'.repeat(40)}`),
-        `hobbyquaker/OpenCCU-Base/lite head <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
+        triggerHtml(`lite@v1.0.0 ${'e'.repeat(40)}`),
+        `hobbyquaker/OpenCCU-Base/lite 1.0.0 <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
     );
+    // the branch lite was a column until task 45: an old trigger of it stays plain text
+    assert.equal(triggerHtml(`lite ${'e'.repeat(7)}`), `lite ${'e'.repeat(7)}`);
     assert.match(
         triggerHtml(`lite@v1.0.0-beta.3 ${'e'.repeat(40)}`),
         /^hobbyquaker\/OpenCCU-Base\/lite 1\.0\.0-beta\.3 <a class="mono" href="https:\/\/github\.com\/hobbyquaker\/OpenCCU-Base\/commit\/e{40}">/,

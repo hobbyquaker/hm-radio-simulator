@@ -12,29 +12,34 @@ export const RELEASE_TAG = /^\d+(\.\d+)+$/;
 export const UPSTREAM_REPO = 'https://github.com/OpenCCU/OpenCCU-Base.git';
 
 /**
- * openccu-lite's tags on the fork: the image version of each build round, `v1.0.0-beta.2` and the like (the fork also
- * carries upstream's own tags such as 3.89.11, which never count as the fork's).
+ * openccu-lite's tags on the fork: the image version of each build round, `v1.0.0`, `v1.1.0-dev.5` and the like (the
+ * fork also carries upstream's own tags such as 3.89.11, which never count as the fork's).
  */
 export const FORK_TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
+
+/** openccu-lite's release tags: a FORK_TAG without a pre-release suffix (no `-dev`, `-beta`, `-rc`), e.g. `v1.0.0`. */
+export const FORK_RELEASE_TAG = /^v\d+\.\d+\.\d+$/;
 
 /**
  * The refs of forks of OpenCCU-Base that every run tests beside upstream's newest release tag and main, each resolved
  * anew on every run:
  *   - `{kind: 'tag', prefix, repo, pattern, branch}`: the fork's newest tag matching `pattern` (by version), labelled
- *     `<prefix><tag>` internally, e.g. `lite@v1.0.0-beta.2`, and shown under the branch it is cut from (refDisplay);
- *   - `{kind: 'branch', label, repo, ref}`: the head of a branch, labelled `label`.
+ *     `<prefix><tag>` internally, e.g. `lite@v1.0.0`, and shown under the branch it is cut from (refDisplay). A tag an
+ *     earlier entry already resolved to is not tested twice (resolve-refs.mjs);
+ *   - `{kind: 'branch', label, repo, ref}`: the head of a branch, labelled `label` (`resolve-refs.mjs --fork`).
  * The differential compares each with the run's upstream release tag.
  *
  * openccu-lite builds its daemons from the fork hobbyquaker/OpenCCU-Base: the branch `lite` is OpenCCU-Base's release
  * plus upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request
  * candidates, test/metadata.js FINDINGS `fork`); every openccu-lite build round tags the commit it builds with its
- * version. So the report shows what the last openccu-lite build and the branch's head fix that upstream does not yet.
- * @type {ReadonlyArray<{kind: 'tag', prefix: string, repo: string, pattern: RegExp}|
+ * version. The report shows the newest openccu-lite release (`v1.0.0`: what users run) and the newest tag of all,
+ * pre-releases included (`v1.1.0-dev.5`: the build in test) - the latter only while it is newer than the release.
+ * @type {ReadonlyArray<{kind: 'tag', prefix: string, repo: string, pattern: RegExp, branch: string}|
  *   {kind: 'branch', label: string, repo: string, ref: string}>}
  */
 export const FORK_REFS = Object.freeze([
+    Object.freeze({kind: 'tag', prefix: 'lite@', repo: FORK_REPO, pattern: FORK_RELEASE_TAG, branch: 'lite'}),
     Object.freeze({kind: 'tag', prefix: 'lite@', repo: FORK_REPO, pattern: FORK_TAG, branch: 'lite'}),
-    Object.freeze({kind: 'branch', label: 'lite', repo: FORK_REPO, ref: 'lite'}),
 ]);
 
 /** The FORK_REFS entry a report label belongs to, or undefined for an upstream ref. */
@@ -113,7 +118,8 @@ export function parseRefSpec(spec, upstream = UPSTREAM_REPO) {
 /**
  * How the report shows a ref (the maintainer's two header rows): grouped by repository and branch -
  * `OpenCCU/OpenCCU-Base/main` above upstream's release tag and main's head, `hobbyquaker/OpenCCU-Base/lite` above the
- * fork's openccu-lite tag and lite's head - and named within the group by the tag (without the `v`) or `head`.
+ * fork's openccu-lite release and pre-release tags (a fork branch from --fork: its head) - and named within the group by
+ * the tag (without the `v`) or `head`.
  * @returns {{group: string, groupUrl: string, name: string}} group '' for a ref outside both repositories
  */
 export function refDisplay(label, forks = FORK_REFS) {

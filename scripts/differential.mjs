@@ -4,7 +4,7 @@
  *
  *   - between neighbouring upstream refs of one run (the release tag against main, older tags against newer ones when
  *     a run has several): what a consumer sees change from the release up to the upstream head; each fork ref
- *     (scripts/refs.mjs FORK_REFS: openccu-lite's tag and branch) against the run's newest upstream release tag;
+ *     (scripts/refs.mjs FORK_REFS: openccu-lite's release and pre-release tags) against the run's newest upstream release tag;
  *   - between main now and main as the previous published report tested it (the upstream watch, task 14), when the
  *     OpenCCU-Base commit changed in between.
  *

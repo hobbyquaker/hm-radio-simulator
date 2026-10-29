@@ -20,12 +20,16 @@ import {
     newestTag,
     compareVersions,
     FORK_TAG,
+    FORK_RELEASE_TAG,
     FORK_REFS,
     UPSTREAM_REPO,
 } from '../../scripts/refs.mjs';
 import {FINDINGS, FORK_REPO} from '../metadata.js';
 import {buildDifferential} from '../../scripts/differential.mjs';
-import {headsOf} from '../../scripts/resolve-refs.mjs';
+import {headsOf, resolveForks, tsanRefs} from '../../scripts/resolve-refs.mjs';
+
+/** FORK_REFS plus a fork branch, as `resolve-refs.mjs --fork <repo>@lite` adds one: the branch-head cases. */
+const WITH_BRANCH = Object.freeze([...FORK_REFS, {kind: 'branch', label: 'lite', repo: FORK_REPO, ref: 'lite'}]);
 
 test('the refs: upstream tags by version, main, the fork tags by version, the fork branch; the newest tag picked', () => {
     assert.deepEqual(['main', '3.89.11', 'feature-x', '3.89.9', '3.100.0'].sort(compareRefs), [
@@ -35,13 +39,18 @@ test('the refs: upstream tags by version, main, the fork tags by version, the fo
         'main',
         'feature-x',
     ]);
-    // upstream first (tag, main), then the fork (tag, branch): the report's 2 x 2
-    assert.deepEqual(['lite', 'main', 'lite@v1.0.0-beta.2', '3.89.11'].sort(compareRefs), [
+    // upstream first (tag, main), then the fork (its release tag, its pre-release tag): the report's 2 x 2
+    assert.deepEqual(['lite@v1.1.0-dev.5', 'main', 'lite@v1.0.0', '3.89.11'].sort(compareRefs), [
         '3.89.11',
         'main',
-        'lite@v1.0.0-beta.2',
-        'lite',
+        'lite@v1.0.0',
+        'lite@v1.1.0-dev.5',
     ]);
+    // a fork branch from --fork after the fork's tags
+    assert.deepEqual(
+        ['lite', 'main', 'lite@v1.0.0-beta.2', '3.89.11'].sort((a, b) => compareRefs(a, b, WITH_BRANCH)),
+        ['3.89.11', 'main', 'lite@v1.0.0-beta.2', 'lite'],
+    );
     assert.deepEqual(['lite@v1.0.0-beta.10', 'lite@v1.0.0', 'lite@v1.0.0-beta.2'].sort(compareRefs), [
         'lite@v1.0.0-beta.2',
         'lite@v1.0.0-beta.10',
@@ -63,6 +72,50 @@ test("the fork's newest openccu-lite tag: v* by version, upstream's tags in the 
     assert.equal(compareVersions('1.0.0-beta', 'v1.0.0-beta.1') < 0, true, 'fewer identifiers sort first');
 });
 
+test("the fork's two columns: the newest release tag (no -dev, -beta, -rc) and the newest tag including pre-releases", () => {
+    const tags = ['3.89.11', '3.89.12', 'v1.0.0-rc.3', 'v1.0.0', 'v1.1.0-dev.4', 'v1.1.0-dev.5', 'v0.9.0', 'lite'];
+    assert.equal(newestTag(tags, FORK_RELEASE_TAG), 'v1.0.0', "the release; upstream's 3.89.12 never counts");
+    assert.equal(newestTag(tags, FORK_TAG), 'v1.1.0-dev.5', 'the pre-release, newer than the release');
+    assert.equal(compareVersions('v1.0.0', 'v1.0.0-rc.3') > 0, true, 'v1.0.0 > v1.0.0-rc.3');
+    for (const pre of ['v1.0.0-dev.1', 'v1.0.0-beta.2', 'v1.0.0-rc.3', 'v1.1.0-alpha']) {
+        assert.ok(!FORK_RELEASE_TAG.test(pre) && FORK_TAG.test(pre), pre);
+    }
+    assert.ok(FORK_RELEASE_TAG.test('v1.0.0') && !FORK_RELEASE_TAG.test('3.89.11') && !FORK_RELEASE_TAG.test('v1.0'));
+    assert.deepEqual(
+        FORK_REFS.map((f) => [f.kind, f.prefix, f.repo, f.pattern, f.branch]),
+        [
+            ['tag', 'lite@', FORK_REPO, FORK_RELEASE_TAG, 'lite'],
+            ['tag', 'lite@', FORK_REPO, FORK_TAG, 'lite'],
+        ],
+        'the release entry first, then the pre-release entry',
+    );
+
+    // resolved: both while the pre-release is newer; the release alone when no pre-release is newer than it
+    const history = (list) => ({forkTags: () => list, resolve: (repo, ref) => `sha-${ref}`});
+    const refsOf = (list) => resolveForks(history(list)).map((r) => r.ref);
+    assert.deepEqual(refsOf(tags), ['lite@v1.0.0', 'lite@v1.1.0-dev.5']);
+    assert.deepEqual(refsOf(['v1.0.0-rc.3', 'v1.0.0', '3.89.11']), ['lite@v1.0.0'], 'rc.3 is older than the release');
+    assert.deepEqual(refsOf(['v1.0.0-rc.3', 'v1.0.0-rc.2']), ['lite@v1.0.0-rc.3'], 'no release yet: the pre-release');
+    assert.deepEqual(refsOf(['3.89.11']), [], "upstream's tags alone: no fork column");
+});
+
+test('the ThreadSanitizer refs: main and the newest fork tag (a fork branch from --fork too), not the older tags', () => {
+    const refs = [{ref: '3.89.11'}, {ref: 'main', head: true}, {ref: 'lite@v1.0.0'}, {ref: 'lite@v1.1.0-dev.5'}];
+    assert.deepEqual(
+        tsanRefs(refs).map((r) => r.ref),
+        ['main', 'lite@v1.1.0-dev.5'],
+    );
+    assert.deepEqual(
+        tsanRefs(refs.slice(0, 3)).map((r) => r.ref),
+        ['main', 'lite@v1.0.0'],
+        'the release when it is the newest',
+    );
+    assert.deepEqual(
+        tsanRefs([...refs, {ref: 'lite', head: true}], WITH_BRANCH).map((r) => r.ref),
+        ['main', 'lite@v1.1.0-dev.5', 'lite'],
+    );
+});
+
 test("the report's names: repository and branch above, the tag without its v or head below", () => {
     assert.deepEqual(refDisplay('3.89.11'), {
         group: 'OpenCCU/OpenCCU-Base/main',
@@ -75,19 +128,28 @@ test("the report's names: repository and branch above, the tag without its v or 
         groupUrl: 'https://github.com/hobbyquaker/OpenCCU-Base/tree/lite',
         name: '1.0.0-beta.2',
     });
-    assert.equal(refText('lite'), 'hobbyquaker/OpenCCU-Base/lite head');
+    assert.equal(refDisplay('lite@v1.0.0').name, '1.0.0');
+    assert.equal(refText('lite@v1.1.0-dev.5'), 'hobbyquaker/OpenCCU-Base/lite 1.1.0-dev.5');
+    assert.equal(refText('lite', WITH_BRANCH), 'hobbyquaker/OpenCCU-Base/lite head');
     assert.deepEqual(
         refDisplay('lite-3.89.11'),
         {group: '', groupUrl: '', name: 'lite-3.89.11'},
         'an old label as it is',
     );
     assert.equal(refPairText('3.89.11', 'main'), 'OpenCCU/OpenCCU-Base/main: 3.89.11 → head');
-    assert.equal(refPairText('lite@v1.0.0-beta.2', 'lite'), 'hobbyquaker/OpenCCU-Base/lite: 1.0.0-beta.2 → head');
+    assert.equal(refPairText('lite@v1.0.0', 'lite@v1.1.0-dev.5'), 'hobbyquaker/OpenCCU-Base/lite: 1.0.0 → 1.1.0-dev.5');
+    assert.equal(
+        refPairText('lite@v1.0.0-beta.2', 'lite', WITH_BRANCH),
+        'hobbyquaker/OpenCCU-Base/lite: 1.0.0-beta.2 → head',
+    );
 });
 
-test('a label belongs to the fork when it is the branch or <prefix><v tag>', () => {
-    assert.equal(forkOf('lite').kind, 'branch');
+test('a label belongs to the fork when it is <prefix><v tag> (or a fork branch of --fork)', () => {
+    assert.equal(forkOf('lite@v1.0.0').pattern, FORK_RELEASE_TAG);
+    assert.equal(forkOf('lite@v1.1.0-dev.5').pattern, FORK_TAG);
     assert.equal(forkOf('lite@v1.0.0-beta.2').kind, 'tag');
+    assert.equal(forkOf('lite'), undefined, 'the branch lite is no column any more');
+    assert.equal(forkOf('lite', WITH_BRANCH).kind, 'branch');
     assert.equal(forkOf('lite@3.89.11'), undefined, "upstream's tag in the fork is not a fork tag");
     assert.equal(forkOf('main'), undefined);
     assert.equal(forkOf('3.89.11'), undefined);
@@ -132,16 +194,9 @@ test("the links of a column go to the repository it was built from: a fork ref's
     assert.equal(webUrl('git@github.com:a/b.git'), 'https://github.com/a/b');
     assert.equal(repoOfRef('main'), 'https://github.com/OpenCCU/OpenCCU-Base');
     assert.equal(commitUrl('3.89.11', 'abc'), 'https://github.com/OpenCCU/OpenCCU-Base/commit/abc');
-    assert.equal(commitUrl('lite', 'abc'), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
-    assert.equal(commitUrl('lite@v1.0.0-beta.2', 'abc'), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
-    // the fork's openccu-lite tag and its branch lite
-    assert.deepEqual(
-        FORK_REFS.map((f) => [f.kind, f.label || f.prefix, f.repo]),
-        [
-            ['tag', 'lite@', FORK_REPO],
-            ['branch', 'lite', FORK_REPO],
-        ],
-    );
+    assert.equal(commitUrl('lite', 'abc', WITH_BRANCH), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
+    assert.equal(commitUrl('lite@v1.0.0', 'abc'), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
+    assert.equal(commitUrl('lite@v1.1.0-dev.5', 'abc'), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
 });
 
 test('a finding with a fork fix is fixed where the fork commit or, later, the upstream merge commit is', () => {
@@ -191,21 +246,21 @@ test("the differential compares each fork ref with the run's upstream release ta
     const job = (ref, answer) => ({ref, variant: 'release', baseCommit: `sha-${ref}`, sweep: {s: {m: answer}}});
     const sections = buildDifferential([
         job('main', 'c'),
-        job('lite', 'd'),
-        job('lite@v1.0.0-beta.2', 'e'),
+        job('lite@v1.1.0-dev.5', 'd'),
+        job('lite@v1.0.0', 'e'),
         job('3.89.11', 'b'),
     ]);
     assert.deepEqual(
         sections.map((s) => s.title),
         [
             'OpenCCU/OpenCCU-Base/main: 3.89.11 → head',
-            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite 1.0.0-beta.2',
-            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite head',
+            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite 1.0.0',
+            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite 1.1.0-dev.5',
         ],
     );
 });
 
-test("the upstream watch's heads from ls-remote: upstream's newest tag and main, the fork's newest v tag and lite", () => {
+test("the upstream watch's heads from ls-remote: upstream's newest tag and main, the fork's newest release and pre-release tags", () => {
     const sha = (c) => c.repeat(40);
     const remotes = {
         [UPSTREAM_REPO]: [
@@ -222,23 +277,34 @@ test("the upstream watch's heads from ls-remote: upstream's newest tag and main,
             `${sha('9')}\trefs/tags/v1.0.0-beta.2`,
             `${sha('a')}\trefs/tags/v1.0.0-beta.2^{}`,
             `${sha('b')}\trefs/tags/v1.0.0-beta.1^{}`,
+            `${sha('c')}\trefs/tags/v0.9.0`,
         ].join('\n'),
     };
     assert.deepEqual(headsOf(remotes), [
         `3.89.11 ${sha('5')}`,
         `main ${sha('1')}`,
+        `lite@v0.9.0 ${sha('c')}`,
+        `lite@v1.0.0-beta.2 ${sha('a')}`,
+    ]);
+    // the release is the newest tag: one fork line
+    const released = `${remotes[FORK_REPO]}\n${sha('d')}\trefs/tags/v1.0.0`;
+    assert.deepEqual(headsOf({...remotes, [FORK_REPO]: released}).slice(2), [`lite@v1.0.0 ${sha('d')}`]);
+    // a fork without an openccu-lite tag yet: no fork line; a fork branch (--fork) by its head
+    assert.deepEqual(headsOf({...remotes, [FORK_REPO]: `${sha('6')}\trefs/heads/lite`}).slice(2), []);
+    assert.deepEqual(headsOf(remotes, {forks: WITH_BRANCH}).slice(2), [
+        `lite@v0.9.0 ${sha('c')}`,
         `lite@v1.0.0-beta.2 ${sha('a')}`,
         `lite ${sha('6')}`,
     ]);
-    // a fork without an openccu-lite tag yet: the branch alone
-    assert.deepEqual(headsOf({...remotes, [FORK_REPO]: `${sha('6')}\trefs/heads/lite`}).slice(2), [`lite ${sha('6')}`]);
 });
 
 test('a missing fix is "known" on a tag and "todo" on a head; the data stays todo', () => {
     assert.equal(statusWord('todo', '3.89.11'), 'known');
     assert.equal(statusWord('todo', 'lite@v1.0.0-beta.2'), 'known');
     assert.equal(statusWord('todo', 'main'), 'todo');
-    assert.equal(statusWord('todo', 'lite'), 'todo');
+    assert.equal(statusWord('todo', 'lite@v1.1.0-dev.5'), 'known');
+    assert.equal(statusWord('todo', 'lite', WITH_BRANCH), 'todo');
     assert.equal(statusWord('pass', '3.89.11'), 'pass');
-    assert.ok(isTagRef('3.89.11') && isTagRef('lite@v1.0.0-beta.2') && !isTagRef('main') && !isTagRef('lite'));
+    assert.ok(isTagRef('3.89.11') && isTagRef('lite@v1.0.0-beta.2') && !isTagRef('main'));
+    assert.ok(!isTagRef('lite', WITH_BRANCH));
 });

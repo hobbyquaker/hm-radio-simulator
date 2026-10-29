@@ -138,8 +138,8 @@ Environment inside the image: `HMRS_VARIANT` (`release`, `asan`), `HMRS_KNOWN_BR
 (the frame fuzzer's seed, logged by every run), `HMRS_FUZZ_FRAMES` (default 400). Results: `results/<variant>/junit.xml`,
 the daemons' logs and sanitizer reports under `results/<variant>/work/`, fuzz artifacts under `results/fuzz/artifacts/`.
 
-CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite tag (`v*`, today `v1.0.0-beta.2`) and the head of the branch `lite`. [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from that branch: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #166, #170, #171, #173, #185 and #195), and every openccu-lite build tags the commit it built with its version. So the report shows what the last openccu-lite build and the branch fix that upstream does not yet. The refs are chosen anew on every run
-(`scripts/resolve-refs.mjs`: upstream tags of the form `X.Y.Z`, fork tags of the form `vX.Y.Z[-…]`, each ordered by version; the fork's copies of upstream's tags do not count); a new tag replaces the previous one, the branches count at their head. Each ref
+CI (`.github/workflows/ci.yml`) runs the unit tests on Node 22 and 24, and four OpenCCU-Base refs side by side, two from each of two repositories: from [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) the newest release tag (today `3.89.11`) and the head of `main`; from the fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) the newest openccu-lite release tag (`vX.Y.Z`, no `-dev`, `-beta` or `-rc`; today `v1.0.0`) and the newest tag including pre-releases (today `v1.1.0-dev.5`; only while it is newer than the release). [openccu-lite](https://github.com/hobbyquaker/openccu-lite) builds its daemons from the fork's branch `lite`: the release tag with upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request candidates, e.g. for #164, #165, #166, #170, #171, #173, #185 and #195), and every openccu-lite build tags the commit it built with its version. So the report shows what the openccu-lite release users run and the pre-release in test fix that upstream does not yet. The refs are chosen anew on every run
+(`scripts/resolve-refs.mjs`: upstream tags of the form `X.Y.Z`, fork tags of the form `vX.Y.Z[-…]`, each ordered by version; the fork's copies of upstream's tags do not count); a new tag replaces the previous one, `main` counts at its head. Each ref
 gets the daemon suite in the release, ASan and coverage variants and 60 s of each fuzz harness (findings fail the job,
 except on a ref without #140's fixes, where they are expected and only reported). The docker layers are cached per ref.
 
@@ -148,7 +148,7 @@ except on a ref without #140's fixes, where they are expected and only reported)
 Every CI run writes a Markdown overview into its summary on GitHub (per job, and for the whole run in the "test report"
 job). A run on `main` also publishes an HTML report on GitHub Pages: **<https://hobbyquaker.github.io/hm-radio-simulator/>**
 
-- the four OpenCCU-Base refs side by side under two header rows: repository and branch above, `OpenCCU/OpenCCU-Base/main` and `hobbyquaker/OpenCCU-Base/lite`, and below each its newest tag and `head`, i.e. `3.89.11` | `head` | `1.0.0-beta.2` | `head` (each with its commit linked; the fork's in the fork; the trend cards and the differential are grouped the same way), the fuzz runs
+- the four OpenCCU-Base refs side by side under two header rows: repository and branch above, `OpenCCU/OpenCCU-Base/main` and `hobbyquaker/OpenCCU-Base/lite`, and below them upstream's newest tag and `head`, the fork's release and pre-release tags, i.e. `3.89.11` | `head` | `1.0.0` | `1.1.0-dev.5` (each with its commit linked; the fork's in the fork; the trend cards and the differential are grouped the same way), the fuzz runs
   and the history of the last 20 runs (`runs/<id>/`). There is **one** result column per ref: where the variants
   (release, ASan, coverage) agree it shows their result, where they differ the worst one with a small chip naming the
   variant (`A` ASan, `C` coverage, `R` release) - the tooltip and the row's collapsible show each variant; the coverage
@@ -194,7 +194,7 @@ tracefile and llvm-cov's JSON - file paths and counts, no source text; with an O
 SIGTERM handler and would lose their profile when the suite stops them, so the variant uses clang's continuous mode,
 where the counters live in an mmapped file. clang was chosen because rfd and hs485d build and pass the suite with it unchanged; the
 release and ASan variants stay on gcc. A fourth variant, `tsan` (ThreadSanitizer, gcc `-fsanitize=thread`), runs on the
-heads only - `main` and the fork's `lite`, where a race fix lands first - on the weekly run with the proof or on request
+refs a race fix lands on first - `main` and the fork's newest tag (today `v1.1.0-dev.5`) - on the weekly run with the proof or on request
 (`workflow_dispatch` input `tsan`), and only with the files of the threaded paths (`HMRS_TEST_FILES`: both daemons' LAN
 gateways, the coprocessor protocol on the pty, the serial read errors, the vanishing receiver, two interfaces - about a
 hundred tests in ten minutes; the whole suite under ThreadSanitizer takes hours). Under ThreadSanitizer the daemons start without address randomisation (`setarch -R`;
@@ -216,9 +216,9 @@ OpenCCU-Base commit, `fuzz/run.sh` a `fuzz-summary.json`; `test/metadata.js` hol
 
 ## When OpenCCU-Base moves
 
-A push in someone else's repository cannot trigger our workflow, so `upstream-watch.yml` polls both repositories every 15 minutes (`git ls-remote`, no clone): OpenCCU/OpenCCU-Base's newest release tag and `main`, the fork's newest openccu-lite tag and its branch `lite`. It keeps the last tested refs on the branch `upstream-state` (written only by
+A push in someone else's repository cannot trigger our workflow, so `upstream-watch.yml` polls both repositories every 15 minutes (`git ls-remote`, no clone): OpenCCU/OpenCCU-Base's newest release tag and `main`, the fork's newest openccu-lite release tag and its newest tag including pre-releases. It keeps the last tested refs on the branch `upstream-state` (written only by
 this workflow), and when any of them moved runs the suite - through the CI workflow as a reusable workflow, for the
-`main` commit it saw and with all four refs as always. The run shows up on the report and in its history as "triggered by OpenCCU-Base `<sha>`" when `main` moved, else by the first new ref, e.g. "hobbyquaker/OpenCCU-Base/lite head `<sha>`" or "hobbyquaker/OpenCCU-Base/lite 1.0.0-beta.3 `<sha>`", with the commit linked. Several moves within one interval are tested as their newest
+`main` commit it saw and with all four refs as always. The run shows up on the report and in its history as "triggered by OpenCCU-Base `<sha>`" when `main` moved, else by the first new ref, e.g. "hobbyquaker/OpenCCU-Base/lite 1.1.0-dev.6 `<sha>`" or "hobbyquaker/OpenCCU-Base/lite 1.1.0 `<sha>`", with the commit linked. Several moves within one interval are tested as their newest
 heads; the commit on the state branch also counts as repository activity, so GitHub does not disable the schedule. A red
 run leaves a warning on the run; it does not open an issue unless the maintainer wants that. `workflow_dispatch` with
 `force` re-tests the current refs. When two runs overlap (a push and the watch), they publish their reports one after

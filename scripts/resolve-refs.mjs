@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
  * Which OpenCCU-Base refs a run tests, and what is known broken on each - chosen, not hard-coded: upstream's newest
- * release tag (`X.Y.Z`, by version) and the head of main, and the refs of FORK_REFS (scripts/refs.mjs): the newest
- * openccu-lite tag (`v*`, by version) and the head of the branch lite of the fork hobbyquaker/OpenCCU-Base. A new tag on
- * either side replaces the previous one on the next run.
+ * release tag (`X.Y.Z`, by version) and the head of main, and the refs of FORK_REFS (scripts/refs.mjs): on the fork
+ * hobbyquaker/OpenCCU-Base the newest openccu-lite release tag (`vX.Y.Z`, no pre-release suffix) and the newest tag
+ * including pre-releases (`v1.1.0-dev.5`), the latter only while it is newer than the release. A new tag on either side
+ * replaces the previous one on the next run.
  *
  * The known-broken list of a ref is derived, not kept by hand: an upstream fix (test/metadata.js UPSTREAM_FIXES, a pull
  * request with its merge commit) is known broken on a ref that does not contain its commit; a finding of this suite
@@ -16,10 +17,10 @@
  *   node scripts/resolve-refs.mjs [--repo <url>] [--main <sha>] [--tags <n>] [--fork <repo>@<branch>[=<label>]]...
  *                                 [--no-forks] [--github-output]
  *     prints {refs, daemons, fuzz, tsan} as JSON; with --github-output also writes refs=, daemons=, fuzz=, tsan= to
- *     $GITHUB_OUTPUT (tsan: the heads, for the ThreadSanitizer job)
+ *     $GITHUB_OUTPUT (tsan: main and the newest fork tag, for the ThreadSanitizer job)
  *     (the matrices of the CI's daemon and fuzz jobs). --main tests that commit as main (the upstream watch); --tags
- *     the number of upstream release tags (default 1); --fork replaces FORK_REFS by fork branches, --no-forks leaves
- *     them out.
+ *     the number of upstream release tags (default 1); --fork replaces FORK_REFS by fork branches (heads: tsan runs
+ *     on them too), --no-forks leaves them out.
  *   node scripts/resolve-refs.mjs --heads [--repo <url>]
  *     prints "<label> <commit>" per ref a run would test, from `git ls-remote` alone (no clone): the upstream watch
  *     compares them with the last tested ones
@@ -34,6 +35,8 @@ import fs from 'node:fs';
 import {
     VARIANTS,
     FORK_REFS,
+    compareRefs,
+    forkOf,
     UPSTREAM_REPO,
     newestReleaseTags,
     newestTag,
@@ -56,10 +59,12 @@ function judged(history, sha) {
 
 /**
  * The refs of FORK_REFS (or of `forks`) resolved in a history: a tag entry to the fork's newest matching tag (left out
- * when the fork has none), a branch entry to its head.
+ * when the fork has none, or when an earlier entry already resolved to the same tag: the newest pre-release tag only
+ * while it is newer than the newest release tag), a branch entry to its head.
  * @returns {Array<{ref: string, repo: string, build: string, sha: string, head?: boolean}>} `head` marks a branch
  */
 export function resolveForks(history, forks = FORK_REFS) {
+    const taken = new Set();
     return forks.flatMap((f) => {
         if (f.kind === 'tag') {
             const tag = newestTag(history.forkTags(f.repo), f.pattern);
@@ -67,13 +72,30 @@ export function resolveForks(history, forks = FORK_REFS) {
                 console.error(`no tag matching ${f.pattern} in ${f.repo}: left out`);
                 return [];
             }
+            const ref = `${f.prefix}${tag}`;
+            if (taken.has(ref)) {
+                console.error(`${ref} is tested already (no newer tag matching ${f.pattern}): left out`);
+                return [];
+            }
+            taken.add(ref);
             const sha = history.resolve(f.repo, tag);
-            return [{ref: `${f.prefix}${tag}`, repo: f.repo, build: sha, sha}];
+            return [{ref, repo: f.repo, build: sha, sha}];
         }
         // a fork branch is built at the commit resolved here, so the image and its known-broken list agree
         const sha = history.resolve(f.repo, f.ref);
         return [{ref: f.label, repo: f.repo, build: sha, sha, head: true}];
     });
+}
+
+/**
+ * The refs the ThreadSanitizer job runs on: the heads (main, a fork branch) and the newest fork tag - a race fix
+ * lands there first, and the older tags cannot change any more.
+ * @param {Array<{ref: string, head?: boolean}>} refs
+ */
+export function tsanRefs(refs, forks = FORK_REFS) {
+    const tags = refs.filter((r) => !r.head && forkOf(r.ref, forks)).sort((a, b) => compareRefs(a.ref, b.ref, forks));
+    const newest = tags[tags.length - 1];
+    return refs.filter((r) => r.head || r === newest);
 }
 
 /**
@@ -98,17 +120,13 @@ export function resolve({repo = UPSTREAM_REPO, main = '', tags = 1, forks = FORK
                 known_broken: r.knownBroken,
             })),
         );
-        // ThreadSanitizer runs on the heads only (main, the fork's branch): a race fix lands there first, and a tag
-        // cannot change any more
-        const tsan = refs
-            .filter((r) => r.head)
-            .map((r) => ({
-                base_ref: r.ref,
-                base_repo: r.repo,
-                build_ref: r.build,
-                variant: 'tsan',
-                known_broken: r.knownBroken,
-            }));
+        const tsan = tsanRefs(refs, forks).map((r) => ({
+            base_ref: r.ref,
+            base_repo: r.repo,
+            build_ref: r.build,
+            variant: 'tsan',
+            known_broken: r.knownBroken,
+        }));
         const fuzz = refs.map((r) => ({
             base_ref: r.ref,
             base_repo: r.repo,
@@ -150,8 +168,9 @@ export function headsOf(remotes, {repo = UPSTREAM_REPO, tags = 1, forks = FORK_R
         const refs = parse(remotes[f.repo]);
         if (f.kind === 'tag') {
             const tag = newestTag(tagsOf(refs), f.pattern);
-            if (tag) {
-                lines.push(`${f.prefix}${tag} ${refs.get(`refs/tags/${tag}`)}`);
+            const line = tag && `${f.prefix}${tag} ${refs.get(`refs/tags/${tag}`)}`;
+            if (line && !lines.includes(line)) {
+                lines.push(line);
             }
         } else if (refs.has(`refs/heads/${f.ref}`)) {
             lines.push(`${f.label} ${refs.get(`refs/heads/${f.ref}`)}`);

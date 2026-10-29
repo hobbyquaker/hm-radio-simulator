@@ -2,12 +2,12 @@ name: upstream watch
 
 # Runs the suite whenever one of the refs the report tests moves, in either repository (scripts/refs.mjs): on
 # OpenCCU/OpenCCU-Base a new release tag or a new main commit, on openccu-lite's fork hobbyquaker/OpenCCU-Base a new
-# openccu-lite tag (v*) or a new lite commit. GitHub has no cross-repository push trigger, so this polls both
+# openccu-lite release tag (vX.Y.Z) or pre-release tag (vX.Y.Z-dev.N and the like). GitHub has no cross-repository push trigger, so this polls both
 # repositories every 15 minutes (`scripts/resolve-refs.mjs --heads`, git ls-remote: "<label> <commit>" per ref), keeps
 # the last tested ones on the branch `upstream-state` (written only here: `last-tested-refs`) and, when one is new,
 # runs the CI workflow - for main's exact commit, with all four refs as always. The report names what triggered it:
-# "OpenCCU-Base <sha>" when main moved, else "<label> <sha>" of the first new ref (e.g. "lite <sha>" or
-# "lite@v1.0.0-beta.3 <sha>"). Several moves within one interval are tested as their newest heads. The state commit
+# "OpenCCU-Base <sha>" when main moved, else "<label> <sha>" of the first new ref (e.g. "lite@v1.0.0 <sha>"
+# or "lite@v1.1.0-dev.5 <sha>"). Several moves within one interval are tested as their newest heads. The state commit
 # also counts as repository activity, which keeps GitHub from disabling the schedule.
 
 on:

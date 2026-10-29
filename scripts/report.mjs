@@ -1148,8 +1148,8 @@ export function renderHtml(report, history = []) {
 }
 
 /**
- * The fork refs in words, for the Jobs paragraph: "openccu-lite's newest tag (v*) and the head of its branch lite on the
- * fork ... (...), ".
+ * The fork refs in words, for the Jobs paragraph: "the newest openccu-lite release tag and the newest tag including
+ * pre-releases ... of the fork ... (...), ".
  */
 function forkRefsText(forks = FORK_REFS) {
     const repos = [...new Set(forks.map((f) => f.repo))];
@@ -1160,7 +1160,9 @@ function forkRefsText(forks = FORK_REFS) {
                 .filter((f) => f.repo === repo)
                 .map((f) =>
                     f.kind === 'tag'
-                        ? `the newest openccu-lite tag (<code>v*</code>, shown without the v)`
+                        ? f.pattern.test('v1.0.0-dev.1')
+                            ? `the newest openccu-lite tag including pre-releases (<code>-dev</code>, <code>-beta</code>, <code>-rc</code>; only when newer than the release)`
+                            : `the newest openccu-lite release tag (<code>vX.Y.Z</code>)`
                         : `the head of the branch <code>${esc(f.ref)}</code>`,
                 );
             return `${parts.join(' and ')} of the fork <a href="${esc(web)}">${esc(web.replace('https://github.com/', ''))}</a> (OpenCCU-Base's release with the fixes openccu-lite builds with: picked from upstream, or not upstream yet), `;

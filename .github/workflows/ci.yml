@@ -14,7 +14,7 @@ on:
         type: boolean
         default: false
       tsan:
-        description: also run the daemon suite under ThreadSanitizer on the heads (main, the fork's lite)
+        description: also run the daemon suite under ThreadSanitizer on main and the fork's newest tag
         type: boolean
         default: false
   # weekly: the whole suite, and the proof of the regression tests (the fixes' commits do not move, the harness does)
@@ -51,8 +51,8 @@ jobs:
       - run: npm run test:unit
 
   # which OpenCCU-Base refs this run tests: upstream's newest release tag and main's head (or the upstream watch's
-  # commit), and on openccu-lite's fork hobbyquaker/OpenCCU-Base its newest openccu-lite tag (v*) and the head of the
-  # branch lite (scripts/refs.mjs FORK_REFS), each with its known-broken list derived from the fixes' commits -
+  # commit), and on openccu-lite's fork hobbyquaker/OpenCCU-Base its newest openccu-lite release tag (vX.Y.Z) and its
+  # newest tag including pre-releases, when newer (scripts/refs.mjs FORK_REFS), each with its known-broken list derived from the fixes' commits -
   # ancestors, or picked onto the fork (scripts/resolve-refs.mjs)
   refs:
     name: OpenCCU-Base refs
@@ -96,7 +96,7 @@ jobs:
             fi
           fi
           echo "prove=${prove}" >> "$GITHUB_OUTPUT"
-          # ThreadSanitizer on the heads: as rare as the proof, or on its own request
+          # ThreadSanitizer on main and the newest fork tag: as rare as the proof, or on its own request
           tsan=${prove}
           if [ -z "${UPSTREAM}" ] && [ "${{ github.event.inputs.tsan }}" = true ]; then tsan=true; fi
           echo "tsan=${tsan}" >> "$GITHUB_OUTPUT"
@@ -248,10 +248,11 @@ jobs:
           path: proof/proof-run.json
           if-no-files-found: ignore
 
-  # ThreadSanitizer: the daemon suite in the tsan variant on the heads (OpenCCU-Base main and the fork's lite - a tag
-  # cannot change any more), on the weekly run or on request (workflow_dispatch input tsan); the daemons start without
+  # ThreadSanitizer: the daemon suite in the tsan variant on OpenCCU-Base main and the fork's newest tag (the
+  # pre-release openccu-lite is testing; scripts/resolve-refs.mjs tsanRefs - the older tags cannot change any more),
+  # on the weekly run or on request (workflow_dispatch input tsan); the daemons start without
   # address randomisation (setarch -R, test/helpers/daemon.js), which docker's default seccomp profile refuses - hence
-  # seccomp=unconfined. The known races on the heads run as todo (test/helpers/known.js, the findings' names).
+  # seccomp=unconfined. The known races on these refs run as todo (test/helpers/known.js, the findings' names).
   tsan:
     name: daemon suite (OpenCCU-Base ${{ matrix.base_ref }}, tsan)
     needs: refs
