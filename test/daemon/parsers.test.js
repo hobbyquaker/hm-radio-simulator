@@ -177,8 +177,8 @@ test(
 );
 
 test(
-    'a malformed JSON value for USER_COLOR (HM-LC-RGBW-WM, a parameter with write dependencies) is refused, rfd lives (finding json-substr)',
-    options(regression('json-substr')),
+    '#260 (#175): a malformed JSON value for USER_COLOR (HM-LC-RGBW-WM, a parameter with write dependencies) is refused, rfd lives',
+    options(regression(260)),
     async (t) => {
         const {rfd, receiver} = await rfdWithReceiver();
         await withDaemon(rfd, async () => {
@@ -219,8 +219,8 @@ test(
 );
 
 test(
-    'a configuration line longer than 255 characters: rfd starts (finding propertymap-long-line)',
-    options(regression('propertymap-long-line')),
+    '#263 (#177): a configuration line longer than 255 characters: rfd starts',
+    options(regression(263)),
     async (t) => {
         // PropertyMap::ReadFromFile reads with istream::getline(line, 256): a longer line sets failbit, eof() never
         // becomes true, and the loop reads nothing for ever - the daemon never gets past its configuration

@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/172
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/172, fixed upstream: a34913fd5a85d20fed4106e7e1b4f3e3f062f59f (#266)
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: dutycycle-upper-bound

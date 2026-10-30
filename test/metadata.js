@@ -88,6 +88,22 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'rfd: compile the exit RPC method only with DEBUG_SHUTDOWN (the exit-rpc finding, #163)',
         commit: '4f606c6edc53d4b9be85c359a5d8abdcf49e18fe',
     },
+    260: {
+        title: 'rfd: do not terminate on, and refuse, JSON values with empty members (the json-substr finding, #175)',
+        commit: 'd64c76f2feb4d92a38b733a97d565d2589ce57a6',
+    },
+    263: {
+        title: 'libelvutils: read configuration lines of any length (the propertymap-long-line finding, #177)',
+        commit: 'd679ef31044ae63944e849f538cdd4692f1ad1f1',
+    },
+    266: {
+        title: 'rfd: do not read past the duty cycle threshold map (the dutycycle-upper-bound finding, #172)',
+        commit: 'a34913fd5a85d20fed4106e7e1b4f3e3f062f59f',
+    },
+    268: {
+        title: 'libhsscomm: keep the string alive in type_conversion_string_unsigned_integer (the string-uint-conversion finding, #168)',
+        commit: '9ed78fe45bb16281d4bec46603f06ffa1f7134b2',
+    },
 });
 
 /**
@@ -260,7 +276,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'certain for HM-OU-LED16 owners (an uncommon device), but a release build misreads only if the dead stack slot was reused',
         draft: '008-string-uint-conversion-dangling.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/168',
+        fixedBy: '9ed78fe45bb16281d4bec46603f06ffa1f7134b2',
     },
     'replace-callback': {
         title: 'rfd and hs485d: a receiver that registers after a device was replaced gets deleteDevices instead of replaceDevice (rfd IsDeviceReplaced() always false; hs485d stores the new serial in the history)',
@@ -288,7 +305,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             '100 % duty cycle does occur, but a release build discards the value read past the end; only ASan aborts',
         draft: '012-dutycycle-upper-bound.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/172',
+        fixedBy: 'a34913fd5a85d20fed4106e7e1b4f3e3f062f59f',
     },
     'flush-drops-events': {
         title: 'rfd discards unread events from the radio module before every command it sends (tcflush TCIFLUSH in SendData)',
@@ -310,7 +328,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'rare: needs an HM-LC-RGBW-WM and a script or client that sends malformed JSON - then rfd aborts, on every repetition',
         draft: '015-json-substr.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/175',
+        fixedBy: 'd64c76f2feb4d92a38b733a97d565d2589ce57a6',
         fuzzHarness: 'fuzz_json',
     },
     'hexfile-no-data': {
@@ -327,7 +346,8 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'practically never: the generated configuration lines are short; only a hand-written line of 256+ characters',
         draft: '017-propertymap-long-line.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/177',
+        fixedBy: 'd679ef31044ae63944e849f538cdd4692f1ad1f1',
         fuzzHarness: 'fuzz_propertymap',
     },
     'xmlrpc-select-fd': {

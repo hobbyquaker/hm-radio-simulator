@@ -440,8 +440,8 @@ test(
 );
 
 test(
-    'rfd takes a reported duty cycle of 100 % without reading past its threshold map (the dutycycle-upper-bound finding)',
-    {...skipWithoutDaemons, ...regression('dutycycle-upper-bound'), timeout: 120000},
+    '#266 (#172): rfd takes a reported duty cycle of 100 % without reading past its threshold map',
+    {...skipWithoutDaemons, ...regression(266), timeout: 120000},
     async (t) => {
         // BidcosInterface::GetDutyCycleUpperBound: `if (duty_cycle_threshold <= SIZE) return MAP[threshold + 1]` -
         // at 100 % the threshold reaches the last entry and the next one is read past the array

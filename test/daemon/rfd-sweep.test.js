@@ -304,8 +304,8 @@ test(
 );
 
 test(
-    'a device type with type_conversion_string_unsigned_integer (HM-OU-LED16) is instantiated without a sanitizer report (the string-uint-conversion finding)',
-    {...skipWithoutDaemons, ...regression('string-uint-conversion'), timeout: 120000},
+    '#268 (#168): a device type with type_conversion_string_unsigned_integer (HM-OU-LED16) is instantiated without a sanitizer report',
+    {...skipWithoutDaemons, ...regression(268), timeout: 120000},
     async (t) => {
         // libhsscomm HSSTypeConversionStringUnsignedInteger::LogicalToPhysical walks the c_str() of a destroyed
         // temporary string; rfd runs it when it sets up the channels (stack-use-after-scope under ASan)

@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/175
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/175, fixed upstream: d64c76f2feb4d92a38b733a97d565d2589ce57a6 (#260)
 component: rfd
 refs: [3.89.9 (5b47e37), 3.89.11 (3ed652a), main (570566e)]
 suite: json-substr

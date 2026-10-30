@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/168
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/168, fixed upstream: 9ed78fe45bb16281d4bec46603f06ffa1f7134b2 (#268)
 component: libhsscomm (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: string-uint-conversion
