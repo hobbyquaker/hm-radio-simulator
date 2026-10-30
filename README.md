@@ -537,7 +537,7 @@ dem zuletzt veröffentlichten Verlauf aufsetzt und keiner den Eintrag des andere
 - 🤷 **Idee: ein simuliertes HmIP-Funkmodul,** damit hmipserver startet: Version über XML-RPC und ein Starttest mit
   neuer JVM; offen, ob das ohne entschlüsselte Funkkommunikation geht (nur der Start-Dialog mit dem Modul)
 - ✅ **Wertgrenzen aus den `rftypes`:** `SET_TEMPERATURE` des HM-CC-RT-DN-BoM von 4,5 bis 30,5 (#221)
-- 🏗️ **Fehler: rfd ohne `exit`-Methode:** seit OpenCCU-Base #258 gibt es die RPC-Methode `exit` nur noch mit `DEBUG_SHUTDOWN`; die Neustart-Tests, die Abdeckung und der Methoden-Durchlauf brauchen einen anderen sauberen Stopp
+- 🕵️ **Fehler: rfd ohne `exit`-Methode:** seit OpenCCU-Base #258 gibt es die RPC-Methode `exit` nur noch mit `DEBUG_SHUTDOWN`; die Neustart-Tests, die Abdeckung und der Methoden-Durchlauf brauchen einen anderen sauberen Stopp
 - 🏗️ **Testbericht: Spalten des Forks:** das neueste Release-Tag (ohne `-dev`, `-beta`, `-rc`, heute `v1.0.0`) und das neueste Vorab-Tag (heute `v1.1.0-dev.5`) statt des neuesten Tags und des Zweigs `lite`
 - 🏗️ **Mehr Abdeckung:** ein paar neue Tests mit dem besten Verhältnis von neu abgedeckten Zeilen zu Aufwand
 
