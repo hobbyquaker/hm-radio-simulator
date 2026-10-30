@@ -114,10 +114,10 @@ export const DESCRIPTIONS = Object.freeze({
             'After the altered telegrams the switch must still be switchable within half a minute; today every device info among them can hold rfd up for two seconds.',
         'a frame for the central while rfd re-adds a paired device after its sysinfo does not cost module timeouts (finding devices-lock-wait)':
             "A paired switch sends its device info, rfd re-registers it with the radio module, and a status message arrives meanwhile; today rfd misses the module's answers and stalls for seconds.",
-        'a malformed JSON value for USER_COLOR (HM-LC-RGBW-WM, a parameter with write dependencies) is refused, rfd lives (finding json-substr)':
-            'Setting the colour of an RGBW controller with broken JSON must give an error; today one such call ends rfd.',
-        'a configuration line longer than 255 characters: rfd starts (finding propertymap-long-line)':
-            'A long line in the configuration file must not stop rfd from starting; today it hangs for ever while reading it.',
+        '#260 (#175): a malformed JSON value for USER_COLOR (HM-LC-RGBW-WM, a parameter with write dependencies) is refused, rfd lives':
+            'Setting the colour of an RGBW controller with broken JSON must give an error; before the fix one such call ended rfd.',
+        '#263 (#177): a configuration line longer than 255 characters: rfd starts':
+            'A long line in the configuration file must not stop rfd from starting; before the fix it hung for ever while reading it.',
         'a wired firmware file without a data record: hs485d reports no firmware and lives (finding hexfile-no-data)':
             'An empty or cut-off firmware file for a wired device must not crash hs485d; today the next device search does.',
         'hs485d device directory: a directory named X.dev and an empty .dev are skipped, the good device stays':
@@ -350,8 +350,8 @@ export const DESCRIPTIONS = Object.freeze({
             'A long run at half of the legal airtime: rfd reports the duty cycle the module counts and its memory stays flat.',
         'rfd load: an overload at 200 % of the air maximum with the module refusing past the duty-cycle limit (window 10 s) - RPC stays responsive, events still arrive (#173), rfd recovers':
             'Twice as many commands as the radio can carry, the module refusing beyond the legal limit: rfd stays responsive and recovers.',
-        'rfd takes a reported duty cycle of 100 % without reading past its threshold map (the dutycycle-upper-bound finding)':
-            'A module reporting 100 % airtime used must not make rfd read past one of its tables; today it does.',
+        '#266 (#172): rfd takes a reported duty cycle of 100 % without reading past its threshold map':
+            'A module reporting 100 % airtime used must not make rfd read past one of its tables; before the fix it did.',
     },
     'test/daemon/rfd-pty-module.test.js': {
         'rfd initialises the simulated module and reports the interface CONNECTED':
@@ -417,8 +417,8 @@ export const DESCRIPTIONS = Object.freeze({
             'One instance of every radio device type is created and every description, setting and value is read.',
         'metadata methods with a missing argument fault, rfd stays up, no sanitizer report (the metadata-args finding)':
             'Calling the metadata methods with an argument missing should give an error; under the memory checker it shows a use-after-free today.',
-        'a device type with type_conversion_string_unsigned_integer (HM-OU-LED16) is instantiated without a sanitizer report (the string-uint-conversion finding)':
-            'Creating an HM-OU-LED16 should be clean; under the memory checker it shows a dangling pointer today.',
+        '#268 (#168): a device type with type_conversion_string_unsigned_integer (HM-OU-LED16) is instantiated without a sanitizer report':
+            'Creating an HM-OU-LED16 should be clean; before the fix the memory checker showed a dangling pointer.',
     },
     'test/daemon/rfd-firmware.test.js': {
         'AVAILABLE_FIRMWARE and UPDATABLE: the fwmap names the file for the type; user firmware wins with the higher version': `${rfd} reads the firmware files it may offer from its fwmap at start-up and from user-deployed firmware directories on request; a device whose type can be updated shows the available version, one whose type cannot shows none, and the higher of two versions wins.`,
