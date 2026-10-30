@@ -41,7 +41,8 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git \
  && rm -rf /var/lib/apt/lists/*
 COPY scripts/fetch-openccu-base.sh /usr/local/bin/
-RUN fetch-openccu-base.sh "${BASE_REPO}" "${BASE_REF}" /openccu-base "${BASE_LABEL:-${BASE_REF}}"
+RUN fetch-openccu-base.sh "${BASE_REPO}" "${BASE_REF}" /openccu-base "${BASE_LABEL:-${BASE_REF}}" \
+ && mkdir -p /openccu-base/src/devicetypes/replaceMap
 
 # hmlangw, the HM-LGW emulation (MIT), for the LAN-gateway stage
 FROM debian:trixie-slim AS hmlangw-src
@@ -112,6 +113,8 @@ COPY --from=build /opt/hmlangw /opt/hmlangw
 COPY --from=build /opt/hmrs /opt/hmrs
 COPY --from=base-src /openccu-base/src/devicetypes/rftypes /opt/openccu-base/rftypes
 COPY --from=base-src /openccu-base/src/devicetypes/hs485types /opt/openccu-base/hs485types
+# rfd's replace map (listReplaceableDevices; empty on a revision without one, the test then skips)
+COPY --from=base-src /openccu-base/src/devicetypes/replaceMap /opt/openccu-base/replaceMap
 COPY --from=base-src /openccu-base/licenses /opt/openccu-base/licenses
 COPY --from=base-src /openccu-base/.openccu-base-commit /opt/openccu-base/commit
 COPY --from=base-src /openccu-base/.openccu-base-ref /opt/openccu-base/ref
@@ -120,6 +123,7 @@ COPY --from=base-src /openccu-base/src/rfd/XmlRpcMethods.cpp /openccu-base/src/r
 COPY --from=base-src /openccu-base/src/hs485d/XmlRpcMethods.cpp /openccu-base/src/hs485d/hs485d.cpp /opt/openccu-base/methods-src/hs485d/
 ENV HMRS_RFTYPES=/opt/openccu-base/rftypes \
     HMRS_HS485TYPES=/opt/openccu-base/hs485types \
+    HMRS_REPLACEMAP=/opt/openccu-base/replaceMap/rfReplaceMap.xml \
     HMRS_HMLANGW=/opt/hmlangw/bin/hmlangw \
     HMRS_FAULT_SHIM=/opt/hmrs/libhmrs-faults.so \
     HMRS_KNOWN_BROKEN=${KNOWN_BROKEN} \

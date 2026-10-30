@@ -6,10 +6,17 @@
  */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
-import {startRfd, spawnRfd, withDaemon, skipWithoutDaemons} from '../helpers/daemon.js';
+import {startRfd, spawnRfd, withDaemon, skipWithoutDaemons, RFTYPES} from '../helpers/daemon.js';
 import {startReceiver} from '../helpers/rpc.js';
 import {regression} from '../helpers/known.js';
+import {announcement} from '../helpers/sweep.js';
+import {loadDeviceDescription} from '../../lib/rftypes.js';
+
+/** OpenCCU-Base's replace map (src/devicetypes/replaceMap), copied into the image next to the rftypes. */
+const REPLACE_MAP = process.env.HMRS_REPLACEMAP || '/opt/openccu-base/replaceMap/rfReplaceMap.xml';
 
 test(
     'rfd without any [Interface] does not start: "No BidCoS-Interface available", exit 0',
@@ -136,3 +143,71 @@ test('a getValue on an unknown address faults, rfd stays up', {...skipWithoutDae
         assert.ok(Array.isArray(await rfd.call('system.listMethods')));
     });
 });
+
+test(
+    "the central's maintenance channel BidCoS-RF:0: INSTALL_MODE through getValue and setValue, AES_KEY from its MASTER paramset",
+    {...skipWithoutDaemons, timeout: 120000},
+    async (t) => {
+        // timing: setValue INSTALL_MODE = true opens the install mode for 60 s (RFCentral::SetInternalValue); the test
+        // reads it back within a few hundred ms, well inside that
+        const rfd = await startRfd();
+        await withDaemon(rfd, async () => {
+            const channel = 'BidCoS-RF:0';
+            assert.equal(await rfd.call('getValue', [channel, 'INSTALL_MODE']), false, 'off after the start');
+            await rfd.call('setValue', [channel, 'INSTALL_MODE', true]);
+            const left = await rfd.call('getInstallMode');
+            assert.ok(left > 50 && left <= 60, `getInstallMode: ${left} s left of the central's 60`);
+            assert.equal(await rfd.call('getValue', [channel, 'INSTALL_MODE']), true);
+            await rfd.call('setValue', [channel, 'INSTALL_MODE', false]);
+            assert.equal(await rfd.call('getInstallMode'), 0, 'off again');
+            assert.equal(await rfd.call('getValue', [channel, 'INSTALL_MODE']), false);
+            const values = await rfd.call('getParamset', [channel, 'VALUES']);
+            const master = await rfd.call('getParamset', [channel, 'MASTER']);
+            t.diagnostic(`VALUES ${JSON.stringify(values)}, MASTER ${JSON.stringify(master)}`);
+            assert.deepEqual(Object.keys(values), ['INSTALL_MODE']);
+            assert.equal(typeof master.AES_KEY, 'number', 'the current key index');
+            assert.deepEqual(rfd.sanitizerReports(), []);
+        });
+    },
+);
+
+test(
+    "listReplaceableDevices with OpenCCU-Base's replace map: a different type the map allows is offered, the same type always, an unrelated one never",
+    {...skipWithoutDaemons, timeout: 120000},
+    async (t) => {
+        if (!fs.existsSync(REPLACE_MAP)) {
+            t.skip(`no replace map in the image (${REPLACE_MAP})`);
+            return;
+        }
+        // timing: none beyond the RPC answers; rfd reads the map on the first listReplaceableDevices that needs it
+        const rfd = await startRfd({extra: `Replacemap File = ${REPLACE_MAP}`});
+        await withDaemon(rfd, async () => {
+            const switches = loadDeviceDescription(path.join(RFTYPES, 'rf_s.xml'));
+            const blinds = loadDeviceDescription(path.join(RFTYPES, 'rf_bl.xml'));
+            const add = async (description, type, address, serial) => {
+                const added = await rfd.call('addVirtualDeviceInstance', [
+                    [...announcement(description, type, address, serial)],
+                ]);
+                assert.equal(added, true, `${serial} (${type})`);
+            };
+            // the map's first entry: ZEL STG RM FZS-2 may replace HM-LC-Sw1-PB-FM and HM-LC-Sw1-Pl-2 (firmware >= 2.4)
+            await add(switches, 'ZEL STG RM FZS-2', 0x4f5001, 'RPLNEW0001');
+            await add(switches, 'HM-LC-Sw1-PB-FM', 0x4f5002, 'RPLOLD0001');
+            await add(switches, 'HM-LC-Sw1-Pl-2', 0x4f5003, 'RPLOLD0002');
+            await add(switches, 'ZEL STG RM FZS-2', 0x4f5004, 'RPLSAME001');
+            await add(blinds, 'HM-LC-Bl1-FM', 0x4f5005, 'RPLBLIND01');
+            const offered = (await rfd.call('listReplaceableDevices', ['RPLNEW0001']))
+                .map((d) => d.ADDRESS)
+                .filter((a) => !a.includes(':'))
+                .sort();
+            t.diagnostic(`replaceable by RPLNEW0001: ${offered.join(' ') || 'none'}`);
+            assert.deepEqual(offered, ['RPLOLD0001', 'RPLOLD0002', 'RPLSAME001']);
+            assert.ok(rfd.grep(/unable to load replace map/).length === 0, 'the map was read');
+            // the other way round the map has no entry: HM-LC-Sw1-PB-FM is not a new type of it
+            const back = (await rfd.call('listReplaceableDevices', ['RPLOLD0001'])).map((d) => d.ADDRESS);
+            t.diagnostic(`replaceable by RPLOLD0001: ${back.filter((a) => !a.includes(':')).join(' ') || 'none'}`);
+            assert.ok(!back.includes('RPLBLIND01'), 'never the blind actuator');
+            assert.deepEqual(rfd.sanitizerReports(), []);
+        });
+    },
+);

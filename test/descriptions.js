@@ -27,6 +27,10 @@ export const DESCRIPTIONS = Object.freeze({
             'A firmware file with a wrong record checksum and with a record type hs485d does not handle is still read; hs485d warns and the update uses the data records.',
     },
     'test/daemon/hs485d-lgw.test.js': {
+        'hs485d started as OpenCCU starts it (-g -i 0 -f hs485d.conf): the serial, LAN key and address from [Interface 0], the gateway on port 1000; a missing section, another Type or no key end it with 2, an unknown option with the usage and 1':
+            'hs485d, the wired daemon, is started the way the CCU starts it: it takes the wired LAN gateway, its key and address from its configuration file and connects. A configuration it cannot use, or an unknown command-line option, must end it with a clear message.',
+        "the central's virtual key BidCoS-Wir:1 linked to the switch channel: PRESS_SHORT and PRESS_LONG send the key frame (#K) to the linked channel":
+            "A virtual key of hs485d's own central is linked to a switch channel of a simulated wired device; pressing the key over RPC must send the key command to that device.",
         'hs485d connects through the gateway: the hello and the switch, an empty bus, the keepalive every 20 s':
             'hs485d, the wired daemon, connects to a simulated wired LAN gateway (HMW-LGW). The test checks the greeting, the switch to the binary protocol and the keepalive every 20 seconds.',
         'AES: hs485d through the encrypted gateway (-k): the V handshake, the binary protocol inside the cipher':
@@ -387,6 +391,10 @@ export const DESCRIPTIONS = Object.freeze({
             'An event receiver that vanishes does not take rfd down, and the others keep getting their events.',
     },
     'test/daemon/rfd-rpc.test.js': {
+        "the central's maintenance channel BidCoS-RF:0: INSTALL_MODE through getValue and setValue, AES_KEY from its MASTER paramset":
+            "rfd, the BidCoS radio daemon, offers its own central as a device. Writing INSTALL_MODE on the central's first channel must start and stop the install mode, and reading the channel's parameters must answer.",
+        "listReplaceableDevices with OpenCCU-Base's replace map: a different type the map allows is offered, the same type always, an unrelated one never":
+            "When a device is replaced, rfd offers the old devices the new one may stand in for: the same type, and the other types OpenCCU-Base's replace map allows. A device of an unrelated kind must not be offered.",
         'rfd without any [Interface] does not start: "No BidCoS-Interface available", exit 0':
             'Without a radio interface configured, rfd refuses to start and says why.',
         'rfd serves its RPC methods over BIN-RPC and XML-RPC on the same port':

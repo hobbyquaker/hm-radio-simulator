@@ -13,11 +13,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {startHs485d, withDaemon, skipWithoutDaemons, HS485TYPES} from '../helpers/daemon.js';
+import {startHs485d, spawnHs485d, withDaemon, skipWithoutDaemons, HS485TYPES} from '../helpers/daemon.js';
 import {startReceiver} from '../helpers/rpc.js';
 import {waitForEvent, waitForValue} from '../helpers/switch.js';
 import {loadDeviceDescription} from '../../lib/rftypes.js';
 import {WiredBus, WiredDevice} from '../../lib/wired.js';
+import {HMW_LGW_PORT} from '../../lib/hmwlgw.js';
 import {createEq3LanDevice} from '../../lib/eq3udp.js';
 import {regression} from '../helpers/known.js';
 
@@ -647,5 +648,95 @@ test(
             await second.call('setValue', [`${SERIAL}:0`, 'STICKY_UNREACH', false]);
             assert.equal(await second.call('getValue', [`${SERIAL}:0`, 'STICKY_UNREACH']), false);
         }).finally(() => receiver.stop());
+    },
+);
+
+test(
+    'hs485d started as OpenCCU starts it (-g -i 0 -f hs485d.conf): the serial, LAN key and address from [Interface 0], the gateway on port 1000; a missing section, another Type or no key end it with 2, an unknown option with the usage and 1',
+    options(),
+    async (t) => {
+        // timing: hs485d connects to the gateway and answers RPC within startHs485d's ready timeout; a refused
+        // configuration or option ends it at once (before any connect), the test allows 20 s
+        const key = 'WiredLanKey-42';
+        const args = ['-g', '-i', '0', '-f', '{config}', '-c', '-l', '0'];
+        const section = (lines) => ['[Interface 0]', ...lines].join('\n');
+        const good = section([
+            'Type = HMWLGW',
+            'Serial Number = SIMWLGW001',
+            `Encryption Key = ${key}`,
+            'IP Address = 127.0.0.1',
+        ]);
+        const {hs485d, receiver, lgw, cleanup} = await setup(
+            t,
+            [makeSwitch()],
+            {key, port: HMW_LGW_PORT},
+            {args, extra: good},
+        );
+        await withDaemon(hs485d, async () => {
+            assert.ok(hs485d.grep(/Using configuration file/).length >= 1, 'hs485d read its configuration file');
+            const lines = lgw.trace.filter((e) => e.line).map((e) => `${e.dir} ${e.line[0]}`);
+            assert.deepEqual(lines.slice(0, 5), ['tx H', 'tx V', 'rx V', 'tx S', 'rx >'], 'the key from the file');
+            await discover(hs485d, receiver);
+        }).finally(cleanup);
+
+        const refused = async (what, daemonOptions, pattern, code) => {
+            const daemon = await spawnHs485d(daemonOptions);
+            const exit = await Promise.race([daemon.exited, sleep(20000).then(() => null)]);
+            await daemon.stop();
+            t.diagnostic(
+                `${what}: ${JSON.stringify(exit)}, ${daemon.log.find((l) => pattern.test(l)) || daemon.tail(3)}`,
+            );
+            assert.ok(exit, `${what}: hs485d ended`);
+            assert.equal(exit.code, code, `${what}: exit code ${code}`);
+            assert.ok(daemon.grep(pattern).length >= 1, `${what}\n${daemon.tail(10)}`);
+            assert.deepEqual(daemon.sanitizerReports(), [], what);
+        };
+        // measured: PropertyMap::SetCurrentSection succeeds for a section the file does not have, so hs485d reports
+        // an empty Type there - its "Cannot find Interface 0" branch is never reached
+        await refused('no [Interface 0]', {args}, /Interface type +not supported/, 2);
+        await refused(
+            'Type HMLGW2',
+            {args, extra: section(['Type = HMLGW2', 'Serial Number = SIMWLGW001', `Encryption Key = ${key}`])},
+            /Interface type HMLGW2 not supported/,
+            2,
+        );
+        await refused(
+            'no Encryption Key',
+            {args, extra: section(['Type = HMWLGW', 'Serial Number = SIMWLGW001'])},
+            /Could not find serial number and encryption key/,
+            2,
+        );
+        await refused('an unknown option', {args: ['-x']}, /Usage:/, 1);
+    },
+);
+
+test(
+    "the central's virtual key BidCoS-Wir:1 linked to the switch channel: PRESS_SHORT and PRESS_LONG send the key frame (#K) to the linked channel",
+    options(),
+    async (t) => {
+        // timing: hs485d sends the key frame while it handles the setValue; the test gives the bus 2 s to see it
+        const sw = makeSwitch();
+        const {hs485d, receiver, cleanup} = await setup(t, [sw]);
+        await withDaemon(hs485d, async () => {
+            await discover(hs485d, receiver);
+            const central = 'BidCoS-Wir:1';
+            await hs485d.call('addLink', [central, SW3, 'central key', ''], {timeout: 60000});
+            assert.ok((await hs485d.call('getLinkPeers', [central])).includes(SW3), 'the central key has the peer');
+            const keyFrames = () => sw.trace.filter((e) => e.dir === 'rx' && e.hex.startsWith('4b')).length;
+            for (const [param, n] of [
+                ['PRESS_SHORT', 1],
+                ['PRESS_LONG', 2],
+            ]) {
+                await hs485d.call('setValue', [central, param, true], {timeout: 30000});
+                const until = Date.now() + 2000;
+                while (keyFrames() < n && Date.now() < until) {
+                    await sleep(50);
+                }
+                assert.equal(keyFrames(), n, `${param}: a K frame reached the switch\n${sw.traceLines().join(' | ')}`);
+            }
+            t.diagnostic(`frames at the switch: ${sw.traceLines().slice(-6).join(' | ')}`);
+            assert.ok(hs485d.alive);
+            assert.deepEqual(hs485d.sanitizerReports(), []);
+        }).finally(cleanup);
     },
 );

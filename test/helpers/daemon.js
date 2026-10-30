@@ -567,9 +567,16 @@ export async function startRfd(options = {}) {
  * Starts hs485d against a TCP "bus" (a plain socket, the CCU1-style transport) or, with `lgw`, against a simulated
  * HMW-LGW. hs485d's XML-RPC port is fixed at 2000 unless it reads an [Interface] section, so one at a time.
  * `env` adds to the daemon's environment (merged last; LD_PRELOAD and the sanitizer options are joined, see combineEnv).
+ * `extra` is appended to hs485d.conf (e.g. an [Interface 0] section); `args` replaces the command line after the binary
+ * (`{config}` is replaced by the config file's path) - the way OpenCCU starts it, `-g -i 0 -f {config}`.
  * @param {{host: string, port: number, logLevel?: number, lgw?: boolean, env?: Record<string, string>}} options
  */
-export async function startHs485d({
+export async function startHs485d(options = {}) {
+    return (await spawnHs485d(options)).waitReady();
+}
+
+/** Like startHs485d, without waiting for hs485d to be ready: for a start-up that is meant to fail. */
+export async function spawnHs485d({
     host = '127.0.0.1',
     port = 0,
     logLevel = 0,
@@ -580,6 +587,8 @@ export async function startHs485d({
     searchSerial = null,
     bus = null,
     env = {},
+    extra = '',
+    args: customArgs = null,
 } = {}) {
     dir = dir || tmpdir('hmrs-hs485d');
     if (!fs.existsSync(path.join(dir, 'devices'))) {
@@ -595,6 +604,7 @@ export async function startHs485d({
             `Device Files Dir = ${path.join(dir, 'devices')}`,
             `Firmware Dir = ${path.join(dir, 'firmware')}`,
             `XmlRpcHandlersFile = ${path.join(dir, 'hs485d.handlers')}`,
+            extra,
             '',
         ].join('\n'),
     );
@@ -612,13 +622,15 @@ export async function startHs485d({
         const key = configuredKey ?? front.key;
         keyArgs = key ? ['-k', key] : [];
     }
-    const args = ['-f', config, '-c', '-l', String(logLevel)];
-    if (searchSerial) {
+    let args = ['-f', config, '-c', '-l', String(logLevel)];
+    if (customArgs) {
+        args = customArgs.map((a) => a.replace('{config}', config));
+    } else if (searchSerial) {
         args.push('-s', searchSerial);
     } else {
         args.push('-h', host, '-p', String(port));
     }
-    if (lgw) {
+    if (lgw && !customArgs) {
         args.push('-g', ...keyArgs);
     }
     const daemon = new Daemon('hs485d', path.join(DAEMONS, 'bin', 'hs485d'), args, dir, 2000);
@@ -626,7 +638,7 @@ export async function startHs485d({
     daemon.lgw = front;
     daemon.bus = bus;
     daemon.dir = dir;
-    return daemon.start().waitReady();
+    return daemon.start();
 }
 
 /**
