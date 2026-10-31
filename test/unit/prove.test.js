@@ -50,12 +50,12 @@ test('the proof covers the upstream fixes and the fork fixes, each with the repo
     for (const number of Object.keys(UPSTREAM_FIXES)) {
         assert.equal(all[number].repo, UPSTREAM_REPO);
     }
-    for (const issue of [164, 195]) {
+    for (const issue of [164]) {
         assert.equal(all[issue].repo, FORK_REPO, `#${issue} from the fork`);
         assert.ok(all[issue].finding);
     }
     // merged upstream later: the pair comes from the merge commit
-    for (const issue of [162, 165, 166, 170, 171, 173, 185]) {
+    for (const issue of [162, 165, 166, 170, 171, 173, 185, 195]) {
         assert.equal(all[issue].repo, UPSTREAM_REPO, `#${issue} from upstream`);
         assert.ok(all[issue].finding);
     }

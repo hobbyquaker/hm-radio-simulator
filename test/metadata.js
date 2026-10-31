@@ -120,6 +120,16 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'rfd: refuse setBidcosInterface with an interface that does not exist (the unknown-interface finding, #174)',
         commit: 'e6bb8354781ab38df9ac0d260af5dc5f423be94a',
     },
+    271: {
+        title: 'libXmlRpc, rfd, hs485d: no freed memory and a clear fault for missing RPC arguments (the metadata-args finding, #167)',
+        commit: '2f366e0a4e3585842107a553e185b285bf9ea071',
+    },
+    // upstream has no SIGTERM handler yet (#164), so only a ref with the fork's handler shows the line: not provable on
+    // upstream's own pair, its test guards the fork
+    281: {
+        title: 'libXmlRpc: do not log an interrupted select() as an error',
+        commit: 'a75ab04ee7aa33b012e00cf7f487650214ed3127',
+    },
 });
 
 /**
@@ -248,6 +258,7 @@ export const FINDINGS = Object.freeze({
             'rare per installation, but possible on every installation with an HMW-LGW - a missed keepalive while a send is under way',
         draft: '025-lgw-wrapper-races.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/195',
+        fixedBy: '30ad06eb015f3140ffe2e5f16291166c42df6242',
         fork: {commit: '6504c8f3044dd55c29e34696e2bfdb60349dd394', branch: 'fix/195-lgw-reconnect'},
     },
     'double-join': {
@@ -288,7 +299,8 @@ export const FINDINGS = Object.freeze({
         relevance: 'edge',
         relevanceNote: 'practically never: only a buggy client calls the metadata methods with too few arguments',
         draft: '007-metadata-missing-argument.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/167',
+        fixedBy: '2f366e0a4e3585842107a553e185b285bf9ea071',
     },
     'string-uint-conversion': {
         title: 'libhsscomm: type_conversion_string_unsigned_integer reads a destroyed temporary string (HM-OU-LED16 channel set-up)',
@@ -305,7 +317,7 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'rare: a device replacement while a logic layer is offline; ReGa, which runs the replacement, is online',
         draft: '009-replace-callback.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/169',
     },
     'init-blocks': {
         title: 'rfd and hs485d: init with a receiver that does not answer freezes the whole daemon - the init callbacks run without a timeout on the main loop',
@@ -380,7 +392,7 @@ export const FINDINGS = Object.freeze({
         relevance: 'edge',
         relevanceNote: 'practically never: the open-file limit of 1024 keeps the descriptors below 1024',
         draft: '018-xmlrpc-select-fd.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/178',
     },
     'system-command-slot': {
         title: "rfd: two coprocessor system commands from two threads share one request slot; one takes the other's answer",
@@ -388,7 +400,7 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'rare on a local radio module (during a module restart), occasional on an HM-LGW or with a periodic listBidcosInterfaces poll; self-healing',
         draft: '019-system-command-slot.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/179',
     },
     'ack-rssi-sign': {
         title: "rfd: the RSSI byte in the module's send status (the ACK) is signed; rfd negates it like the event's magnitude",

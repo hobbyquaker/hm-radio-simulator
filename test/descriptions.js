@@ -73,6 +73,8 @@ export const DESCRIPTIONS = Object.freeze({
             'An array or struct nested tens of thousands of levels deep, which used to overflow the stack and crash hs485d, is refused and hs485d keeps serving.',
     },
     'test/daemon/hs485d-sweep.test.js': {
+        '#271 (#167): a method with too few required arguments answers the fault "Insufficient parameters."':
+            'A method whose arguments are all required refuses a call that leaves one out, with a clear error, instead of working on empty values.',
         'method sweep: system.listMethods of hs485d is the dispatcher table of its source':
             'The list of methods hs485d reports matches the method table in its source code, so a method added or removed upstream shows up here.',
         'method sweep: every hs485d method with valid, missing, extra and wrong-typed arguments; hs485d stays up, no sanitizer report':
@@ -211,6 +213,8 @@ export const DESCRIPTIONS = Object.freeze({
             "rfd's diagnostic listening mode starts without devices and still answers the remote interface.",
         '#164 SIGTERM: rfd leaves its main loop and exits 0 - with the pty module and behind the LAN gateway':
             'Stopped with the signal the init system sends, rfd ends cleanly with exit code 0 instead of being killed: its threads are joined and the radio module or LAN gateway is closed (OpenCCU-Base #164).',
+        '#281: a stop with SIGTERM logs no error from the interrupted select()':
+            'The signal that stops rfd also interrupts its wait for network traffic; that is no error and must not be logged as one.',
         '#164 SIGTERM: hs485d behind the wired LAN gateway leaves its main loop and exits 0':
             'Stopped with the signal the init system sends, hs485d ends cleanly with exit code 0 instead of being killed (OpenCCU-Base #164).',
         'hs485d restart: every wired type comes back from its file with the same address, type, version and channels':
@@ -421,8 +425,10 @@ export const DESCRIPTIONS = Object.freeze({
             'Every method of rfd is called with correct, missing, extra and wrongly typed arguments; rfd must answer each call and stay up.',
         'device-type sweep: one virtual instance of every rftypes type; descriptions, paramsets and values of every device and channel':
             'One instance of every radio device type is created and every description, setting and value is read.',
-        'metadata methods with a missing argument fault, rfd stays up, no sanitizer report (the metadata-args finding)':
-            'Calling the metadata methods with an argument missing should give an error; under the memory checker it shows a use-after-free today.',
+        '#271 (#167): metadata methods with a missing argument fault, rfd stays up, no sanitizer report':
+            'Calling the metadata methods with an argument missing gives an error; before the fix the memory checker showed a use-after-free.',
+        '#271 (#167): a method with too few required arguments answers the fault "Insufficient parameters." and changes nothing':
+            'A method whose arguments are all required refuses a call that leaves one out, with a clear error, instead of working on empty values.',
         '#268 (#168): a device type with type_conversion_string_unsigned_integer (HM-OU-LED16) is instantiated without a sanitizer report':
             'Creating an HM-OU-LED16 should be clean; before the fix the memory checker showed a dangling pointer.',
     },

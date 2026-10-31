@@ -32,9 +32,9 @@ test('describeTest: pull requests in the name become regression links, findings 
             'https://github.com/OpenCCU/OpenCCU-Base/commit/0d71a252d1d3c0b9ddd77410cc3db2e864c1e6ec',
         ],
     );
-    const known = describeTest('setVolatileMetadata with a missing argument (the metadata-args finding)');
+    const known = describeTest('a NACK to an update frame (the update-nack-ignored finding)');
     assert.equal(known.kind, 'known-bug');
-    assert.ok(known.refs[0].url.endsWith('upstream-reports/007-metadata-missing-argument.md'), known.refs[0].url);
+    assert.ok(known.refs[0].url.endsWith('upstream-reports/021-update-nack-ignored.md'), known.refs[0].url);
     const viaTodo = describeTest('no busy loop after the hangup', {
         todo: 'the read-eof finding is not fixed in this BASE_REF',
     });

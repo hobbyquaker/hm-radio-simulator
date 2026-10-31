@@ -491,6 +491,19 @@ test(
     },
 );
 
+test(
+    '#281: a stop with SIGTERM logs no error from the interrupted select()',
+    // visible only with a handler, so with #164's fix too: without one the signal ends the process inside select()
+    options(regression(281, 'no-sigterm')),
+    async (t) => {
+        const rfd = await startQuietRfd();
+        await withDaemon(rfd, async () => {
+            await terminate(t, rfd, 'rfd on the pty module');
+            assert.doesNotMatch(rfd.tail(200), /Error in XmlRpcDispatch::work/);
+        });
+    },
+);
+
 /** Every hs485types type with a condition as a wired device, as in the type sweep. */
 function wiredDevices() {
     const devices = [];

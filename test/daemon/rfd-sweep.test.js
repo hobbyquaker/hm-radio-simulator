@@ -280,8 +280,8 @@ test(
 );
 
 test(
-    'metadata methods with a missing argument fault, rfd stays up, no sanitizer report (the metadata-args finding)',
-    {...skipWithoutDaemons, ...regression('metadata-args'), timeout: 120000},
+    '#271 (#167): metadata methods with a missing argument fault, rfd stays up, no sanitizer report',
+    {...skipWithoutDaemons, ...regression(271), timeout: 120000},
     async (t) => {
         // XmlRpcMethods.cpp: `const char* dataId = ((std::string&)params[0]).c_str(); ... params[1]` - indexing the
         // missing second argument grows the array and frees the string under dataId (heap-use-after-free under ASan)
@@ -300,6 +300,39 @@ test(
             }
             assert.deepEqual(rfd.sanitizerReports(), []);
         }).finally(() => caller.close());
+    },
+);
+
+test(
+    '#271 (#167): a method with too few required arguments answers the fault "Insufficient parameters." and changes nothing',
+    {...skipWithoutDaemons, ...regression(271), timeout: 120000},
+    async () => {
+        const rfd = await startSweepRfd();
+        await withDaemon(rfd, async () => {
+            for (const [method, params] of [
+                ['getParamsetDescription', [CENTRAL]],
+                ['putParamset', [CENTRAL, 'MASTER']],
+                ['getParamset', [CENTRAL]],
+                ['determineParameter', [CENTRAL, 'MASTER']],
+                ['getValue', [`${CENTRAL}:1`]],
+                ['setValue', [`${CENTRAL}:1`, 'PRESS_SHORT']],
+                ['removeLink', [`${CENTRAL}:1`]],
+                ['getParamsetId', [CENTRAL]],
+                ['getMetadata', [CENTRAL]],
+                ['setMetadata', [CENTRAL, 'sweep271']],
+                ['setVolatileMetadata', ['sweep271']],
+                ['setInterfaceClock', [0]],
+            ]) {
+                // the BIN-RPC client resolves with a fault, the XML-RPC one rejects
+                const answer = await rfd.call(method, params).catch((error) => error);
+                const what = `${method}(${params.join(', ')}): ${JSON.stringify(answer)}`;
+                assert.equal(answer?.faultCode, -1, what);
+                assert.match(String(answer?.faultString), /Insufficient parameters\./, what);
+                assert.ok(rfd.alive, `rfd died on ${method}: ${JSON.stringify(rfd.exit)}`);
+            }
+            assert.equal(await rfd.call('hasVolatileMetadata', ['sweep271']), false);
+            assert.deepEqual(rfd.sanitizerReports(), []);
+        });
     },
 );
 

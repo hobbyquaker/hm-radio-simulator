@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {startHs485d, withDaemon, skipWithoutDaemons, HS485TYPES} from '../helpers/daemon.js';
+import {regression} from '../helpers/known.js';
 import {startReceiver} from '../helpers/rpc.js';
 import {SweepCaller, readMethodTable, writeRecord, summarize} from '../helpers/sweep.js';
 import {loadDeviceDescription, sysinfoSatisfying} from '../../lib/rftypes.js';
@@ -133,6 +134,33 @@ test(
             caller.close();
             await receiver.stop();
         });
+    },
+);
+
+test(
+    '#271 (#167): a method with too few required arguments answers the fault "Insufficient parameters."',
+    {...skipWithoutDaemons, ...regression(271), timeout: 120000},
+    async () => {
+        const {hs485d, receiver} = await setup([]);
+        await withDaemon(hs485d, async () => {
+            for (const [method, params] of [
+                ['getParamsetDescription', [SERIAL]],
+                ['getParamsetId', [SERIAL]],
+                ['putParamset', [SERIAL, 'MASTER']],
+                ['getParamset', [SERIAL]],
+                ['getValue', [`${SERIAL}:1`]],
+                ['setValue', [`${SERIAL}:1`, 'STATE']],
+                ['removeLink', [`${SERIAL}:1`]],
+            ]) {
+                // the BIN-RPC client resolves with a fault, the XML-RPC one rejects
+                const answer = await hs485d.call(method, params).catch((error) => error);
+                const what = `${method}(${params.join(', ')}): ${JSON.stringify(answer)}`;
+                assert.equal(answer?.faultCode, -1, what);
+                assert.match(String(answer?.faultString), /Insufficient parameters\./, what);
+                assert.ok(hs485d.alive, `hs485d died on ${method}: ${JSON.stringify(hs485d.exit)}`);
+            }
+            assert.deepEqual(hs485d.sanitizerReports(), []);
+        }).finally(() => receiver.stop());
     },
 );
 
