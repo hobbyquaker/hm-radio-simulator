@@ -441,6 +441,7 @@ coprocessor-state mutex that `improvedInit()` holds while it waits, so rfd gives
 | -     | more coverage: a few new tests with the best ratio of newly covered lines to effort                                                                                                                                                                                                                                          | done          |
 | -     | the fix table for OpenCCU-Base #260, #263, #266, #268: four findings these fixes resolve count as fixed from upstream `main` and the fork's tag `v1.1.0-dev.6`, not as known broken                                                                                                                                          | done          |
 | -     | bug: `run-tests.sh` tests a stale tree for a branch: docker reuses the cached clone as long as `BASE_REF` (e.g. `main`) does not change; resolve the branch to its commit before the build                                                                                                                                   | ready         |
+| -     | review the upstream merges in OpenCCU and OpenCCU-Base and adapt the simulator or the tests where needed                                                                                                                                                                                                                     | in progress   |
 
 ## Credits and licences
 
