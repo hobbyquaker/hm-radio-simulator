@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/174
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/174, fixed upstream: e6bb8354781ab38df9ac0d260af5dc5f423be94a (#272)
 component: rfd
 refs: [3.89.11 (3ed652a), main (570566e)]
 suite: unknown-interface

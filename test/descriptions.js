@@ -16,6 +16,8 @@ export const DESCRIPTIONS = Object.freeze({
             'hs485d, the wired daemon, learns the firmware it can offer a device type from its fwmap: as a version written there, or read from the firmware file itself; a type without a usable entry offers none.',
         'the update: sleep mode, u, the page size, the pages written and verified, g, the device rebuilt with the new version':
             'hs485d updates a simulated wired device: the bus is put to sleep, the device enters its bootloader, the pages are written and read back, the application is started, and the device is announced again with its new version.',
+        '#257: an update that changes the device type, then a failed send: no event on a deleted maintenance channel':
+            'A firmware update can turn a wired device into another type, which replaces its channels. A send that fails afterwards must reach the new maintenance channel, not the deleted one.',
         'a verify mismatch: the write spoils a byte, the read-back differs, hs485d reports false and does not rebuild':
             'A page that reads back differently from what was written: hs485d stops the verify there, reports the update as failed and keeps the old version.',
         'the device does not enter its bootloader: the bootloader frames go unanswered, hs485d reports false':
@@ -118,8 +120,10 @@ export const DESCRIPTIONS = Object.freeze({
             'Setting the colour of an RGBW controller with broken JSON must give an error; before the fix one such call ended rfd.',
         '#263 (#177): a configuration line longer than 255 characters: rfd starts':
             'A long line in the configuration file must not stop rfd from starting; before the fix it hung for ever while reading it.',
-        'a wired firmware file without a data record: hs485d reports no firmware and lives (finding hexfile-no-data)':
-            'An empty or cut-off firmware file for a wired device must not crash hs485d; today the next device search does.',
+        '#267 (#176): a wired firmware file without a data record: hs485d reports no firmware and lives':
+            'An empty or cut-off firmware file for a wired device must not crash hs485d; before the fix the next device search did.',
+        '#267 (#176): a version address right before the firmware data: hs485d reports no firmware and lives':
+            'A firmware map that names a version address just before the data must not make hs485d read outside the file; it offers no firmware instead.',
         'hs485d device directory: a directory named X.dev and an empty .dev are skipped, the good device stays':
             'Junk in the device directory - a folder named like a device file and an empty file - is skipped and the real device comes back.',
     },
@@ -362,9 +366,9 @@ export const DESCRIPTIONS = Object.freeze({
             'A busy answer from the module is retried and the start completes.',
         'rfd survives the hangup': 'rfd keeps running after its serial line hangs up.',
         'no busy loop after the hangup':
-            'rfd should not use a full CPU core after the hangup (read-eof, OpenCCU-Base #162, fixed on the fork).',
+            'rfd should not use a full CPU core after the hangup (read-eof, OpenCCU-Base #162, fixed by #264).',
         'listBidcosInterfaces reports the interface as not connected':
-            'After the hangup rfd should report the interface as disconnected (read-eof, OpenCCU-Base #162, fixed on the fork).',
+            'After the hangup rfd should report the interface as disconnected (read-eof, OpenCCU-Base #162, fixed by #264).',
         'module lost: the pty hangs up - rfd stays alive without spinning (#115) and reports CONNECTED false (#116)':
             'The serial line to the radio module hangs up: rfd should stay alive, idle, and report the interface as disconnected.',
         '#162 read-eof: the pty hangs up (read() == 0) - rfd stays alive, without spinning, and reports CONNECTED false':
@@ -401,10 +405,12 @@ export const DESCRIPTIONS = Object.freeze({
             'rfd answers both the binary and the XML remote protocol on one port.',
         'init registers a receiver: rfd asks it for its methods and calls listDevices/newDevices on it':
             'A program registering for events is asked what it supports and then told about the devices.',
-        'init with an empty id deregisters the receiver and rfd stays up (the double-join finding under ASan)':
-            'Unregistering an event receiver must not crash rfd; under the memory checker it does today.',
-        'init with an empty id deregisters the receiver and rfd stays up':
+        '#269 (#161): init with an empty id deregisters the receiver and rfd stays up (under ASan)':
+            'Unregistering an event receiver must not crash rfd; before the fix it did under the memory checker.',
+        '#269 (#161): init with an empty id deregisters the receiver and rfd stays up':
             'Unregistering an event receiver must not crash rfd.',
+        '#269 (#161): a receiver deregistered right after its registration, twenty times: rfd keeps answering':
+            'A program that registers and unregisters at once, again and again, must not leave rfd stuck waiting for a thread.',
         'a getValue on an unknown address faults, rfd stays up':
             'Asking for a value of a device that does not exist gives an error, nothing worse.',
     },
@@ -479,8 +485,8 @@ export const DESCRIPTIONS = Object.freeze({
             'A switch is paired through the interface that receives it better, and can be moved to the other by hand.',
         'roaming: a better copy on the other interface moves the device after 150 ms, not within 300 ms of a send':
             'With roaming on, a device moves to the interface that hears it better - but not right after a command was sent to it.',
-        'setBidcosInterface with an interface that does not exist is refused (finding unknown-interface)':
-            'Moving a device to an interface that does not exist should be an error; today rfd accepts and stores it.',
+        '#272 (#174): setBidcosInterface with an interface that does not exist is refused; the id is compared exactly':
+            'Moving a device to an interface that does not exist is an error, also for a real serial in another case; an empty id and a real serial still work. Before the fix rfd accepted and stored anything.',
         'one interface lost: devices on the other carry on, a roaming device is taken over':
             'When one interface disappears, devices on the other keep working and a roaming device is taken over.',
         'duty-cycle bands: an event when a band changes, none inside a band, per interface; downwards with hysteresis':

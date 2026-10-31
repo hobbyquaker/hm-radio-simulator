@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/165
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/165, fixed upstream: f5c583e9140e727cc9250fd80d934cf500596f74 (#211)
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: aes-republish

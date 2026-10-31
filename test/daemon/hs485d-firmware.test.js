@@ -35,6 +35,9 @@ const KEY = 'H17V0'; // how hs485d names the type in the fwmap (HS485Device::Get
 const VERSION_ADDRESS = 0x3fe;
 const IMAGE = buildWiredImage({size: 1024, version: [3, 6], versionAddress: VERSION_ADDRESS});
 const CH0 = `${SERIAL}:0`;
+// the type the rebuild of the #257 test finds (hmw_lc_bl1_dr.xml)
+const OTHER_TYPE = 'HMW-LC-Bl1-DR';
+const OTHER_TYPE_BYTE = 0x15;
 
 let wiredDescription = null;
 function switchDescription() {
@@ -201,6 +204,42 @@ test(
             // the device still works
             await hs485d.call('setValue', [`${SERIAL}:3`, 'STATE', true]);
             assert.equal(device.behaviour.channel(2).STATE, 200);
+        }).finally(cleanup);
+    },
+);
+
+test(
+    '#257: an update that changes the device type, then a failed send: no event on a deleted maintenance channel',
+    options(regression(257)),
+    async (t) => {
+        // HS485Device::Rebuild deletes the channels when the type changes; before #257 the maintenance channel stayed
+        // registered for the device's internal value events, so the next UNREACH called OnEvent() on freed memory. The
+        // device comes from its file (a restart), which gives the maintenance channel its class on every ref. The new
+        // type is chosen: the simulated image only changes the version, so the type byte is set by hand for the `h` of
+        // the rebuild.
+        const device = makeSwitch();
+        const {hs485d, receiver, bus, dir, cleanup} = await setup(t, {device});
+        await hs485d.stop();
+        await receiver.stop();
+        const second = await startHs485d({lgwFront: {serial: 'SIMWLGW001'}, bus, dir});
+        await withDaemon(second, async () => {
+            device.sysinfo[0] = OTHER_TYPE_BYTE;
+            const {fault} = await updateResult(second);
+            t.diagnostic(`update: ${JSON.stringify(fault || 'ok')}`);
+            assert.equal((await second.call('getDeviceDescription', [SERIAL])).TYPE, OTHER_TYPE, 'the type changed');
+            device.answering = false;
+            // a write that fails sets UNREACH (two tries, 620 ms each, measured; the wait has a margin of seconds)
+            await second
+                .call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 4.0}}], {timeout: 30000})
+                .catch(() => null);
+            let unreach = false;
+            for (let i = 0; i < 40 && !unreach && second.alive; i++) {
+                await sleep(500);
+                unreach = await second.call('getValue', [CH0, 'UNREACH']).catch(() => false);
+            }
+            assert.ok(second.alive, `hs485d lives: ${JSON.stringify(second.exit)}`);
+            assert.equal(unreach, true, 'the new channel has the failure');
+            assert.deepEqual(second.sanitizerReports(), []);
         }).finally(cleanup);
     },
 );

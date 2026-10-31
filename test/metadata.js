@@ -104,6 +104,22 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'libhsscomm: keep the string alive in type_conversion_string_unsigned_integer (the string-uint-conversion finding, #168)',
         commit: '9ed78fe45bb16281d4bec46603f06ffa1f7134b2',
     },
+    257: {
+        title: 'hs485d, libhsscomm: unregister maintenance channels before deleting them (a use-after-free after a type-changing rebuild)',
+        commit: '8a7a7569dfa725ee1a84c4eaa264c05b90e88753',
+    },
+    267: {
+        title: 'libelvutils, hs485d: refuse a hex file without data (the hexfile-no-data finding, #176)',
+        commit: '703ec920f08dc9af59cd1f04a0c7ad3953676107',
+    },
+    269: {
+        title: "libelvutils: join an actor's thread only once and mark it running in Start() (the double-join finding, #161)",
+        commit: '3cee2feb66ff01ebeeedc9cbab77bf6601306487',
+    },
+    272: {
+        title: 'rfd: refuse setBidcosInterface with an interface that does not exist (the unknown-interface finding, #174)',
+        commit: 'e6bb8354781ab38df9ac0d260af5dc5f423be94a',
+    },
 });
 
 /**
@@ -240,18 +256,21 @@ export const FINDINGS = Object.freeze({
         relevanceNote:
             'the trigger (a client deregistering) is common, the effect practically never: a release build ignores the second join, only ASan aborts',
         draft: '001-double-join.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/161',
+        fixedBy: '3cee2feb66ff01ebeeedc9cbab77bf6601306487',
     },
     'read-eof': {
         title: 'rfd on main spins at 100 % and keeps CONNECTED after a pty hangup: read() == 0 is not treated as an error (#115/#116)',
         draft: '002-read-eof.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/162',
+        fixedBy: 'acea320c73edda08a8903544d96f8441c51b7eaf',
         fork: {commit: '03b0570abfb020688f26a13d253464ff13f63c41', branch: 'fix/162-read-eof'},
     },
     'aes-republish': {
         title: 'rfd does not restore the per-channel AES policy (AUTHENTICATION_ON) when it republishes devices after a coprocessor re-init',
         draft: '005-aes-policy-after-reinit.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/165',
+        fixedBy: 'f5c583e9140e727cc9250fd80d934cf500596f74',
         fork: {commit: '800f1312692b18ff93f02d41ec89b667c97d82eb', branch: 'fix/165-aes-republish'},
     },
     'wired-maintenance': {
@@ -261,6 +280,7 @@ export const FINDINGS = Object.freeze({
             'plausible on every wired installation: from learning a device until the next restart of hs485d (often months) its bus failure raises no UNREACH',
         draft: '006-wired-maintenance-channel.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/166',
+        fixedBy: '1b1143c8b71fcee73df46bac082e982932b3fe68',
         fork: {commit: '386f36a0838dede0084957fcab6924ba05b5a5fd', branch: 'fix/166-wired-maintenance'},
     },
     'metadata-args': {
@@ -291,12 +311,14 @@ export const FINDINGS = Object.freeze({
         title: 'rfd and hs485d: init with a receiver that does not answer freezes the whole daemon - the init callbacks run without a timeout on the main loop',
         draft: '010-init-blocks-main-loop.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/170',
+        fixedBy: '0aa528f60e59a2d7dee44a913c5abd07f4a9bc02',
         fork: {commit: '751cd79f787261ca06d9a3b87b244f8f13bc10ae', branch: 'fix/170-init-timeout'},
     },
     'async-callback-threads': {
         title: 'rfd and hs485d: every unanswered newDevices/deleteDevices/replaceDevice leaves a thread and a socket behind for good',
         draft: '011-async-callback-threads.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/171',
+        fixedBy: '002b8d13819335641e7e16a3c87a86175b904aa0',
         fork: {commit: '05af7256bbdf154a697c3d878454becc84c41bd3', branch: 'fix/171-async-timeout'},
     },
     'dutycycle-upper-bound': {
@@ -312,6 +334,7 @@ export const FINDINGS = Object.freeze({
         title: 'rfd discards unread events from the radio module before every command it sends (tcflush TCIFLUSH in SendData)',
         draft: '013-flush-drops-events.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/173',
+        fixedBy: '592e903b0f8546f85486ef629b18819e2d09a9b2',
         fork: {commit: 'dc67832cfaff6eaa0f5304bd001c49419125c2a8', branch: 'fix/173-no-tcflush-on-send'},
         proofRepeat: 5,
     },
@@ -320,7 +343,8 @@ export const FINDINGS = Object.freeze({
         relevance: 'edge',
         relevanceNote: 'practically never: the WebUI offers only existing interfaces',
         draft: '014-unknown-interface.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/174',
+        fixedBy: 'e6bb8354781ab38df9ac0d260af5dc5f423be94a',
     },
     'json-substr': {
         title: 'rfd terminates on setValue with a malformed JSON value for a parameter with write dependencies (JSONObject throws std::out_of_range)',
@@ -337,7 +361,8 @@ export const FINDINGS = Object.freeze({
         relevance: 'edge',
         relevanceNote: 'practically never: the wired firmware files are on the read-only root file system',
         draft: '016-hexfile-no-data.md',
-        issue: null,
+        issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/176',
+        fixedBy: '703ec920f08dc9af59cd1f04a0c7ad3953676107',
         fuzzHarness: 'fuzz_hexfile',
     },
     'propertymap-long-line': {
@@ -372,6 +397,7 @@ export const FINDINGS = Object.freeze({
             'certain: every ACK of a BidCos-RF device to the central on an RPI-RF-MOD; RSSI_PEER and rssiInfo show impossible values',
         draft: '020-ack-rssi-signed.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/185',
+        fixedBy: 'efb620975ada689a24a26fcf21e0ff35d74df97e',
         fork: {commit: '6e87b0c1412ad358693f072ea6d52aa591ab24b9', branch: 'fix/185-ack-rssi-sign'},
     },
     'update-nack-ignored': {

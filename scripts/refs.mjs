@@ -58,8 +58,11 @@ function forkTagOf(label, forks = FORK_REFS) {
 
 /**
  * Compares two versions `[v]X.Y.Z[-pre]` as semver does: the numbers, then a release after its prereleases, then the
- * prerelease identifiers (numbers numerically, below words; words lexically).
+ * prerelease identifiers (numbers numerically, below words; the channels by openccu-lite's order dev < alpha < beta <
+ * rc, which is not semver's: lexically `beta` sorts before `dev`; other words lexically, below the channels).
  */
+const CHANNELS = Object.freeze(['dev', 'alpha', 'beta', 'rc']);
+
 export function compareVersions(a, b) {
     const split = (v) => {
         const [core, ...pre] = String(v).replace(/^v/, '').split('-');
@@ -88,7 +91,8 @@ export function compareVersions(a, b) {
             return np ? -1 : 1;
         }
         if (!np && p !== q) {
-            return p < q ? -1 : 1;
+            const [cp, cq] = [CHANNELS.indexOf(p), CHANNELS.indexOf(q)];
+            return cp !== cq ? cp - cq : p < q ? -1 : 1;
         }
     }
     return 0;

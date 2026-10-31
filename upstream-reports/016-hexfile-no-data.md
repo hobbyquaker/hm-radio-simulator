@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/176
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/176, fixed upstream: 703ec920f08dc9af59cd1f04a0c7ad3953676107 (#267)
 component: libelvutils, hs485d
 refs: [3.89.9 (5b47e37), 3.89.11 (3ed652a), main (570566e)]
 suite: hexfile-no-data

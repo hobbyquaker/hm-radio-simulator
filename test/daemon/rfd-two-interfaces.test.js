@@ -276,8 +276,8 @@ test(
 );
 
 test(
-    'setBidcosInterface with an interface that does not exist is refused (finding unknown-interface)',
-    options(regression('unknown-interface')),
+    '#272 (#174): setBidcosInterface with an interface that does not exist is refused; the id is compared exactly',
+    options(regression(272)),
     async (t) => {
         const {rfd, receiver, air, a, b, cleanup} = await setup(t);
         await withDaemon(rfd, async () => {
@@ -296,6 +296,17 @@ test(
             assert.ok((defaultIface === SERIAL_A ? a : b).peers.has(SWITCH_ADDRESS), 'the device is on an interface');
             assert.ok(bogus.fault, 'an unknown interface is a fault');
             assert.equal(after, before, 'the interface is unchanged');
+            // the check is an exact lookup in the map of interfaces: another spelling of a real serial is unknown too
+            const lower = await faultOrResult(
+                rfd.call('setBidcosInterface', [SWITCH_SERIAL, SERIAL_B.toLowerCase(), false]),
+            );
+            assert.ok(lower.fault, `a serial in another case is refused: ${JSON.stringify(lower)}`);
+            // an empty id still selects the default interface, and a real serial still moves the device
+            const empty = await faultOrResult(rfd.call('setBidcosInterface', [SWITCH_SERIAL, '', false]));
+            assert.equal(empty.fault, undefined, JSON.stringify(empty));
+            const real = await faultOrResult(rfd.call('setBidcosInterface', [SWITCH_SERIAL, SERIAL_B, false]));
+            assert.equal(real.fault, undefined, JSON.stringify(real));
+            assert.equal((await rfd.call('getDeviceDescription', [SWITCH_SERIAL])).INTERFACE, SERIAL_B);
         }).finally(cleanup);
     },
 );

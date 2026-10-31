@@ -213,8 +213,8 @@ for (const flavour of FLAVOURS) {
     );
 
     test(
-        `${flavour.name}: the unreachable rule - ten failed deliveries in a row remove a receiver at the next event, a success resets the count${ASAN ? ' (the double-join finding under ASan)' : ''}`,
-        {...skipWithoutDaemons, ...(ASAN ? regression('double-join') : {}), timeout: 300000},
+        `${flavour.name}: the unreachable rule - ten failed deliveries in a row remove a receiver at the next event, a success resets the count${ASAN ? ' (#269, #161 under ASan)' : ''}`,
+        {...skipWithoutDaemons, ...(ASAN ? regression(269) : {}), timeout: 300000},
         async (t) => {
             const daemon = await flavour.start();
             const steady = await startReceiver();

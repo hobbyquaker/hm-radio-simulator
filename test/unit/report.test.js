@@ -32,11 +32,9 @@ test('describeTest: pull requests in the name become regression links, findings 
             'https://github.com/OpenCCU/OpenCCU-Base/commit/0d71a252d1d3c0b9ddd77410cc3db2e864c1e6ec',
         ],
     );
-    const known = describeTest(
-        'init with an empty id deregisters the receiver and rfd stays up (the double-join finding under ASan)',
-    );
+    const known = describeTest('setVolatileMetadata with a missing argument (the metadata-args finding)');
     assert.equal(known.kind, 'known-bug');
-    assert.ok(known.refs[0].url.endsWith('upstream-reports/001-double-join.md'), known.refs[0].url);
+    assert.ok(known.refs[0].url.endsWith('upstream-reports/007-metadata-missing-argument.md'), known.refs[0].url);
     const viaTodo = describeTest('no busy loop after the hangup', {
         todo: 'the read-eof finding is not fixed in this BASE_REF',
     });
@@ -123,7 +121,7 @@ test('descriptions: every test needs one, a variant suffix finds the plain name'
     assert.ok(
         describe(
             'test/daemon/rfd-rpc.test.js',
-            'init with an empty id deregisters the receiver and rfd stays up (the double-join finding under ASan)',
+            '#269 (#161): init with an empty id deregisters the receiver and rfd stays up (under ASan)',
         ),
     );
     assert.ok(describe('/opt/x/test/daemon/rfd-rpc.test.js', 'a getValue on an unknown address faults, rfd stays up'));

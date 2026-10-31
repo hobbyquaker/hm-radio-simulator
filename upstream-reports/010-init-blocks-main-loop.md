@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/170
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/170, fixed upstream: 0aa528f60e59a2d7dee44a913c5abd07f4a9bc02 (#207)
 component: libhsscomm, libXmlRpc (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: init-blocks

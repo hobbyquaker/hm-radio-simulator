@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/171
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/171, fixed upstream: 002b8d13819335641e7e16a3c87a86175b904aa0 (#208)
 component: libhsscomm (rfd, hs485d)
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: async-callback-threads

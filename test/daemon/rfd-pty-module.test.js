@@ -84,7 +84,7 @@ test('a BUSY answer to GET_SERIALNR is retried by rfd (250 ms, twice) and the in
 // A pty slave whose master went away answers read() with 0 (end of file), not with -1: #115/#116 handle the error
 // case (a stale /dev/mmd_bidcos gives ENODEV, an unplugged USB adapter EIO) but not the end-of-file case, so rfd on
 // main still spins at 100 % CPU and keeps CONNECTED = true after the hangup - the `read-eof` finding, OpenCCU-Base
-// #162, fixed on the fork (a read() of 0 takes the error path of #115/#116, with "end of file" in the log line). The
+// #162, fixed by #264 (a read() of 0 takes the error path of #115/#116, with "end of file" in the log line). The
 // error case itself, with a read() that really fails, is rfd-serial-errors.test.js (the fault shim).
 test(
     '#162 read-eof: the pty hangs up (read() == 0) - rfd stays alive, without spinning, and reports CONNECTED false',

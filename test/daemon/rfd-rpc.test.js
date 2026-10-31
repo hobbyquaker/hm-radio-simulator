@@ -98,8 +98,8 @@ test(
 );
 
 test(
-    'init with an empty id deregisters the receiver and rfd stays up (the double-join finding under ASan)',
-    {...skipWithoutDaemons, ...regression('double-join'), timeout: 120000},
+    '#269 (#161): init with an empty id deregisters the receiver and rfd stays up (under ASan)',
+    {...skipWithoutDaemons, ...regression(269), timeout: 120000},
     async () => {
         // Deregistering tears the receiver's event dispatcher down; under AddressSanitizer rfd 3.89.11 aborts there
         // with "pthread_join: thread not found" - the dispatcher's thread is joined a second time (Actor::Stop() from
@@ -121,6 +121,30 @@ test(
                     .map((r) => r.text)
                     .join('\n'),
             );
+        }).finally(() => receiver.stop());
+    },
+);
+
+test(
+    '#269 (#161): a receiver deregistered right after its registration, twenty times: rfd keeps answering',
+    {...skipWithoutDaemons, ...regression(269), timeout: 180000},
+    async () => {
+        // Before #269 the actor marked itself running only in its new thread: a Stop() that came first skipped the
+        // signal, and the join then blocked rfd's main loop for good. That window is a race, so this repeats it; the
+        // calls have no timing assumption of their own beyond the RPC client's timeout (a hang fails on it).
+        const rfd = await startRfd();
+        const receiver = await startReceiver();
+        await withDaemon(rfd, async () => {
+            for (let i = 0; i < 20; i++) {
+                await Promise.all([
+                    rfd.call('init', [receiver.url, `hmrs-${i}`]),
+                    rfd.call('init', [receiver.url, '']),
+                ]);
+            }
+            await rfd.call('init', [receiver.url, '']);
+            assert.ok(Array.isArray(await rfd.call('listDevices')));
+            assert.ok(rfd.alive);
+            assert.deepEqual(rfd.sanitizerReports(), []);
         }).finally(() => receiver.stop());
     },
 );

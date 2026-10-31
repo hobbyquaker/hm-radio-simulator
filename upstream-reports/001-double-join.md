@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/161
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/161, fixed upstream: 3cee2feb66ff01ebeeedc9cbab77bf6601306487 (#269)
 component: libelvutils (Actor), rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: double-join

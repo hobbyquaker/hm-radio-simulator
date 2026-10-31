@@ -248,8 +248,8 @@ function wiredSwitch() {
 }
 
 test(
-    'a wired firmware file without a data record: hs485d reports no firmware and lives (finding hexfile-no-data)',
-    options(regression('hexfile-no-data')),
+    '#267 (#176): a wired firmware file without a data record: hs485d reports no firmware and lives',
+    options(regression(267)),
     async (t) => {
         const dir = tmpdir('hmrs-hs485d');
         fs.mkdirSync(path.join(dir, 'firmware'), {recursive: true});
@@ -271,6 +271,41 @@ test(
             assert.equal(search.result, 1, 'the device was found');
             const desc = await hs485d.call('getDeviceDescription', ['SIMW000001'], {timeout: 10000});
             assert.equal(desc.AVAILABLE_FIRMWARE || '', '', 'no firmware available from a file without data');
+            assert.deepEqual(hs485d.sanitizerReports(), []);
+        });
+    },
+);
+
+test(
+    '#267 (#176): a version address right before the firmware data: hs485d reports no firmware and lives',
+    options(regression(267)),
+    async (t) => {
+        const dir = tmpdir('hmrs-hs485d');
+        fs.mkdirSync(path.join(dir, 'firmware'), {recursive: true});
+        // HS485FirmwareManager::GetFirmwareVersion: position = version address - start, unsigned. One byte before the
+        // data it wraps to 0xFFFFFFFF, position + 1 wraps to 0 and passes the size check, and the read goes far out of
+        // the buffer. The data starts at 0x1000 (a type 00 record with 16 bytes), the map names 0x0FFF.
+        const record = [0x10, 0x10, 0x00, 0x00, ...new Array(16).fill(0x55)];
+        const crc = (0x100 - (record.reduce((sum, b) => sum + b, 0) & 0xff)) & 0xff;
+        const data = [...record, crc]
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('')
+            .toUpperCase();
+        fs.writeFileSync(path.join(dir, 'firmware', 'fwmap'), 'H17V0\thmrs_before.hex\t@0x0FFF\n');
+        fs.writeFileSync(path.join(dir, 'firmware', 'hmrs_before.hex'), `:${data}\n:00000001FF\n`);
+        const bus = new WiredBus();
+        bus.add(wiredSwitch());
+        const hs485d = await startHs485d({lgwFront: {serial: 'SIMWLGW001'}, bus, dir});
+        await withDaemon(hs485d, async () => {
+            const search = await faultOrResult(hs485d.call('searchDevices', [], {timeout: 30000}));
+            await sleep(1000);
+            t.diagnostic(
+                `searchDevices: ${JSON.stringify(search).slice(0, 120)}; last log: ${hs485d.log.slice(-1).join('')}`,
+            );
+            assert.ok(hs485d.alive, 'hs485d survives the firmware map');
+            assert.equal(search.result, 1, 'the device was found');
+            const desc = await hs485d.call('getDeviceDescription', ['SIMW000001'], {timeout: 10000});
+            assert.equal(desc.AVAILABLE_FIRMWARE || '', '', 'no firmware from an address before the data');
             assert.deepEqual(hs485d.sanitizerReports(), []);
         });
     },

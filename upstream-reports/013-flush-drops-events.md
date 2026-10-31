@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/173
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/173, fixed upstream: 592e903b0f8546f85486ef629b18819e2d09a9b2 (#274)
 component: rfd
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: flush-drops-events

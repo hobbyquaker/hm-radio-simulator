@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/166
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/166, fixed upstream: 1b1143c8b71fcee73df46bac082e982932b3fe68 (#209)
 component: hs485d
 refs: [3.89.11 (3ed652a), main (030dba7)]
 suite: wired-maintenance

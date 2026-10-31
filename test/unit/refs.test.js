@@ -63,9 +63,13 @@ test('the refs: upstream tags by version, main, the fork tags by version, the fo
 
 test("the fork's newest openccu-lite tag: v* by version, upstream's tags in the fork never count", () => {
     const tags = ['3.89.9', '3.89.11', 'v1.0.0-beta.1', 'v1.0.0-beta.2', 'v1.0.0-alpha.7', 'v-test', 'lite'];
-    assert.equal(newestTag(tags), 'v1.0.0-beta.2', 'beta after alpha (semver: words lexically)');
+    assert.equal(newestTag(tags), 'v1.0.0-beta.2', 'beta after alpha');
     assert.equal(newestTag([...tags, 'v1.0.0-beta.10']), 'v1.0.0-beta.10', 'numbers numerically');
     assert.equal(newestTag([...tags, 'v1.0.0']), 'v1.0.0', 'the release after its prereleases');
+    assert.equal(newestTag(['v1.1.0-dev.6', 'v1.1.0-beta.0']), 'v1.1.0-beta.0', 'beta after dev, not ASCII order');
+    assert.equal(newestTag(['v1.1.0-rc.0', 'v1.1.0-beta.9', 'v1.1.0-alpha.3', 'v1.1.0-dev.20']), 'v1.1.0-rc.0');
+    assert.equal(newestTag(['v1.1.0-alpha.0', 'v1.1.0-dev.20']), 'v1.1.0-alpha.0', 'alpha after dev');
+    assert.equal(newestTag(['v1.1.0-beta.0', 'v1.2.0-dev.0']), 'v1.2.0-dev.0', 'the numbers first');
     assert.equal(newestTag(['3.89.11']), '');
     assert.ok(FORK_TAG.test('v1.0.0-beta.2') && !FORK_TAG.test('3.89.11') && !FORK_TAG.test('v1.0'));
     assert.equal(compareVersions('v1.0.0-rc.1', 'v1.0.0-beta.9') > 0, true);

@@ -1,5 +1,5 @@
 ---
-status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/185
+status: reported: https://github.com/OpenCCU/OpenCCU-Base/issues/185, fixed upstream: efb620975ada689a24a26fcf21e0ff35d74df97e (#254)
 component: rfd
 refs: [3.89.11 (3ed652a), main (ee85651)]
 suite: ack-rssi-sign
