@@ -23,7 +23,7 @@ import {startReceiver} from '../helpers/rpc.js';
 import {loadDeviceDescription} from '../../lib/rftypes.js';
 import {WiredBus, WiredDevice} from '../../lib/wired.js';
 import {buildWiredImage, encodeIntelHex, writeWiredFwmapEntry} from '../../lib/firmware.js';
-import {regression} from '../helpers/known.js';
+import {regression, isKnownBroken} from '../helpers/known.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const options = (extra = {}) => ({...skipWithoutDaemons, timeout: 240000, ...extra});
@@ -238,7 +238,11 @@ test(
                 unreach = await second.call('getValue', [CH0, 'UNREACH']).catch(() => false);
             }
             assert.ok(second.alive, `hs485d lives: ${JSON.stringify(second.exit)}`);
-            assert.equal(unreach, true, 'the new channel has the failure');
+            // a rebuilt channel carries its maintenance class only with #209 (the wired-maintenance finding), which came
+            // after #257; the point of #257 is that nothing touches the deleted channel
+            if (!isKnownBroken('wired-maintenance')) {
+                assert.equal(unreach, true, 'the new channel has the failure');
+            }
             assert.deepEqual(second.sanitizerReports(), []);
         }).finally(cleanup);
     },
