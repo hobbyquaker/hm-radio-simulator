@@ -411,7 +411,7 @@ test('the filter bar (task 37): hidden without JavaScript, chips with counts, ro
     assert.match(html, /<section class="test-file"><h3 class="mono">test\/daemon\/rfd-pty-module\.test\.js<\/h3>/);
 });
 
-test("describeTest: a finding's issue number in the name links the issue and the fork commit, not a pull request", () => {
+test("describeTest: a finding's issue number in the name links the issue and the fix's commit, not a pull request", () => {
     const {kind, refs} = describeTest(
         '#164 SIGTERM: hs485d behind the wired LAN gateway leaves its main loop and exits 0',
     );
@@ -420,7 +420,8 @@ test("describeTest: a finding's issue number in the name links the issue and the
         refs.map((r) => [r.kind, r.url]),
         [
             ['issue', 'https://github.com/OpenCCU/OpenCCU-Base/issues/164'],
-            ['commit', 'https://github.com/hobbyquaker/OpenCCU-Base/commit/2386c07aca3c5763336b62ba2c582bd38f5e815c'],
+            // merged upstream (#255): the upstream commit, no longer the fork's
+            ['commit', 'https://github.com/OpenCCU/OpenCCU-Base/commit/58acf7330bb806add9e1ef507e6d8c844c14db04'],
         ],
     );
     // the finding's name and its number in one name: one set of links

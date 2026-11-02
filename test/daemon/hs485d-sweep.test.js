@@ -99,6 +99,7 @@ test(
                 ['getLinkInfo', [key, channel]],
                 ['removeLink', [key, channel]],
                 ['clearConfigCache', [SERIAL]],
+                ['restoreConfigToDevice', [SERIAL]],
                 ['listReplaceableDevices', [SERIAL]],
                 ['ping', ['sweep']],
                 ['init', ['xmlrpc_bin://127.0.0.1:9', 'sweep']],

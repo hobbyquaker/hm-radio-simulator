@@ -118,9 +118,10 @@ COPY --from=base-src /openccu-base/src/devicetypes/replaceMap /opt/openccu-base/
 COPY --from=base-src /openccu-base/licenses /opt/openccu-base/licenses
 COPY --from=base-src /openccu-base/.openccu-base-commit /opt/openccu-base/commit
 COPY --from=base-src /openccu-base/.openccu-base-ref /opt/openccu-base/ref
-# the daemons' RPC dispatcher sources, for the method sweep's table (scripts/method-table.mjs below)
-COPY --from=base-src /openccu-base/src/rfd/XmlRpcMethods.cpp /openccu-base/src/rfd/rfd.cpp /opt/openccu-base/methods-src/rfd/
-COPY --from=base-src /openccu-base/src/hs485d/XmlRpcMethods.cpp /openccu-base/src/hs485d/hs485d.cpp /opt/openccu-base/methods-src/hs485d/
+# the daemons' RPC dispatcher sources, for the method sweep's table (scripts/method-table.mjs below), and their
+# version.sh, for the version test (test/daemon/versions.test.js)
+COPY --from=base-src /openccu-base/src/rfd/XmlRpcMethods.cpp /openccu-base/src/rfd/rfd.cpp /openccu-base/src/rfd/version.sh /opt/openccu-base/methods-src/rfd/
+COPY --from=base-src /openccu-base/src/hs485d/XmlRpcMethods.cpp /openccu-base/src/hs485d/hs485d.cpp /openccu-base/src/hs485d/version.sh /opt/openccu-base/methods-src/hs485d/
 ENV HMRS_RFTYPES=/opt/openccu-base/rftypes \
     HMRS_HS485TYPES=/opt/openccu-base/hs485types \
     HMRS_REPLACEMAP=/opt/openccu-base/replaceMap/rfReplaceMap.xml \

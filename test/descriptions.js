@@ -11,6 +11,12 @@
 const rfd = 'rfd, the BidCoS radio daemon,';
 
 export const DESCRIPTIONS = Object.freeze({
+    'test/daemon/versions.test.js': {
+        '#294: rfd -v and --version print its version from version.sh and the versions of its libraries, and exit 0':
+            'Asked for its version, rfd prints it together with the versions of the libraries it uses and ends, instead of starting.',
+        '#294: hs485d -v and --version print its version from version.sh and the versions of its libraries, and exit 0':
+            'Asked for its version, hs485d prints it together with the versions of the libraries it uses and ends, instead of starting.',
+    },
     'test/daemon/hs485d-firmware.test.js': {
         'AVAILABLE_FIRMWARE from the fwmap: a literal version, and the version word read from the hex (@address)':
             'hs485d, the wired daemon, learns the firmware it can offer a device type from its fwmap: as a version written there, or read from the firmware file itself; a type without a usable entry offers none.',
@@ -29,6 +35,8 @@ export const DESCRIPTIONS = Object.freeze({
             'A firmware file with a wrong record checksum and with a record type hs485d does not handle is still read; hs485d warns and the update uses the data records.',
     },
     'test/daemon/hs485d-lgw.test.js': {
+        '#217: restoreConfigToDevice writes the configuration hs485d keeps back to a device that lost it; an unknown address faults':
+            'A wired device that lost its settings gets them back from what hs485d stored, as the radio daemon already could: the settings written before are on the device again.',
         'hs485d started as OpenCCU starts it (-g -i 0 -f hs485d.conf): the serial, LAN key and address from [Interface 0], the gateway on port 1000; a missing section, another Type or no key end it with 2, an unknown option with the usage and 1':
             'hs485d, the wired daemon, is started the way the CCU starts it: it takes the wired LAN gateway, its key and address from its configuration file and connects. A configuration it cannot use, or an unknown command-line option, must end it with a clear message.',
         "the central's virtual key BidCoS-Wir:1 linked to the switch channel: PRESS_SHORT and PRESS_LONG send the key frame (#K) to the linked channel":
@@ -149,12 +157,14 @@ export const DESCRIPTIONS = Object.freeze({
             'A program that registers late still learns about an earlier problem, such as an unreachable device.',
         'rfd: replaceDevice - every registered receiver is told replaceDevice(id, old, new) when it happens':
             'When a device is replaced by a new one, every registered program is told.',
-        'rfd: replaceDevice - a receiver that still lists the old device gets replaceDevice(old, new) at init, not deleteDevices (the replace-callback finding)':
-            'A program that missed a replacement should learn about it when it registers again; today it is told the old device was deleted instead.',
+        'rfd: #283 (#169): replaceDevice - a receiver that still lists the old device gets replaceDevice(old, new) at init, not deleteDevices':
+            'A program that missed a replacement learns about it when it registers again; before the fix it was told the old device was deleted instead.',
         'hs485d: replaceDevice - every registered receiver is told replaceDevice(id, old, new) when it happens':
             'When a wired device is replaced by a new one, every registered program is told.',
-        'hs485d: replaceDevice - a receiver that still lists the old device gets replaceDevice(old, new) at init, not deleteDevices (the replace-callback finding)':
-            'A program that missed a replacement should learn about it when it registers again; today it gets the wrong answer.',
+        'hs485d: #283 (#169): replaceDevice - a receiver that still lists the old device gets replaceDevice(old, new) at init, not deleteDevices':
+            'A program that missed a replacement learns about it when it registers again; before the fix it got the wrong answer.',
+        '#287: hs485d forgets a replacement when the old device is found on the bus again - a receiver that lists it gets no replaceDevice at init':
+            'A replaced wired device that turns up again is a device of its own again: a program that registers later is not told it was replaced.',
     },
     'test/daemon/receiver-misbehaviour.test.js': {
         'rfd, binrpc callbacks: a receiver that misbehaves on events (close, close-partial, vanish, no-answer, no-read, http-500, fault, garbage, truncated, wrong-type, huge, trickle, twice) holds up no other receiver, no RPC, no radio, and leaks nothing':
@@ -212,11 +222,13 @@ export const DESCRIPTIONS = Object.freeze({
         'rfd in sniffing mode (-s): starts without the device model and still answers RPC':
             "rfd's diagnostic listening mode starts without devices and still answers the remote interface.",
         '#164 SIGTERM: rfd leaves its main loop and exits 0 - with the pty module and behind the LAN gateway':
-            'Stopped with the signal the init system sends, rfd ends cleanly with exit code 0 instead of being killed: its threads are joined and the radio module or LAN gateway is closed (OpenCCU-Base #164).',
+            'Stopped with the signal the init system sends, rfd ends cleanly with exit code 0 instead of being killed: its threads are joined and the radio module or LAN gateway is closed (OpenCCU-Base #164, fixed upstream by #255).',
         '#281: a stop with SIGTERM logs no error from the interrupted select()':
             'The signal that stops rfd also interrupts its wait for network traffic; that is no error and must not be logged as one.',
+        '#255: SIGTERM right after an RPC call that added a device - rfd saves the device before it exits 0':
+            'A device added just before rfd is stopped is still written to its file: rfd finishes the save it already scheduled before it exits.',
         '#164 SIGTERM: hs485d behind the wired LAN gateway leaves its main loop and exits 0':
-            'Stopped with the signal the init system sends, hs485d ends cleanly with exit code 0 instead of being killed (OpenCCU-Base #164).',
+            'Stopped with the signal the init system sends, hs485d ends cleanly with exit code 0 instead of being killed (OpenCCU-Base #164, fixed upstream by #255).',
         'hs485d restart: every wired type comes back from its file with the same address, type, version and channels':
             'One device of every wired type is discovered, hs485d is restarted, and every device must come back unchanged.',
         'hs485d reads extra descriptions from /etc/config/hs485types: a type only described there is discovered as that type':
@@ -318,16 +330,16 @@ export const DESCRIPTIONS = Object.freeze({
             'The gateway sends its messages cut into pieces and several messages in one piece, as a slow network does. rfd must put them together correctly: the setup, the keepalives and switching a device all work, with encryption.',
         "plaintext: the gateway's messages split across TCP segments and gathered into one - the init, the keepalives and a switch work (6c757603)":
             'The same cut and merged gateway messages without encryption: rfd must still assemble them correctly.',
-        'AES: rfd started with 900 descriptors open - its sockets get numbers below 1024; the gateway path (e097a3c1) and the RPC server work':
+        '#285 (#178): AES: rfd started with 900 descriptors open - its sockets get numbers below 1024; the gateway path (e097a3c1) and the RPC server work':
             'A control run: rfd starts with 900 files already open, so its network connections get high numbers that are still below 1024. The gateway connection and the RPC server both work.',
-        'AES: rfd started with 1100 descriptors open - its sockets get numbers above 1024; the gateway path (e097a3c1) and the RPC server work':
-            'rfd starts with 1100 files already open, so its network connections get numbers above 1024. The gateway connection works since fix e097a3c1; the RPC server should work too (it does not: finding xmlrpc-select-fd).',
+        '#285 (#178): AES: rfd started with 1100 descriptors open - its sockets get numbers above 1024; the gateway path (e097a3c1) and the RPC server work':
+            'rfd starts with 1100 files already open, so its network connections get numbers above 1024. The gateway connection works since fix e097a3c1, the RPC server since the server waits with poll() instead of select().',
         'the gateway path':
             'rfd stays alive, its sockets have the expected numbers, both gateway channels connect and the radio module is set up.',
         'the RPC server answers': 'rfd answers an RPC call.',
         'no sanitizer report': 'The sanitizer build reports no memory error.',
-        'two coprocessor system commands at once: each gets its own answer (a duty-cycle query while the module restarts)':
-            'Two parts of rfd send a command to the radio module at the same moment: an RPC call asks for the duty cycle while the module restarts. Each command must get its own answer (it does not: finding system-command-slot).',
+        '#282 (#179): two coprocessor system commands at once: each gets its own answer (a duty-cycle query while the module restarts)':
+            "Two parts of rfd send a command to the radio module at the same moment: an RPC call asks for the duty cycle while the module restarts. Each command must get its own answer; before the fix one took the other one's.",
         'both commands get their own answers':
             'The duty cycle is reported correctly and rfd logs no error for either command.',
     },

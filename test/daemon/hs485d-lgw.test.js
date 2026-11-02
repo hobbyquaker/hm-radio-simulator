@@ -297,6 +297,45 @@ test(
 );
 
 test(
+    '#217: restoreConfigToDevice writes the configuration hs485d keeps back to a device that lost it; an unknown address faults',
+    // RestoreConfigToDevice: GetConfig() from hs485d's EEPROM cache, then RestoreConfig() - the W frames of a replaced
+    // device's restore; the bus answers in 20 ms, so the 60 s timeout is margin only
+    options(regression(217)),
+    async (t) => {
+        const sw = makeSwitch();
+        const {hs485d, receiver, cleanup} = await setup(t, [sw]);
+        await withDaemon(hs485d, async () => {
+            await discover(hs485d, receiver);
+            await hs485d.call('putParamset', [SERIAL, 'MASTER', {LOGGING_TIME: {explicitDouble: 5.0}}], {
+                timeout: 30000,
+            });
+            // LOGGING_TIME: EEPROM address 0x0001, factor 10
+            assert.equal(sw.eeprom[1], 50);
+            const kept = Buffer.from(sw.eeprom);
+            sw.eeprom.fill(0xff); // the device lost its configuration (a factory reset, a new board)
+            const writes = sw.writes;
+            // the BIN-RPC client resolves with a fault, the XML-RPC one rejects
+            const restored = await hs485d
+                .call('restoreConfigToDevice', [SERIAL], {timeout: 60000})
+                .catch((error) => error);
+            t.diagnostic(`restoreConfigToDevice: ${JSON.stringify(restored)}; ${sw.writes - writes} W frames`);
+            assert.ok(!(restored instanceof Error) && restored?.faultCode === undefined, 'no fault');
+            assert.ok(sw.writes > writes, 'W frames reached the device');
+            assert.equal(sw.eeprom[1], 50, 'LOGGING_TIME is back');
+            const lost = [...kept].flatMap((b, i) => (b !== 0xff && sw.eeprom[i] !== b ? [i] : []));
+            assert.deepEqual(lost, [], 'every byte hs485d had written is back');
+            assert.equal((await hs485d.call('getParamset', [SERIAL, 'MASTER'])).LOGGING_TIME, 5.0);
+            const unknown = await hs485d.call('restoreConfigToDevice', ['SIMW999999']).catch((error) => error);
+            assert.ok(
+                unknown instanceof Error || unknown?.faultCode !== undefined,
+                `faults: ${JSON.stringify(unknown)}`,
+            );
+            assert.ok(hs485d.alive);
+        }).finally(cleanup);
+    },
+);
+
+test(
     'a link from the key to the switch channel: addLink writes the link EEPROM, getLinks shows it, removeLink',
     options(),
     async (t) => {

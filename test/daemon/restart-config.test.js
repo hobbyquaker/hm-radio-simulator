@@ -493,13 +493,33 @@ test(
 
 test(
     '#281: a stop with SIGTERM logs no error from the interrupted select()',
-    // visible only with a handler, so with #164's fix too: without one the signal ends the process inside select()
+    // visible only with a handler (the fork's #164, upstream's #255): without one the signal ends the process inside
+    // select()
     options(regression(281, 'no-sigterm')),
     async (t) => {
         const rfd = await startQuietRfd();
         await withDaemon(rfd, async () => {
             await terminate(t, rfd, 'rfd on the pty module');
             assert.doesNotMatch(rfd.tail(200), /Error in XmlRpcDispatch::work/);
+        });
+    },
+);
+
+test(
+    '#255: SIGTERM right after an RPC call that added a device - rfd saves the device before it exits 0',
+    // rfd writes the device file from a 0 ms timer of its main loop; #255 runs the timers that are already due after
+    // the loop ends and wakes the loop at least once a second (it waited in select() up to the next timer before).
+    // The fork's handler of #164 has neither, so a signal that lands in the window loses the file there.
+    options(regression(255)),
+    async (t) => {
+        const rfd = await startQuietRfd();
+        await withDaemon(rfd, async () => {
+            await addSwitch(rfd, 'SWPTERM002', 0x4f3002);
+            await terminate(t, rfd, 'rfd right after addVirtualDeviceInstance');
+            assert.ok(
+                fs.existsSync(path.join(rfd.workdir, 'devices', 'SWPTERM002.dev')),
+                'the device file was written on the way out',
+            );
         });
     },
 );

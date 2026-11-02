@@ -449,7 +449,7 @@ for (const key of [KEY, '']) {
 for (const floor of [900, 1100]) {
     const above = floor > 1024;
     test(
-        `AES: rfd started with ${floor} descriptors open - its sockets get numbers ${above ? 'above' : 'below'} 1024; the gateway path (e097a3c1) and the RPC server work`,
+        `#285 (#178): AES: rfd started with ${floor} descriptors open - its sockets get numbers ${above ? 'above' : 'below'} 1024; the gateway path (e097a3c1) and the RPC server work`,
         options(),
         async (t) => {
             const rfd = await spawnRfd({lgwFront: {serial: SERIAL, key: KEY}, fdFloor: floor});
@@ -485,13 +485,13 @@ for (const floor of [900, 1100]) {
                       )
                     : 'rfd is gone';
                 t.diagnostic(`RPC: ${ready}`);
-                // libXmlRpc's XmlRpcDispatch::work() still builds fd_sets for select(): a descriptor of 1024 or more
-                // is outside the set (FD_SET writes past it), the server socket is never seen readable
-                await t.test('the RPC server answers', above ? regression('xmlrpc-select-fd') : {}, () => {
+                // before #285 libXmlRpc's XmlRpcDispatch::work() built fd_sets for select(): a descriptor of 1024 or more
+                // is outside the set (FD_SET writes past it), the server socket is never seen readable; now poll()
+                await t.test('the RPC server answers', above ? regression(285) : {}, () => {
                     assert.equal(ready, true);
                 });
                 const reports = rfd.sanitizerReports();
-                await t.test('no sanitizer report', above ? regression('xmlrpc-select-fd') : {}, () => {
+                await t.test('no sanitizer report', above ? regression(285) : {}, () => {
                     assert.equal(reports.length, 0, reports.map((r) => r.text.slice(0, 2000)).join('\n'));
                 });
             } finally {
@@ -502,7 +502,7 @@ for (const floor of [900, 1100]) {
 }
 
 test(
-    'two coprocessor system commands at once: each gets its own answer (a duty-cycle query while the module restarts)',
+    '#282 (#179): two coprocessor system commands at once: each gets its own answer (a duty-cycle query while the module restarts)',
     options(),
     async (t) => {
         const rfd = await startRfd({lgwFront: {serial: SERIAL, key: KEY}});
@@ -536,10 +536,10 @@ test(
             );
             t.diagnostic(`the module saw: ${names.join(' ')}`);
             assert.ok(names.indexOf('STARTBOOTLOADER') > names.indexOf('GETDUTYCYCLE'), 'the two commands overlapped');
-            // CCU2CommController::sendSystemCommand keeps one request slot (systemCommandRequestInfo) and waits with
-            // pthread_cond_timedwait on the mutex that guards it - the wait releases the mutex, so the second command
-            // overwrites the first one's request, and one thread takes the other's answer
-            await t.test('both commands get their own answers', regression('system-command-slot'), () => {
+            // before #282 CCU2CommController::sendSystemCommand kept one request slot (systemCommandRequestInfo) and
+            // waited with pthread_cond_timedwait on the mutex that guards it - the wait releases the mutex, so the second
+            // command overwrote the first one's request, and one thread took the other's answer; #282 serializes them
+            await t.test('both commands get their own answers', regression(282), () => {
                 assert.equal(dutyCycle, 23, `DUTY_CYCLE ${dutyCycle}`);
                 assert.deepEqual(errors, []);
             });

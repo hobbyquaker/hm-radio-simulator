@@ -367,8 +367,8 @@ for (const flavour of FLAVOURS) {
     );
 
     test(
-        `${flavour.name}: replaceDevice - a receiver that still lists the old device gets replaceDevice(old, new) at init, not deleteDevices (the replace-callback finding)`,
-        {...skipWithoutDaemons, ...regression('replace-callback'), timeout: 240000},
+        `${flavour.name}: #283 (#169): replaceDevice - a receiver that still lists the old device gets replaceDevice(old, new) at init, not deleteDevices`,
+        {...skipWithoutDaemons, ...regression(283), timeout: 240000},
         async (t) => {
             const daemon = await flavour.start();
             const bystander = await startReceiver();
@@ -410,3 +410,52 @@ for (const flavour of FLAVOURS) {
         },
     );
 }
+
+test(
+    '#287: hs485d forgets a replacement when the old device is found on the bus again - a receiver that lists it gets no replaceDevice at init',
+    // HS485Manager::AddNewDevice drops the serial from every replacement history since #287; the bus answers a
+    // search in 20 ms, hs485d collects answers for 3 x 700 ms (margins of seconds)
+    {...skipWithoutDaemons, ...regression(287), timeout: 240000},
+    async (t) => {
+        const flavour = FLAVOURS.find((f) => f.name === 'hs485d');
+        const daemon = await flavour.start();
+        const bystander = await startReceiver();
+        let receiver = null;
+        await withDaemon(daemon, async () => {
+            await register(flavour, daemon, bystander, 'contract-bystander');
+            const [oldDevice, newDevice] = await flavour.replacePair(daemon);
+            const version = (await daemon.call('getDeviceDescription', [oldDevice])).VERSION;
+            assert.equal(await daemon.call('replaceDevice', [oldDevice, newDevice], {timeout: 30000}), true);
+            // the old device is still on the bus at its address: a search adds it again, as itself
+            const found = await daemon.call('searchDevices', [], {timeout: 60000});
+            const after = (await daemon.call('listDevices')).map((d) => d.ADDRESS);
+            t.diagnostic(`searchDevices after the replace: ${found}; devices ${after.join(' ')}`);
+            assert.ok(after.includes(oldDevice) && after.includes(newDevice), 'both devices are known again');
+
+            receiver = await startReceiver({
+                methods: {
+                    'system.listMethods': () => [
+                        'system.listMethods',
+                        'system.multicall',
+                        'listDevices',
+                        'newDevices',
+                        'deleteDevices',
+                        'replaceDevice',
+                        'event',
+                    ],
+                    listDevices: () => [{ADDRESS: oldDevice, VERSION: version}],
+                    replaceDevice: () => '',
+                },
+            });
+            await register(flavour, daemon, receiver, 'contract-readded');
+            await sleep(1500);
+            const replaces = receiver.calls('replaceDevice').map((c) => c.params.slice(1));
+            const deletes = receiver.calls('deleteDevices').flatMap((c) => c.params[1]);
+            t.diagnostic(
+                `to the receiver: replaceDevice ${JSON.stringify(replaces)}, deleteDevices ${JSON.stringify(deletes)}`,
+            );
+            assert.deepEqual(replaces, [], 'the device that is back is not reported as replaced');
+            assert.ok(!deletes.includes(oldDevice), 'nor as deleted');
+        }).finally(() => stopAll([bystander, receiver].filter(Boolean)));
+    },
+);

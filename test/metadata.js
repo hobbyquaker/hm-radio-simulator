@@ -124,11 +124,41 @@ export const UPSTREAM_FIXES = Object.freeze({
         title: 'libXmlRpc, rfd, hs485d: no freed memory and a clear fault for missing RPC arguments (the metadata-args finding, #167)',
         commit: '2f366e0a4e3585842107a553e185b285bf9ea071',
     },
-    // upstream has no SIGTERM handler yet (#164), so only a ref with the fork's handler shows the line: not provable on
-    // upstream's own pair, its test guards the fork
+    // upstream got its SIGTERM handler only with #255, after this one, so only a ref with a handler shows the line: not
+    // provable on upstream's own pair, its test guards the refs with a handler
     281: {
         title: 'libXmlRpc: do not log an interrupted select() as an error',
         commit: 'a75ab04ee7aa33b012e00cf7f487650214ed3127',
+    },
+    283: {
+        title: 'rfd, hs485d: tell a receiver that registers after a device replacement (the replace-callback finding, #169)',
+        commit: '46c1bf01691f0b8abc7e3aacccb426078e9cf82f',
+    },
+    282: {
+        title: 'rfd: serialize coprocessor system commands and BidCoS requests (the system-command-slot finding, #179)',
+        commit: 'ce5e83a9ab8c3a01f4745ced7e2ca90d6d7a6418',
+    },
+    285: {
+        title: 'Replace select() with poll() for descriptors of 1024 and more (the xmlrpc-select-fd finding, #178)',
+        commit: '7ac2d6176983dfeec1b29a116bb0955d65093dd0',
+    },
+    // upstream's form of the fork's #164 handler (the no-sigterm finding's fixedBy), plus what the fork lacked: the
+    // main loop wakes once a second, and the timers already due run after it (a save the last RPC call requested)
+    255: {
+        title: 'rfd, hs485d: handle SIGTERM and SIGINT with a clean shutdown (the no-sigterm finding, #164)',
+        commit: '58acf7330bb806add9e1ef507e6d8c844c14db04',
+    },
+    217: {
+        title: 'hs485d, webui: add restoreConfigToDevice for BidCos-Wired',
+        commit: '483a6dce354802217cfe9e489e63eaa482adedf9',
+    },
+    287: {
+        title: 'hs485d: forget a replacement when the old device is added again',
+        commit: '60dbdc7e81996cd17acd9105a6a249be64b12fd4',
+    },
+    294: {
+        title: 'add a version to every program and library (rfd and hs485d: -v, --version)',
+        commit: '98c9cd1d2c5f62897b9315b239a42758dfc63339',
     },
 });
 
@@ -318,6 +348,7 @@ export const FINDINGS = Object.freeze({
             'rare: a device replacement while a logic layer is offline; ReGa, which runs the replacement, is online',
         draft: '009-replace-callback.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/169',
+        fixedBy: '46c1bf01691f0b8abc7e3aacccb426078e9cf82f',
     },
     'init-blocks': {
         title: 'rfd and hs485d: init with a receiver that does not answer freezes the whole daemon - the init callbacks run without a timeout on the main loop',
@@ -393,6 +424,7 @@ export const FINDINGS = Object.freeze({
         relevanceNote: 'practically never: the open-file limit of 1024 keeps the descriptors below 1024',
         draft: '018-xmlrpc-select-fd.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/178',
+        fixedBy: '7ac2d6176983dfeec1b29a116bb0955d65093dd0',
     },
     'system-command-slot': {
         title: "rfd: two coprocessor system commands from two threads share one request slot; one takes the other's answer",
@@ -401,6 +433,7 @@ export const FINDINGS = Object.freeze({
             'rare on a local radio module (during a module restart), occasional on an HM-LGW or with a periodic listBidcosInterfaces poll; self-healing',
         draft: '019-system-command-slot.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/179',
+        fixedBy: 'ce5e83a9ab8c3a01f4745ced7e2ca90d6d7a6418',
     },
     'ack-rssi-sign': {
         title: "rfd: the RSSI byte in the module's send status (the ACK) is signed; rfd negates it like the event's magnitude",
@@ -449,6 +482,7 @@ export const FINDINGS = Object.freeze({
         title: 'rfd and hs485d do not handle SIGTERM: a pending save is lost on stop',
         draft: '004-no-sigterm-handling.md',
         issue: 'https://github.com/OpenCCU/OpenCCU-Base/issues/164',
+        fixedBy: '58acf7330bb806add9e1ef507e6d8c844c14db04',
         fork: {commit: '2386c07aca3c5763336b62ba2c582bd38f5e815c', branch: 'fix/164-sigterm'},
     },
 });

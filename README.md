@@ -72,8 +72,9 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   Reconnects übrig, `SET_CLOCK` scheitert beim Start; ein Hello ohne Seriennummer, die Statusdatei unter der
   konfigurierten Seriennummer, Port 2001 mit fremder Seriennummer, die Suche nach der konfigurierten Seriennummer;
   Nachrichten des Gateways auf mehrere TCP-Segmente verteilt und zusammengefasst (6c757603), Sockets über Deskriptor 1024
-  (e097a3c1) - dabei fiel `xmlrpc-select-fd` auf - und zwei Systembefehle aus zwei Threads gleichzeitig
-  (`system-command-slot`).
+  (e097a3c1) - dabei fiel `xmlrpc-select-fd` auf, behoben mit [#285](https://github.com/OpenCCU/OpenCCU-Base/pull/285) -
+  und zwei Systembefehle aus zwei Threads gleichzeitig (`system-command-slot`, behoben mit
+  [#282](https://github.com/OpenCCU/OpenCCU-Base/pull/282)).
 - **AES-gesicherte Geräte und eine Fernbedienung (HM-RC-4 aus `rf_rc.xml`):** der Schlüsseltausch beim Anlernen,
   `AES_ACTIVE` setzt die Kanal-Authentifizierung im Modul (`AUTHENTICATION_ON`), ein Schaltbefehl läuft durch
   Challenge-Response (die Luftstrecke rechnet, was sonst die Modul-Firmware tut: `ACK_W_AES_CHALLENGE`,
@@ -137,7 +138,8 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   EEPROM (`W`/`R`), eine Verknüpfung Taste → Aktor, ein stummes Gerät (`a 01`, `UNREACH`/`STICKY_UNREACH`), der
   Keepalive-Ausfall mit Wiederverbindung und der Neustart mit den Gerätedateien, darunter ein Typ-Byte ≥ 0x80
   ([#9](https://github.com/OpenCCU/OpenCCU-Base/pull/9)) - und nach dem Neustart der Wartungskanal, der dem neu
-  gefundenen Gerät fehlt (`wired-maintenance`).
+  gefundenen Gerät fehlt (`wired-maintenance`); `restoreConfigToDevice` schreibt die Konfiguration, die hs485d
+  gespeichert hat, zurück auf ein Gerät, das sie verloren hat ([#217](https://github.com/OpenCCU/OpenCCU-Base/pull/217)).
 - **Firmware-Updates mit hs485d (der Hexfile-Pfad):** `Firmware Dir/fwmap` nennt je Gerätetyp (`H17V0`) eine
   Intel-HEX-Datei, die Version als Zahl oder als `@<Adresse>` des Versionsworts im Image; `AVAILABLE_FIRMWARE`
   daraus. Das Update: `z` zweimal, `u` in die Anwendung, `u` an den Bootloader, `p` (Seitengröße), die Seiten mit
@@ -165,7 +167,9 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   das elfte Event entfernt den Empfänger samt Eintrag in der Handler-Datei; ein Erfolg setzt die Zählung zurück. Ein
   hängender Empfänger bremst nur sich selbst (die anderen bekommen ihre Events nach rund 20 ms, RPC antwortet sofort).
   Servicemeldungen werden einem später angemeldeten Empfänger nachgeschickt; ein `replaceDevice` erreicht alle
-  angemeldeten Empfänger.
+  angemeldeten Empfänger und einen, der sich später anmeldet und das alte Gerät noch kennt
+  ([#283](https://github.com/OpenCCU/OpenCCU-Base/pull/283)); hs485d vergisst einen Tausch, wenn das alte Gerät
+  wieder am Bus auftaucht ([#287](https://github.com/OpenCCU/OpenCCU-Base/pull/287)).
 - **Neustart, Gerätedateien und Konfiguration:** je ein Gerät jedes `rftypes`-Typs, rfd sauber beendet (über
   seine RPC-Methode `exit`, wo es sie hat, sonst mit SIGTERM; exit(0) in Millisekunden) und neu gestartet - alle Adressen, Typen, Versionen und Kanäle sind
   wieder da (dazu die Team-Geräte der Rauchmelder, die erst das Laden aus der Datei anlegt); dasselbe für jeden
@@ -176,7 +180,8 @@ kaputter BIN-RPC-Request? Und wie verhält sich eine neue Version im Vergleich z
   (`XmlRpcHandlersFile`). Die Start-Matrix: fehlende Konfigurationsdatei, unbekannter Interface-`Type`, `Log
 Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exit-Code 0), zwei Interfaces, die alte
   Coprozessor-Initialisierung, der Sniffing-Modus (`-s`), hs485d mit zusätzlichen Beschreibungen in
-  `/etc/config/hs485types`.
+  `/etc/config/hs485types`. SIGTERM beendet rfd und hs485d mit Exit-Code 0, und ein Gerät, das kurz vor dem Signal
+  angelegt wurde, ist trotzdem gespeichert ([#255](https://github.com/OpenCCU/OpenCCU-Base/pull/255)).
 - **Ein Empfänger, der sich danebenbenimmt** (rfd und hs485d, Rückrufe über BIN-RPC und XML-RPC): ein Empfänger
   auf Byte-Ebene schließt mitten in der Anfrage, verschwindet, antwortet nie oder liest nicht mehr, antwortet mit
   HTTP-Fehler, Fault, Müll, abgeschnitten, mit falschem Typ, mit mehreren MB, Byte für Byte oder doppelt - der zweite
@@ -202,6 +207,9 @@ Destination` File und None, `UDS File`, ein belegter Port ("Could not bind", Exi
   sind aufrufbar, hs485d 28 von 28, kein ungelisteter Name ist aufrufbar (hs485ds nicht registriertes
   `activateLinkParamset` eingeschlossen); `system.methodHelp` kennt `system.multicall` nicht (es steckt in der
   Verbindung), `system.methodSignature` gibt es nicht. Der Testbericht zeigt die Zahlen als Tabelle.
+- **Die Versionen** ([#294](https://github.com/OpenCCU/OpenCCU-Base/pull/294)): `rfd -v`/`--version` und
+  `hs485d -v`/`--version` geben die Version des Daemons aus seiner `version.sh` aus, dazu eine Zeile je
+  OpenCCU-Base-Bibliothek, die er aufruft, und enden mit Exit-Code 0, ohne zu starten.
 - **Last (rfd):** sechs Schaltaktoren und eine Fernbedienung auf der Luftstrecke mit berechneter Sendezeit. Eine Salve
   mit 50 % des Luft-Maximums (8,3 von 16,7 Befehlen pro Sekunde) mit einem `putParamset` mittendrin und
   Fernbedienungs-Tastendrücken währenddessen: jeder Aufruf beantwortet, jeder Befehl in Reihenfolge in der Luft, jeder
@@ -258,8 +266,7 @@ im Verlauf die neue Seriennummer statt der alten. Der Test mit dem Empfänger, d
 (`system.listMethods`, `listDevices`) ohne Timeout in der Hauptschleife des Daemons zurück; antwortet er nicht, steht
 der ganze Daemon (RPC, Events an andere, Timer, die Funkseite), bis die Verbindung schließt. Und
 `async-callback-threads` - jedes unbeantwortete `newDevices`/`deleteDevices`/`replaceDevice` lässt einen Thread und
-einen Socket für immer zurück. Gegen `main` bleiben
-`replace-callback`, `xmlrpc-select-fd` (hat ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortet der RPC-Server nicht mehr: libXmlRpc wartet noch mit `select()` auf `fd_set`s), `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilen sich einen Platz für die Anfrage; einer bekommt die Antwort des anderen) und `no-sigterm` (#164). Upstream inzwischen behoben: `init-blocks` (#207), `async-callback-threads` (#208), `wired-maintenance` (#209), `aes-republish` (#211), `read-eof` (#264), `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren; #274), `ack-rssi-sign` (das Modul schickt den RSSI der Quittung im Sendestatus als vorzeichenbehaftetes Byte, rfd negiert ihn wie den Betrag im Event: -216 statt -40 dBm auf dem CCU3, +40 auf x86_64, in `RSSI_PEER` und `rssiInfo`; #254), diese sieben schon länger im Fork; `double-join` (#269), `hexfile-no-data` (siehe Fuzzing; #267) und `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldete Erfolg und speicherte es; #272), im Fork im `lite`-Stand nach `v1.1.0-dev.6`; `json-substr` (#260), `propertymap-long-line` (#263; beide siehe Fuzzing), `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest; #266) und `string-uint-conversion` (#268), im Fork ab `v1.1.0-dev.6`; `metadata-args` (fehlende Argumente; jetzt der Fehler `Insufficient parameters.`; #271) und `lgw-reconnect-uaf`, der Use-after-free aus #195 (#265, die um eine frühere Sperre ergänzte Fassung des Fork-Fixes), im Fork im `lite`-Stand nach `v1.1.0-beta.0`; ihre Tests sind jetzt Regressionstests. Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-019 sind als
+einen Socket für immer zurück. Upstream inzwischen behoben: `init-blocks` (#207), `async-callback-threads` (#208), `wired-maintenance` (#209), `aes-republish` (#211), `read-eof` (#264), `flush-drops-events` (rfd verwirft vor jedem Befehl ungelesene Eingaben vom Modul; unter Last gehen so Events verloren; #274), `ack-rssi-sign` (das Modul schickt den RSSI der Quittung im Sendestatus als vorzeichenbehaftetes Byte, rfd negiert ihn wie den Betrag im Event: -216 statt -40 dBm auf dem CCU3, +40 auf x86_64, in `RSSI_PEER` und `rssiInfo`; #254), diese sieben schon länger im Fork; `double-join` (#269), `hexfile-no-data` (siehe Fuzzing; #267) und `unknown-interface` (`setBidcosInterface` mit einem Interface, das es nicht gibt, meldete Erfolg und speicherte es; #272), im Fork im `lite`-Stand nach `v1.1.0-dev.6`; `json-substr` (#260), `propertymap-long-line` (#263; beide siehe Fuzzing), `dutycycle-upper-bound` (meldet das Modul 100 % Duty Cycle, liest rfd hinter seiner Schwellen-Tabelle; gefunden vom Lasttest; #266) und `string-uint-conversion` (#268), im Fork ab `v1.1.0-dev.6`; `metadata-args` (fehlende Argumente; jetzt der Fehler `Insufficient parameters.`; #271) und `lgw-reconnect-uaf`, der Use-after-free aus #195 (#265, die um eine frühere Sperre ergänzte Fassung des Fork-Fixes), im Fork im `lite`-Stand nach `v1.1.0-beta.0`; `replace-callback` (#283), `system-command-slot` (zwei Systembefehle an den Coprozessor aus zwei Threads teilten sich einen Platz für die Anfrage, einer bekam die Antwort des anderen; #282), `xmlrpc-select-fd` (hatte ein Socket von rfd oder hs485d eine Deskriptor-Nummer ab 1024, antwortete der RPC-Server nicht mehr: libXmlRpc wartete mit `select()` auf `fd_set`s, jetzt mit `poll()`; #285) und `no-sigterm` (#255, die Upstream-Fassung des Fork-Fixes zu #164, die zusätzlich die schon fälligen Timer vor dem Ende ausführt, etwa das Speichern eines eben angelegten Geräts), im Fork im `lite`-Stand nach `v1.1.0`; ihre Tests sind jetzt Regressionstests. Neu getestet sind außerdem `restoreConfigToDevice` für BidCos-Wired (#217), das Vergessen eines Tauschs, wenn das alte Gerät wieder auftaucht (#287), und `-v`/`--version` von rfd und hs485d mit den Versionen ihrer Bibliotheken (#294). Für jeden Fund liegt ein Issue-Entwurf in [`upstream-reports/`](upstream-reports/); 001-019 sind als
 OpenCCU-Base #161-#179 gemeldet, 020 als #185 (die Links stehen in der [Liste](upstream-reports/README.md#die-entwürfe)). Die Firmware-Update-Tests brachten `update-nack-ignored` (ein NACK des Geräts auf einen Update-Frame gilt
 als Quittung: `SendUpdataFrame` prüft die Antwort nie, das Update endet mit `true` und `Rebuild`, das Gerät bleibt
 bei seiner Version oder im Bootloader) und `info-blank-line` (`RFFirmwareManager::TrimLine` läuft mit einem
@@ -393,7 +400,7 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) das neueste openccu-lite-Release-Tag (`vX.Y.Z`, ohne `-dev`, `-beta` oder `-rc`; heute `v1.0.0`) und das neueste Tag einschließlich der Vorabversionen (heute `v1.1.0-dev.6`; nur solange es neuer ist als das Release). Aus dem Zweig `lite` des Forks baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests, etwa zu #164); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was das openccu-lite-Release der Nutzer und die Vorabversion im Test beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [hobbyquaker/OpenCCU-Base](https://github.com/hobbyquaker/OpenCCU-Base) das neueste openccu-lite-Release-Tag (`vX.Y.Z`, ohne `-dev`, `-beta` oder `-rc`; heute `v1.0.0`) und das neueste Tag einschließlich der Vorabversionen (heute `v1.1.0-dev.6`; nur solange es neuer ist als das Release). Aus dem Zweig `lite` des Forks baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests; seit #255 ist keiner mehr offen); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was das openccu-lite-Release der Nutzer und die Vorabversion im Test beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
 (`scripts/resolve-refs.mjs`: upstream Tags der Form `X.Y.Z`, im Fork Tags der Form `vX.Y.Z[-…]`, je nach Version sortiert; die Kopien der Upstream-Tags im Fork zählen nicht); ein neues Tag ersetzt das bisherige, `main` zählt mit seinem neuesten Commit. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
 
 ## Testbericht
@@ -426,7 +433,7 @@ man ihn:
   der ganze Nachweis in `proof.json`. Er kostet zwei Image-Builds je Fix; die CI führt ihn deshalb wöchentlich, auf
   Anforderung (`workflow_dispatch` mit `prove`) und bei einem Push aus, der die Fix-Liste oder einen Regressionstest
   ändert; dazwischen behält der Bericht den letzten. Lokal: `node scripts/prove.mjs local [--fixes 9,16]`;
-- **known bug** - ein Fund dieser Suite ohne Fix upstream (`replace-callback`, `xmlrpc-select-fd`, `system-command-slot`, `no-sigterm`, `devices-lock-wait`); verlinkt das Issue oder,
+- **known bug** - ein Fund dieser Suite ohne Fix upstream (`devices-lock-wait`); verlinkt das Issue oder,
   solange es keins gibt, den Abschnitt oben;
 - **Feldrelevanz** - die Tests eines Funds tragen vor ihrem Namen eine Einordnung, wie wahrscheinlich eine gewöhnliche
   Installation im normalen Betrieb auf ihn trifft. Sie stammt aus einer Recherche vom 2026-10-14 zu jedem Fund: was ihn
