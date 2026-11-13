@@ -232,7 +232,7 @@ test('proofForTest: the proof field of a report test', () => {
         null,
         forkFix,
     );
-    assert.equal(forkProof.fixes[200].repo, 'https://github.com/hobbyquaker/OpenCCU-Base');
+    assert.equal(forkProof.fixes[200].repo, 'https://github.com/openccu-lite/OpenCCU-Base');
     const issueRefs = [{kind: 'issue', label: 'f (issue)', url: 'https://github.com/OpenCCU/OpenCCU-Base/issues/200'}];
     assert.deepEqual(proofForTest({...t('a'), refs: issueRefs}, forkProof), {
         status: 'proven',
@@ -240,7 +240,7 @@ test('proofForTest: the proof field of a report test', () => {
         parent: 'parent-sha',
         merge: 'merge-sha',
         date: '2026-10-11T12:00:00Z',
-        repo: 'https://github.com/hobbyquaker/OpenCCU-Base',
+        repo: 'https://github.com/openccu-lite/OpenCCU-Base',
         finding: 'f',
     });
 });

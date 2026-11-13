@@ -1,7 +1,7 @@
 name: upstream watch
 
 # Runs the suite whenever one of the refs the report tests moves, in either repository (scripts/refs.mjs): on
-# OpenCCU/OpenCCU-Base a new release tag or a new main commit, on openccu-lite's fork hobbyquaker/OpenCCU-Base a new
+# OpenCCU/OpenCCU-Base a new release tag or a new main commit, on openccu-lite's fork openccu-lite/OpenCCU-Base a new
 # openccu-lite release tag (vX.Y.Z) or pre-release tag (vX.Y.Z-dev.N and the like). GitHub has no cross-repository push trigger, so this polls both
 # repositories every 15 minutes (`scripts/resolve-refs.mjs --heads`, git ls-remote: "<label> <commit>" per ref), keeps
 # the last tested ones on the branch `upstream-state` (written only here: `last-tested-refs`) and, when one is new,
@@ -123,7 +123,7 @@ jobs:
             git checkout -q --orphan upstream-state
             git rm -rfq . >/dev/null 2>&1 || true
           fi
-          printf '# upstream-state\n\nWritten by the upstream-watch workflow: the refs of OpenCCU-Base and of the fork hobbyquaker/OpenCCU-Base the suite ran for last (last-tested-refs, "<label> <commit>" per ref), and every run in history.\n' > README.md
+          printf '# upstream-state\n\nWritten by the upstream-watch workflow: the refs of OpenCCU-Base and of the fork openccu-lite/OpenCCU-Base the suite ran for last (last-tested-refs, "<label> <commit>" per ref), and every run in history.\n' > README.md
           # one "<label> <sha>" line per ref; the files of the earlier watch (main and the fork branches) are gone
           printf '%s' "$HEADS" | tr ';' '\n' | sed '/^$/d' > last-tested-refs
           git rm -q --ignore-unmatch last-tested last-tested-forks

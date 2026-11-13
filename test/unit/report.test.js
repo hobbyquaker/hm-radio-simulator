@@ -347,17 +347,17 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
         fix: 164,
         parent: 'c'.repeat(40),
         merge: 'd'.repeat(40),
-        repo: 'https://github.com/hobbyquaker/OpenCCU-Base',
+        repo: 'https://github.com/openccu-lite/OpenCCU-Base',
     });
     assert.ok(fork.includes('href="https://github.com/OpenCCU/OpenCCU-Base/issues/164"'), fork);
     assert.ok(
         fork.includes(
-            `fork commit <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'d'.repeat(40)}"`,
+            `fork commit <a class="mono" href="https://github.com/openccu-lite/OpenCCU-Base/commit/${'d'.repeat(40)}"`,
         ),
     );
     assert.ok(
         fork.includes(
-            `parent <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'c'.repeat(40)}"`,
+            `parent <a class="mono" href="https://github.com/openccu-lite/OpenCCU-Base/commit/${'c'.repeat(40)}"`,
         ),
     );
 });
@@ -365,13 +365,13 @@ test('the regression proof (task 30): a mark in the kind cell, the commits behin
 test('a fork column links its commits in the fork; a fork or tag trigger is linked where the commit is', () => {
     assert.equal(
         triggerHtml(`lite@v1.0.0 ${'e'.repeat(40)}`),
-        `hobbyquaker/OpenCCU-Base/lite 1.0.0 <a class="mono" href="https://github.com/hobbyquaker/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
+        `openccu-lite/OpenCCU-Base/lite 1.0.0 <a class="mono" href="https://github.com/openccu-lite/OpenCCU-Base/commit/${'e'.repeat(40)}">eeeeeee</a>`,
     );
     // the branch lite was a column until task 45: an old trigger of it stays plain text
     assert.equal(triggerHtml(`lite ${'e'.repeat(7)}`), `lite ${'e'.repeat(7)}`);
     assert.match(
         triggerHtml(`lite@v1.0.0-beta.3 ${'e'.repeat(40)}`),
-        /^hobbyquaker\/OpenCCU-Base\/lite 1\.0\.0-beta\.3 <a class="mono" href="https:\/\/github\.com\/hobbyquaker\/OpenCCU-Base\/commit\/e{40}">/,
+        /^openccu-lite\/OpenCCU-Base\/lite 1\.0\.0-beta\.3 <a class="mono" href="https:\/\/github\.com\/openccu-lite\/OpenCCU-Base\/commit\/e{40}">/,
     );
     assert.match(
         triggerHtml('3.89.12 abcdef1'),

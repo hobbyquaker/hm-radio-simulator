@@ -128,23 +128,23 @@ test("the report's names: repository and branch above, the tag without its v or 
     });
     assert.equal(refDisplay('main').name, 'head');
     assert.deepEqual(refDisplay('lite@v1.0.0-beta.2'), {
-        group: 'hobbyquaker/OpenCCU-Base/lite',
-        groupUrl: 'https://github.com/hobbyquaker/OpenCCU-Base/tree/lite',
+        group: 'openccu-lite/OpenCCU-Base/lite',
+        groupUrl: 'https://github.com/openccu-lite/OpenCCU-Base/tree/lite',
         name: '1.0.0-beta.2',
     });
     assert.equal(refDisplay('lite@v1.0.0').name, '1.0.0');
-    assert.equal(refText('lite@v1.1.0-dev.5'), 'hobbyquaker/OpenCCU-Base/lite 1.1.0-dev.5');
-    assert.equal(refText('lite', WITH_BRANCH), 'hobbyquaker/OpenCCU-Base/lite head');
+    assert.equal(refText('lite@v1.1.0-dev.5'), 'openccu-lite/OpenCCU-Base/lite 1.1.0-dev.5');
+    assert.equal(refText('lite', WITH_BRANCH), 'openccu-lite/OpenCCU-Base/lite head');
     assert.deepEqual(
         refDisplay('lite-3.89.11'),
         {group: '', groupUrl: '', name: 'lite-3.89.11'},
         'an old label as it is',
     );
     assert.equal(refPairText('3.89.11', 'main'), 'OpenCCU/OpenCCU-Base/main: 3.89.11 → head');
-    assert.equal(refPairText('lite@v1.0.0', 'lite@v1.1.0-dev.5'), 'hobbyquaker/OpenCCU-Base/lite: 1.0.0 → 1.1.0-dev.5');
+    assert.equal(refPairText('lite@v1.0.0', 'lite@v1.1.0-dev.5'), 'openccu-lite/OpenCCU-Base/lite: 1.0.0 → 1.1.0-dev.5');
     assert.equal(
         refPairText('lite@v1.0.0-beta.2', 'lite', WITH_BRANCH),
-        'hobbyquaker/OpenCCU-Base/lite: 1.0.0-beta.2 → head',
+        'openccu-lite/OpenCCU-Base/lite: 1.0.0-beta.2 → head',
     );
 });
 
@@ -180,9 +180,9 @@ test('the differential compares neighbours: the older tag with the newer one, th
 });
 
 test('a ref with its repository: <repo>@<branch>[=<label>], a plain ref is one of OpenCCU-Base', () => {
-    assert.deepEqual(parseRefSpec('https://github.com/hobbyquaker/OpenCCU-Base.git@lite'), {
+    assert.deepEqual(parseRefSpec('https://github.com/openccu-lite/OpenCCU-Base.git@lite'), {
         label: 'lite',
-        repo: 'https://github.com/hobbyquaker/OpenCCU-Base.git',
+        repo: 'https://github.com/openccu-lite/OpenCCU-Base.git',
         ref: 'lite',
     });
     assert.deepEqual(parseRefSpec('git@github.com:someone/OpenCCU-Base.git@fix/x=mine'), {
@@ -198,9 +198,9 @@ test("the links of a column go to the repository it was built from: a fork ref's
     assert.equal(webUrl('git@github.com:a/b.git'), 'https://github.com/a/b');
     assert.equal(repoOfRef('main'), 'https://github.com/OpenCCU/OpenCCU-Base');
     assert.equal(commitUrl('3.89.11', 'abc'), 'https://github.com/OpenCCU/OpenCCU-Base/commit/abc');
-    assert.equal(commitUrl('lite', 'abc', WITH_BRANCH), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
-    assert.equal(commitUrl('lite@v1.0.0', 'abc'), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
-    assert.equal(commitUrl('lite@v1.1.0-dev.5', 'abc'), 'https://github.com/hobbyquaker/OpenCCU-Base/commit/abc');
+    assert.equal(commitUrl('lite', 'abc', WITH_BRANCH), 'https://github.com/openccu-lite/OpenCCU-Base/commit/abc');
+    assert.equal(commitUrl('lite@v1.0.0', 'abc'), 'https://github.com/openccu-lite/OpenCCU-Base/commit/abc');
+    assert.equal(commitUrl('lite@v1.1.0-dev.5', 'abc'), 'https://github.com/openccu-lite/OpenCCU-Base/commit/abc');
 });
 
 test('a finding with a fork fix is fixed where the fork commit or, later, the upstream merge commit is', () => {
@@ -258,8 +258,8 @@ test("the differential compares each fork ref with the run's upstream release ta
         sections.map((s) => s.title),
         [
             'OpenCCU/OpenCCU-Base/main: 3.89.11 → head',
-            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite 1.0.0',
-            'OpenCCU/OpenCCU-Base/main 3.89.11 → hobbyquaker/OpenCCU-Base/lite 1.1.0-dev.5',
+            'OpenCCU/OpenCCU-Base/main 3.89.11 → openccu-lite/OpenCCU-Base/lite 1.0.0',
+            'OpenCCU/OpenCCU-Base/main 3.89.11 → openccu-lite/OpenCCU-Base/lite 1.1.0-dev.5',
         ],
     );
 });

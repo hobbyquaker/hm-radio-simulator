@@ -2,7 +2,7 @@
 /**
  * Which OpenCCU-Base refs a run tests, and what is known broken on each - chosen, not hard-coded: upstream's newest
  * release tag (`X.Y.Z`, by version) and the head of main, and the refs of FORK_REFS (scripts/refs.mjs): on the fork
- * hobbyquaker/OpenCCU-Base the newest openccu-lite release tag (`vX.Y.Z`, no pre-release suffix) and the newest tag
+ * openccu-lite/OpenCCU-Base the newest openccu-lite release tag (`vX.Y.Z`, no pre-release suffix) and the newest tag
  * including pre-releases (`v1.1.0-dev.5`), the latter only while it is newer than the release. A new tag on either side
  * replaces the previous one on the next run.
  *

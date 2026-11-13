@@ -51,7 +51,7 @@ jobs:
       - run: npm run test:unit
 
   # which OpenCCU-Base refs this run tests: upstream's newest release tag and main's head (or the upstream watch's
-  # commit), and on openccu-lite's fork hobbyquaker/OpenCCU-Base its newest openccu-lite release tag (vX.Y.Z) and its
+  # commit), and on openccu-lite's fork openccu-lite/OpenCCU-Base its newest openccu-lite release tag (vX.Y.Z) and its
   # newest tag including pre-releases, when newer (scripts/refs.mjs FORK_REFS), each with its known-broken list derived from the fixes' commits -
   # ancestors, or picked onto the fork (scripts/resolve-refs.mjs)
   refs:

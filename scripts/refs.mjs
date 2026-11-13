@@ -29,7 +29,7 @@ export const FORK_RELEASE_TAG = /^v\d+\.\d+\.\d+$/;
  *   - `{kind: 'branch', label, repo, ref}`: the head of a branch, labelled `label` (`resolve-refs.mjs --fork`).
  * The differential compares each with the run's upstream release tag.
  *
- * openccu-lite builds its daemons from the fork hobbyquaker/OpenCCU-Base: the branch `lite` is OpenCCU-Base's release
+ * openccu-lite builds its daemons from the fork openccu-lite/OpenCCU-Base: the branch `lite` is OpenCCU-Base's release
  * plus upstream fixes picked onto it (`git cherry-pick -x`) and fixes that are not upstream yet (pull request
  * candidates, test/metadata.js FINDINGS `fork`); every openccu-lite build round tags the commit it builds with its
  * version. The report shows the newest openccu-lite release (`v1.0.0`: what users run) and the newest tag of all,
@@ -121,7 +121,7 @@ export function parseRefSpec(spec, upstream = UPSTREAM_REPO) {
 
 /**
  * How the report shows a ref (the maintainer's two header rows): grouped by repository and branch -
- * `OpenCCU/OpenCCU-Base/main` above upstream's release tag and main's head, `hobbyquaker/OpenCCU-Base/lite` above the
+ * `OpenCCU/OpenCCU-Base/main` above upstream's release tag and main's head, `openccu-lite/OpenCCU-Base/lite` above the
  * fork's openccu-lite release and pre-release tags (a fork branch from --fork: its head) - and named within the group by
  * the tag (without the `v`) or `head`.
  * @returns {{group: string, groupUrl: string, name: string}} group '' for a ref outside both repositories
@@ -158,7 +158,7 @@ export function statusWord(status, label, forks = FORK_REFS) {
     return status === 'todo' && isTagRef(label, forks) ? 'known' : status;
 }
 
-/** A ref as one line of text: "<group> <name>", e.g. "hobbyquaker/OpenCCU-Base/lite 1.0.0-beta.2". */
+/** A ref as one line of text: "<group> <name>", e.g. "openccu-lite/OpenCCU-Base/lite 1.0.0-beta.2". */
 export function refText(label, forks = FORK_REFS) {
     const d = refDisplay(label, forks);
     return d.group ? `${d.group} ${d.name}` : d.name;
