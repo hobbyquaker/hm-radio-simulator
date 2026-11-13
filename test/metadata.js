@@ -16,7 +16,7 @@ const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
 /** The fork that carries fixes before they are upstream (openccu-lite builds from its branch lite and tags each build). */
 export const FORK_REPO = 'https://github.com/openccu-lite/OpenCCU-Base.git';
 const FORK = FORK_REPO.replace(/\.git$/, '');
-const UPSTREAM_REPORTS = 'https://github.com/hobbyquaker/hm-radio-simulator/blob/main/upstream-reports';
+const UPSTREAM_REPORTS = 'https://github.com/openccu-lite/hm-radio-simulator/blob/main/upstream-reports';
 
 /**
  * The OpenCCU-Base pull requests the regression tests pin, with their merge commits (from the GitHub API). Every entry

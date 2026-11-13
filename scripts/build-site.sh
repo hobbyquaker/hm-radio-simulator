@@ -11,7 +11,7 @@
 #
 # Usage: scripts/build-site.sh <artifacts dir> <proofs dir> <out dir> [<trigger>]
 #   env: GITHUB_SHA, GITHUB_REF_NAME, GITHUB_RUN_ID, GITHUB_SERVER_URL, GITHUB_REPOSITORY (as in GitHub Actions);
-#        SITE (default https://hobbyquaker.github.io/hm-radio-simulator); SUMMARY, a file the proof's and the
+#        SITE (default https://openccu-lite.github.io/hm-radio-simulator); SUMMARY, a file the proof's and the
 #        report's Markdown summaries are appended to (default none)
 #
 set -euo pipefail
@@ -20,7 +20,7 @@ ARTIFACTS=${1:?usage: $0 <artifacts dir> <proofs dir> <out dir> [<trigger>]}
 PROOFS=${2:?missing proofs dir}
 OUT=${3:?missing out dir}
 TRIGGER=${4:-}
-SITE=${SITE:-https://hobbyquaker.github.io/hm-radio-simulator}
+SITE=${SITE:-https://openccu-lite.github.io/hm-radio-simulator}
 SUMMARY=${SUMMARY:-}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 WORK=$(mktemp -d)

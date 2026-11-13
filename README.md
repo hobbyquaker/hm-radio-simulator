@@ -2,8 +2,8 @@
 
 [:uk: English README](README.en.md)
 
-[![CI](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/hobbyquaker/hm-radio-simulator/actions/workflows/ci.yml)
-[![Testbericht](https://img.shields.io/badge/Testbericht-GitHub%20Pages-2ea44f)](https://hobbyquaker.github.io/hm-radio-simulator/)
+[![CI](https://github.com/openccu-lite/hm-radio-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/openccu-lite/hm-radio-simulator/actions/workflows/ci.yml)
+[![Testbericht](https://img.shields.io/badge/Testbericht-GitHub%20Pages-2ea44f)](https://openccu-lite.github.io/hm-radio-simulator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 hm-radio-simulator ist ein simuliertes Homematic-Funkmodul und eine Testsuite für die Funk-Daemons der CCU:
@@ -400,14 +400,14 @@ Kerneln mit 32 Bit `mmap`-Randomisierung beim Start ab, was wie ein sporadischer
 aussieht; LLVM 19 und GCC 14 aus trixie haben das Problem nicht.
 
 Die Ergebnisse landen in `results/<variante>/` (JUnit, Logs der Daemons, Sanitizer-Berichte), Fuzzing-Funde in
-`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [openccu-lite/OpenCCU-Base](https://github.com/openccu-lite/OpenCCU-Base) das neueste openccu-lite-Release-Tag (`vX.Y.Z`, ohne `-dev`, `-beta` oder `-rc`; heute `v1.0.0`) und das neueste Tag einschließlich der Vorabversionen (heute `v1.1.0-dev.6`; nur solange es neuer ist als das Release). Aus dem Zweig `lite` des Forks baut [openccu-lite](https://github.com/hobbyquaker/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests; seit #255 ist keiner mehr offen); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was das openccu-lite-Release der Nutzer und die Vorabversion im Test beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
+`results/fuzz/artifacts/`. Die CI (`.github/workflows/ci.yml`) testet vier OpenCCU-Base-Stände nebeneinander, je zwei aus zwei Repositories: aus [OpenCCU/OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base) das neueste Release-Tag (heute `3.89.11`) und den aktuellen Stand von `main`; aus dem Fork [openccu-lite/OpenCCU-Base](https://github.com/openccu-lite/OpenCCU-Base) das neueste openccu-lite-Release-Tag (`vX.Y.Z`, ohne `-dev`, `-beta` oder `-rc`; heute `v1.0.0`) und das neueste Tag einschließlich der Vorabversionen (heute `v1.1.0-dev.6`; nur solange es neuer ist als das Release). Aus dem Zweig `lite` des Forks baut [openccu-lite](https://github.com/openccu-lite/openccu-lite) seine Daemons: das Release-Tag mit Upstream-Fixes, die per `git cherry-pick -x` übernommen sind, und mit eigenen Fixes, die upstream noch fehlen (Kandidaten für Pull Requests; seit #255 ist keiner mehr offen); jeder openccu-lite-Build markiert seinen Stand mit einem Tag seiner Version. So zeigt der Bericht, was das openccu-lite-Release der Nutzer und die Vorabversion im Test beheben und upstream noch nicht. Die Stände werden bei jedem Lauf neu bestimmt
 (`scripts/resolve-refs.mjs`: upstream Tags der Form `X.Y.Z`, im Fork Tags der Form `vX.Y.Z[-…]`, je nach Version sortiert; die Kopien der Upstream-Tags im Fork zählen nicht); ein neues Tag ersetzt das bisherige, `main` zählt mit seinem neuesten Commit. Jede Version läuft in den Varianten normal, ASan und coverage, und jeder Fuzzer läuft 60 s gegen jede.
 
 ## Testbericht
 
 Jeder CI-Lauf schreibt eine Markdown-Übersicht in seine Zusammenfassung auf GitHub (je Job, und für den ganzen Lauf im
 Job "test report"). Der Lauf auf `main` veröffentlicht dazu einen HTML-Bericht auf GitHub Pages:
-**<https://hobbyquaker.github.io/hm-radio-simulator/>** - die vier OpenCCU-Base-Stände nebeneinander, in zwei Kopfzeilen: oben Repository und Zweig, `OpenCCU/OpenCCU-Base/main` und `openccu-lite/OpenCCU-Base/lite`, darunter upstream das neueste Tag und `head`, beim Fork das Release- und das Vorab-Tag, also `3.89.11` | `head` | `1.0.0` | `1.1.0-dev.6` (je mit verlinktem Commit; die Commits des Forks im Fork; die Trendkarten und der Vergleich gruppieren genauso), dazu die Fuzzing-Läufe und ein Verlauf der letzten 20 Läufe
+**<https://openccu-lite.github.io/hm-radio-simulator/>** - die vier OpenCCU-Base-Stände nebeneinander, in zwei Kopfzeilen: oben Repository und Zweig, `OpenCCU/OpenCCU-Base/main` und `openccu-lite/OpenCCU-Base/lite`, darunter upstream das neueste Tag und `head`, beim Fork das Release- und das Vorab-Tag, also `3.89.11` | `head` | `1.0.0` | `1.1.0-dev.6` (je mit verlinktem Commit; die Commits des Forks im Fork; die Trendkarten und der Vergleich gruppieren genauso), dazu die Fuzzing-Läufe und ein Verlauf der letzten 20 Läufe
 (`runs/<id>/`). Je Version gibt es **eine** Ergebnisspalte: Stimmen die Varianten (normal, ASan, coverage) überein,
 steht dort ihr gemeinsames Ergebnis; weichen sie ab, das schlechteste mit einem kleinen Chip für die Variante (`A`
 ASan, `C` coverage, `R` normal), Tooltip und Aufklappbereich zeigen jede Variante. Die coverage-Variante zählt nur, wo

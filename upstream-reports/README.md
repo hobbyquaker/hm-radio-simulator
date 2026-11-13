@@ -2,7 +2,7 @@
 
 Funde in den Daemons von [OpenCCU-Base](https://github.com/OpenCCU/OpenCCU-Base), die diese Suite gemacht hat, als
 Entwürfe für Issues dort. 001-019 sind am 2026-10-11 als OpenCCU-Base #161-#179 gemeldet, 020 am 2026-10-13 als #185; 021-026 sind
-Entwürfe; ob und wann ein neuer Entwurf als Issue aufgemacht wird, entscheidet der Maintainer. Der [Testbericht](https://hobbyquaker.github.io/hm-radio-simulator/) und das README verlinken
+Entwürfe; ob und wann ein neuer Entwurf als Issue aufgemacht wird, entscheidet der Maintainer. Der [Testbericht](https://openccu-lite.github.io/hm-radio-simulator/) und das README verlinken
 die Entwürfe hier, wo sie früher auf den Abschnitt mit den Funden im README zeigten.
 
 Eine Datei je Fund, `NNN-<kurzname>.md`, auf Englisch (so, wie ein Issue in OpenCCU-Base geschrieben würde), mit

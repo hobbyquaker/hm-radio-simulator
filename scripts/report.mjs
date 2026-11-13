@@ -38,7 +38,7 @@ import {readSweep, buildDifferential, DIFF_LIST_LIMIT} from './differential.mjs'
 import {compareRefs, commitUrl, forkOf, refDisplay, refText, statusWord, FORK_REFS, RELEASE_TAG} from './refs.mjs';
 import {proofForTest} from './prove.mjs';
 
-const REPO = 'https://github.com/hobbyquaker/hm-radio-simulator';
+const REPO = 'https://github.com/openccu-lite/hm-radio-simulator';
 const BASE = 'https://github.com/OpenCCU/OpenCCU-Base';
 /** A commit of a report column, linked in the repository the column was built from (a fork branch: the fork). */
 const refCommit = (ref, sha) => commitUrl(ref, sha);

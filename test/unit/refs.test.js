@@ -141,7 +141,10 @@ test("the report's names: repository and branch above, the tag without its v or 
         'an old label as it is',
     );
     assert.equal(refPairText('3.89.11', 'main'), 'OpenCCU/OpenCCU-Base/main: 3.89.11 → head');
-    assert.equal(refPairText('lite@v1.0.0', 'lite@v1.1.0-dev.5'), 'openccu-lite/OpenCCU-Base/lite: 1.0.0 → 1.1.0-dev.5');
+    assert.equal(
+        refPairText('lite@v1.0.0', 'lite@v1.1.0-dev.5'),
+        'openccu-lite/OpenCCU-Base/lite: 1.0.0 → 1.1.0-dev.5',
+    );
     assert.equal(
         refPairText('lite@v1.0.0-beta.2', 'lite', WITH_BRANCH),
         'openccu-lite/OpenCCU-Base/lite: 1.0.0-beta.2 → head',

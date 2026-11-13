@@ -330,7 +330,7 @@ jobs:
           name: test-report
           path: site
 
-  # GitHub Pages (source "GitHub Actions"): https://hobbyquaker.github.io/hm-radio-simulator/
+  # GitHub Pages (source "GitHub Actions"): https://openccu-lite.github.io/hm-radio-simulator/
   # Fetching the published history, building the site and deploying it are one job in one concurrency group, so
   # overlapping runs (a push and the upstream watch) publish one after another and each adds its entry to the history
   # the previous one published (B-2). GitHub keeps at most one run waiting per group: a third run that arrives while
